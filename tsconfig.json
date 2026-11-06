@@ -26,5 +26,6 @@
     "server/src/**/*",
     "shared/src/**/*",
     "tests/**/*"
-  ]
+  ],
+  "exclude": ["build"]
 }

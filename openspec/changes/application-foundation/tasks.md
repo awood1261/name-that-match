@@ -46,15 +46,15 @@
 - [x] Capture explicit acceptance for startup behavior in both development and production flows.
 
 ### 9. Document development and production workflows
-- [ ] Define a development startup path using the local data directory.
-- [ ] Define a production startup path for filming or local presentation use.
-- [ ] Document Studio and Road mode expectations without implementing those flows.
-- [ ] Include instructions for safe backup and portability of the local data directory.
+- [x] Define a development startup path using the local data directory.
+- [x] Define a production startup path for filming or local presentation use.
+- [x] Document Studio and Road mode expectations without implementing those flows.
+- [x] Include instructions for safe backup and portability of the local data directory.
 
 ### 10. Validate the foundation change
 - [x] Run the OpenSpec validation workflow.
 - [x] Confirm the architecture remains minimal, testable, and scoped to the foundation only.
-- [ ] Confirm implementation is ready to proceed only after review and approval of the specification.
+- [x] Confirm implementation is ready to proceed only after review and approval of the specification.
 
 ## Completion criteria
 

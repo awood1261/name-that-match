@@ -24,6 +24,27 @@ data/
 
 The storage layer is intentionally scoped to foundation setup and does not create match or screenshot schema tables yet.
 
+## Development and production behavior
+
+- Development mode uses the configured data directory for the local app server.
+- Production mode also resolves the same data root so restarts do not wipe existing storage.
+- The SQLite database file is retained across restarts unless the directory is intentionally replaced.
+- The screenshot directory is preserved as long as the configured data root remains unchanged.
+
+## Networking and security notes
+
+The default host is `127.0.0.1`, which keeps the app local-only by default. To expose it to a Wi‑Fi network intentionally, set:
+
+```bash
+NAME_THAT_MATCH_HOST=0.0.0.0 npm run prod
+```
+
+This should only be used in a trusted local network. Exposing the local server to a Wi‑Fi network increases the attack surface and should not be treated as a remote management endpoint.
+
+## Backup
+
+Always back up the SQLite file and the screenshot folder together to preserve the full local dataset. A consistent backup routine is required before future metadata or import workflows are introduced.
+
 ## Notes
 
 - The application data directory must remain writable by the current user.

@@ -7,6 +7,7 @@ import {
   initializeStorage,
   resolveDataDirectory,
 } from '../../server/src/storage';
+import { getConfiguredHost, getConfiguredPort } from '../../server/src/index';
 
 describe('storage configuration and initialization', () => {
   const createdPaths: string[] = [];
@@ -20,6 +21,8 @@ describe('storage configuration and initialization', () => {
 
     createdPaths.length = 0;
     delete process.env.NAME_THAT_MATCH_DATA_DIR;
+    delete process.env.NAME_THAT_MATCH_HOST;
+    delete process.env.NAME_THAT_MATCH_PORT;
   });
 
   function createTempDirectory() {
@@ -33,6 +36,14 @@ describe('storage configuration and initialization', () => {
     process.env.NAME_THAT_MATCH_DATA_DIR = expected;
 
     expect(resolveDataDirectory()).toBe(expected);
+  });
+
+  it('resolves the configured host and port for local network binding', () => {
+    process.env.NAME_THAT_MATCH_HOST = '0.0.0.0';
+    process.env.NAME_THAT_MATCH_PORT = '4200';
+
+    expect(getConfiguredHost()).toBe('0.0.0.0');
+    expect(getConfiguredPort()).toBe(4200);
   });
 
   it('initializes a SQLite database and screenshot directory without creating feature tables', () => {
