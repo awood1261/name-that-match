@@ -1,0 +1,99 @@
+.appShell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at top, rgba(116, 81, 255, 0.25), transparent 35%),
+    linear-gradient(180deg, #090b13 0%, #17182b 100%);
+  color: #f5f7ff;
+}
+
+.stage {
+  width: min(100%, 720px);
+  border: 1px solid rgba(145, 120, 255, 0.7);
+  background: rgba(14, 18, 33, 0.9);
+  box-shadow: 0 0 0 1px rgba(248, 220, 82, 0.32), 0 24px 64px rgba(6, 8, 18, 0.8);
+  border-radius: 24px;
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.kicker {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #f8dc52;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 7vw, 4rem);
+  line-height: 1;
+}
+
+.statusPanel {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(8, 12, 22, 0.8);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+}
+
+.label {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #aeb9e8;
+}
+
+.status {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #dfe6ff;
+}
+
+.statusConnected {
+  margin: 0;
+  color: #7ef0b4;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.statusOffline {
+  margin: 0;
+  color: #ff8f8f;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.meta {
+  margin: 0;
+  color: #bdc9ee;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 480px) {
+  .appShell {
+    padding: 1rem;
+  }
+
+  .stage {
+    padding: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .statusPanel {
+    transition: none;
+  }
+}
