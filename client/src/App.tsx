@@ -8,6 +8,8 @@ const EMPTY_HEALTH: HealthResponse = {
   timestamp: new Date().toISOString(),
 };
 
+const navItems = ['Play', 'Image Library', 'Game Settings', 'System'];
+
 function App() {
   const [health, setHealth] = useState<HealthResponse>(EMPTY_HEALTH);
   const [connected, setConnected] = useState(false);
@@ -39,27 +41,60 @@ function App() {
 
   return (
     <main className={styles.appShell}>
-      <section className={styles.stage} aria-live="polite">
-        <header className={styles.header}>
-          <span className={styles.kicker}>Local foundation</span>
-          <h1>Name That Match</h1>
-        </header>
-
-        <div className={styles.statusPanel}>
-          <p className={styles.label}>Local server</p>
-          {loading ? (
-            <p className={styles.status}>Checking connection…</p>
-          ) : connected ? (
-            <p className={styles.statusConnected}>Connected</p>
-          ) : (
-            <p className={styles.statusOffline}>Server unavailable</p>
-          )}
-          <p className={styles.meta}>
-            {connected
-              ? `${health.service} • ${new Date(health.timestamp).toLocaleTimeString()}`
-              : 'Waiting for the local Node server to respond.'}
-          </p>
+      <header className={styles.topBar}>
+        <div className={styles.brandBlock}>
+          <span className={styles.brandFrame} aria-hidden="true" />
+          <div className={styles.brandCopy}>
+            <h1 className={styles.brand}>Name That <span>Match</span></h1>
+            <p className={styles.tagline}>THE WRESTLING GUESSING GAME</p>
+          </div>
         </div>
+
+        <nav className={styles.nav} aria-label="Primary navigation">
+          {navItems.map((item) => (
+            <button key={item} type="button" className={styles.navButton}>
+              {item}
+            </button>
+          ))}
+        </nav>
+
+        <div className={styles.statusBadge} aria-live="polite">
+          <span className={connected ? styles.statusDotOnline : styles.statusDotOffline} aria-hidden="true" />
+          <span>{connected ? 'Local ready' : 'Offline'}</span>
+        </div>
+      </header>
+
+      <section className={styles.panel} aria-live="polite">
+        <div className={styles.panelHeader}>
+          <p className={styles.kicker}>Local server</p>
+          <h2>System status</h2>
+        </div>
+
+        <div className={styles.statusGrid}>
+          <div className={styles.statusCard}>
+            <span className={styles.label}>Connection</span>
+            {loading ? (
+              <strong className={styles.statusValue}>Checking…</strong>
+            ) : connected ? (
+              <strong className={styles.statusValueOnline}>Connected</strong>
+            ) : (
+              <strong className={styles.statusValueOffline}>Server unavailable</strong>
+            )}
+          </div>
+
+          <div className={styles.statusCard}>
+            <span className={styles.label}>Runtime</span>
+            <strong className={styles.statusValue}>
+              {connected ? health.service : 'Awaiting response'}
+            </strong>
+          </div>
+        </div>
+
+        <p className={styles.meta}>
+          {connected
+            ? `Last heartbeat: ${new Date(health.timestamp).toLocaleTimeString()}`
+            : 'Waiting for the local Node server to respond before the shell can finish booting.'}
+        </p>
       </section>
     </main>
   );
