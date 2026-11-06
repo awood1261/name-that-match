@@ -41,9 +41,21 @@ NAME_THAT_MATCH_HOST=0.0.0.0 npm run prod
 
 This should only be used in a trusted local network. Exposing the local server to a Wi‑Fi network increases the attack surface and should not be treated as a remote management endpoint.
 
-## Backup
+## Backup and restore
 
-Always back up the SQLite file and the screenshot folder together to preserve the full local dataset. A consistent backup routine is required before future metadata or import workflows are introduced.
+The database uses SQLite WAL mode. Committed data can still reside in `library.sqlite-wal` rather than the main file. Copying a live `library.sqlite` alone can lose data or produce an inconsistent backup. Database transactions also do not make screenshot-file copies atomic.
+
+This manual procedure requires downtime; there is no automated or live backup utility.
+
+1. Identify the actual configured data root. Stop all app instances, development watchers that might restart the server, external SQLite tools, and any screenshot writers. Confirm that all database connections are closed and no process can change the dataset until copying and verification finish. If you cannot establish that condition, do not use a raw filesystem copy.
+2. Copy the **entire unchanged data root** to a new destination outside the source root, preserving relative paths and filenames. Include `library.sqlite`, `screenshots/`, and any remaining `library.sqlite-wal`, `library.sqlite-shm`, or journal files. A clean last connection close normally checkpoints WAL, but never manually delete remaining sidecars or separate them from their matching database.
+3. Treat an interrupted copy as incomplete. Keep the original and the previous known-good backup. Compare the file inventory and file checksums between the still-unchanged source and destination before marking the backup complete. Keep writers stopped until verification finishes.
+4. To restore, keep writers stopped and copy the complete backup to a **separate, empty, writable data root**. Do not overwrite an active dataset or merge with stale destination sidecars. Keep the original and backup unchanged. Open the restored database with a SQLite tool so it can recover preserved WAL content, and run `PRAGMA integrity_check;`; the expected result is `ok`. Check screenshot inventory/checksums against the backup and confirm relative paths still resolve.
+5. Start the application using `NAME_THAT_MATCH_DATA_DIR` pointed at the restored root. Verify startup and the expected local dataset before adopting it. Verification can create sidecars in the restored root; do not run it against the backup itself. If verification fails, retain the original and investigate rather than replacing it with the failed restore.
+
+SQLite integrity checks do not prove screenshot completeness. Future live backups require a SQLite-supported snapshot method plus coordination of asset writes, separately specified and approved.
+
+Technical references: [SQLite backup safety](https://sqlite.org/howtocorrupt.html#backup_or_restore_while_a_transaction_is_active) and [SQLite WAL files](https://sqlite.org/wal.html#the_wal_file).
 
 ## Notes
 

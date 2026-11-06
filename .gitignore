@@ -7,3 +7,18 @@ data/
 .env.*
 npm-debug.log*
 .DS_Store
+
+# Compiler output and local SQLite datasets (including configured overrides)
+/build/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
+*.db
+*.db-wal
+*.db-shm
+*.db-journal

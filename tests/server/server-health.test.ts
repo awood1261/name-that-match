@@ -1,48 +1,32 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer } from '../../server/src/index';
+import { createTestResources, listen } from '../helpers/resources';
 
 describe('server health endpoint', () => {
-  let server: ReturnType<typeof createServer>;
-  const port = 3456;
+  let resources: ReturnType<typeof createTestResources>;
+  let baseUrl: string;
 
   beforeEach(async () => {
-    server = createServer(port);
-    await new Promise<void>((resolve) => {
-      server.listen(port, '127.0.0.1', () => resolve());
-    });
+    resources = createTestResources();
+    const server = resources.server(createServer(0, { dataDir: resources.root }));
+    baseUrl = await listen(server);
   });
 
   afterEach(async () => {
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve();
-      });
-    });
+    try {
+      await resources.cleanup();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    }
   });
 
-  it('returns a valid health payload at /health', async () => {
-    const response = await fetch(`http://127.0.0.1:${port}/health`);
+  it.each(['/health', '/api/health'])('returns the existing health payload at %s', async (endpoint) => {
+    const response = await fetch(`${baseUrl}${endpoint}`);
     expect(response.status).toBe(200);
-
-    const payload = await response.json();
-    expect(payload).toMatchObject({
-      status: 'ok',
-      service: 'name-that-match-server',
+    expect(response.headers.get('content-type')).toContain('application/json');
+    expect(await response.json()).toMatchObject({
+      status: 'ok', service: 'name-that-match-server', timestamp: expect.any(String),
     });
-    expect(typeof payload.timestamp).toBe('string');
-  });
-
-  it('returns a valid health payload at /api/health', async () => {
-    const response = await fetch(`http://127.0.0.1:${port}/api/health`);
-    expect(response.status).toBe(200);
-
-    const payload = await response.json();
-    expect(payload.status).toBe('ok');
-    expect(payload.service).toBe('name-that-match-server');
   });
 });

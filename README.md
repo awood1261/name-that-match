@@ -89,8 +89,11 @@ npm test
 npm run typecheck
 npm run lint
 npm run build
-npx openspec validate application-foundation --type change
+openspec validate application-foundation --type spec --strict
+openspec validate foundation-hardening --type change --strict
 ```
+
+The first OpenSpec command validates the current capability; the second validates the active hardening change. Use the installed OpenSpec CLI. See [foundation review](docs/foundation-review.md) for historical discrepancies, design references, and verification limits.
 
 ## Troubleshooting
 
@@ -101,4 +104,4 @@ npx openspec validate application-foundation --type change
 
 ## Backup considerations
 
-Back up the SQLite file and the screenshot directory together to preserve the local data set. A consistent database backup strategy is required before any future screenshot imports or metadata changes are introduced.
+Follow the [stopped-writer backup and restore procedure](docs/local-storage.md#backup-and-restore). It preserves the complete SQLite WAL dataset and screenshots together. Copying a live `library.sqlite` file alone is not a complete backup. No automated or live backup utility is provided.

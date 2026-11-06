@@ -116,6 +116,13 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
     options.production ?? (process.argv.includes('--production') || process.env.NODE_ENV === 'production'),
   );
   const storage = initializeStorage(options);
+  let storageReleased = false;
+  const releaseStorage = () => {
+    if (!storageReleased) {
+      storageReleased = true;
+      closeStorage(storage);
+    }
+  };
   const staticDir = options.staticDir ?? (productionMode ? path.resolve(process.cwd(), 'dist') : undefined);
 
   const server = http.createServer((req, res) => {
@@ -149,7 +156,9 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
   });
 
   server.on('listening', () => {
-    console.log(`Name That Match server listening on http://${resolvedHost}:${resolvedPort}`);
+    const address = server.address();
+    const boundPort = address && typeof address !== 'string' ? address.port : resolvedPort;
+    console.log(`Name That Match server listening on http://${resolvedHost}:${boundPort}`);
     console.log(`Storage initialized at ${storage.rootDir}`);
     if (productionMode) {
       console.log(`Production static assets served from ${staticDir}`);
@@ -157,23 +166,43 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
   });
 
   server.on('error', (error) => {
-    closeStorage(storage);
-    console.error('Server error:', error);
+    releaseStorage();
+    // Startup callers receive the error; report errors without a startup listener here.
+    if (server.listenerCount('error') === 1) console.error('Server error:', error);
   });
 
   server.on('close', () => {
-    closeStorage(storage);
+    releaseStorage();
   });
 
   return server;
 }
 
 export function startServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
-  return new Promise<http.Server>((resolve) => {
+  return new Promise<http.Server>((resolve, reject) => {
     const server = createServer(port, options);
     const resolvedHost = getConfiguredHost(options.host);
     const resolvedPort = getConfiguredPort(port ?? options.port);
-    server.listen(resolvedPort, resolvedHost, () => resolve(server));
+    const removeStartupListeners = () => {
+      server.off('error', onError);
+      server.off('listening', onListening);
+    };
+    const onError = (error: Error) => {
+      removeStartupListeners();
+      reject(error);
+    };
+    const onListening = () => {
+      removeStartupListeners();
+      resolve(server);
+    };
+    server.once('error', onError);
+    server.once('listening', onListening);
+    try {
+      server.listen(resolvedPort, resolvedHost);
+    } catch (error) {
+      // Use the same release and rejection path for synchronous listen errors.
+      server.emit('error', error);
+    }
   });
 }
 
@@ -185,6 +214,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   void startServer(port, {
     host,
     production: productionMode,
+  }).catch((error: unknown) => {
+    console.error('Unable to start Name That Match server:', error);
+    process.exitCode = 1;
   });
 }
 

@@ -75,9 +75,18 @@ export function initializeStorage(options: StorageOptions = {}): StorageSession 
     readonly: false,
   });
 
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
-  db.pragma('foreign_keys = ON');
+  try {
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('foreign_keys = ON');
+  } catch (error) {
+    try {
+      db.close();
+    } catch (closeError) {
+      console.error('Failed to close partially initialized SQLite connection:', closeError);
+    }
+    throw error;
+  }
 
   return {
     rootDir,
@@ -88,7 +97,7 @@ export function initializeStorage(options: StorageOptions = {}): StorageSession 
 }
 
 export function closeStorage(session?: StorageSession): void {
-  if (!session) {
+  if (!session || !session.db.open) {
     return;
   }
 

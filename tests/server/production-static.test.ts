@@ -1,62 +1,39 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createServer } from '../../server/src/index';
+import { createTestResources, listen } from '../helpers/resources';
 
 describe('production static serving', () => {
-  let tempRoot = '';
-  let server: ReturnType<typeof createServer> | undefined;
+  let resources: ReturnType<typeof createTestResources>;
+  let baseUrl: string;
 
-  beforeEach(() => {
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ntm-prod-'));
-    const distDir = path.join(tempRoot, 'dist');
-    fs.mkdirSync(distDir, { recursive: true });
-    fs.writeFileSync(path.join(distDir, 'index.html'), '<!doctype html><html><body><h1>Production shell</h1></body></html>');
+  beforeEach(async () => {
+    resources = createTestResources();
+    const distDir = path.join(resources.root, 'dist');
+    fs.mkdirSync(distDir);
+    fs.writeFileSync(path.join(distDir, 'index.html'), '<!doctype html><h1>Production shell</h1>');
     fs.writeFileSync(path.join(distDir, 'asset.js'), 'console.log("asset");');
+    const server = resources.server(createServer(0, {
+      production: true, staticDir: distDir, host: '127.0.0.1',
+      dataDir: path.join(resources.root, 'data'),
+    }));
+    baseUrl = await listen(server);
   });
 
-  afterEach(async () => {
-    const activeServer = server;
+  afterEach(async () => { await resources.cleanup(); });
 
-    if (activeServer) {
-      await new Promise<void>((resolve, reject) => {
-        activeServer.close((error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-
-          resolve();
-        });
-      });
-    }
-
-    server = undefined;
-
-    if (tempRoot) {
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
-  });
-
-  it('serves the built app and health endpoint from the same origin', async () => {
-    server = createServer(3567, {
-      production: true,
-      staticDir: path.join(tempRoot, 'dist'),
-      host: '127.0.0.1',
-      dataDir: path.join(tempRoot, 'data'),
-    });
-
-    await new Promise<void>((resolve) => {
-      server!.listen(3567, '127.0.0.1', () => resolve());
-    });
-
-    const rootResponse = await fetch('http://127.0.0.1:3567/');
-    expect(rootResponse.status).toBe(200);
-    expect(await rootResponse.text()).toContain('Production shell');
-
-    const healthResponse = await fetch('http://127.0.0.1:3567/api/health');
-    expect(healthResponse.status).toBe(200);
-    expect(await healthResponse.json()).toMatchObject({ status: 'ok' });
+  it('serves HTML, JavaScript, and health at one origin', async () => {
+    const root = await fetch(`${baseUrl}/`);
+    expect(root.status).toBe(200);
+    expect(root.headers.get('content-type')).toContain('text/html');
+    expect(await root.text()).toContain('Production shell');
+    const asset = await fetch(`${baseUrl}/asset.js`);
+    expect(asset.status).toBe(200);
+    expect(asset.headers.get('content-type')).toContain('application/javascript');
+    expect(await asset.text()).toBe('console.log("asset");');
+    const health = await fetch(`${baseUrl}/api/health`);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toMatchObject({ status: 'ok' });
   });
 });

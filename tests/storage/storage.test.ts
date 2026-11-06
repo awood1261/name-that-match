@@ -1,46 +1,46 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  closeStorage,
   initializeStorage,
   resolveDataDirectory,
 } from '../../server/src/storage';
+import { createTestResources } from '../helpers/resources';
 import { getConfiguredHost, getConfiguredPort } from '../../server/src/index';
 
 describe('storage configuration and initialization', () => {
-  const createdPaths: string[] = [];
-
-  afterEach(() => {
-    for (const item of createdPaths) {
-      if (fs.existsSync(item)) {
-        fs.rmSync(item, { recursive: true, force: true });
-      }
-    }
-
-    createdPaths.length = 0;
-    delete process.env.NAME_THAT_MATCH_DATA_DIR;
-    delete process.env.NAME_THAT_MATCH_HOST;
-    delete process.env.NAME_THAT_MATCH_PORT;
+  let resources: ReturnType<typeof createTestResources>;
+  beforeEach(() => { resources = createTestResources(); });
+  afterEach(async () => {
+    try { await resources.cleanup(); }
+    finally { vi.unstubAllEnvs(); }
   });
-
   function createTempDirectory() {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ntm-storage-'));
-    createdPaths.push(dir);
-    return dir;
+    return fs.mkdtempSync(path.join(resources.root, 'storage-'));
+  }
+  function openStorage(dataDir: string) {
+    return resources.storage(initializeStorage({ dataDir }));
   }
 
   it('resolves the configured data directory from the environment override', () => {
     const expected = createTempDirectory();
-    process.env.NAME_THAT_MATCH_DATA_DIR = expected;
+    vi.stubEnv('NAME_THAT_MATCH_DATA_DIR', expected);
 
     expect(resolveDataDirectory()).toBe(expected);
   });
 
+  it('preserves host/port defaults and explicit port zero', () => {
+    vi.stubEnv('NAME_THAT_MATCH_HOST', undefined);
+    vi.stubEnv('NAME_THAT_MATCH_PORT', undefined);
+    vi.stubEnv('PORT', undefined);
+    expect(getConfiguredHost()).toBe('127.0.0.1');
+    expect(getConfiguredPort()).toBe(3001);
+    expect(getConfiguredPort(0)).toBe(0);
+  });
+
   it('resolves the configured host and port for local network binding', () => {
-    process.env.NAME_THAT_MATCH_HOST = '0.0.0.0';
-    process.env.NAME_THAT_MATCH_PORT = '4200';
+    vi.stubEnv('NAME_THAT_MATCH_HOST', '0.0.0.0');
+    vi.stubEnv('NAME_THAT_MATCH_PORT', '4200');
 
     expect(getConfiguredHost()).toBe('0.0.0.0');
     expect(getConfiguredPort()).toBe(4200);
@@ -48,7 +48,7 @@ describe('storage configuration and initialization', () => {
 
   it('initializes a SQLite database and screenshot directory without creating feature tables', () => {
     const root = createTempDirectory();
-    const session = initializeStorage({ dataDir: root });
+    const session = openStorage(root);
 
     expect(fs.existsSync(path.join(root, 'library.sqlite'))).toBe(true);
     expect(fs.existsSync(path.join(root, 'screenshots'))).toBe(true);
@@ -58,16 +58,18 @@ describe('storage configuration and initialization', () => {
       .all() as Array<{ name: string }>;
 
     expect(tables.some((entry) => entry.name === 'matches' || entry.name === 'screenshots')).toBe(false);
-
-    closeStorage(session);
   });
 
-  it('is idempotent when the same data directory is initialized repeatedly', () => {
+  it('is idempotent and closes both sessions before cleanup', async () => {
     const root = createTempDirectory();
-    const first = initializeStorage({ dataDir: root });
-    expect(() => initializeStorage({ dataDir: root })).not.toThrow();
-
-    closeStorage(first);
+    const first = openStorage(root);
+    const second = openStorage(root);
+    expect(first.db.open).toBe(true);
+    expect(second.db.open).toBe(true);
+    await resources.cleanup();
+    expect(first.db.open).toBe(false);
+    expect(second.db.open).toBe(false);
+    expect(fs.existsSync(resources.root)).toBe(false);
   });
 
   it('fails clearly when the storage path is invalid or is not a directory', () => {
