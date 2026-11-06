@@ -90,10 +90,9 @@ npm run typecheck
 npm run lint
 npm run build
 openspec validate application-foundation --type spec --strict
-openspec validate foundation-hardening --type change --strict
 ```
 
-The first OpenSpec command validates the current capability; the second validates the active hardening change. Use the installed OpenSpec CLI. See [foundation review](docs/foundation-review.md) for historical discrepancies, design references, and verification limits.
+The OpenSpec command validates the current capability. For an active change, use `openspec validate <change-name> --type change --strict` with the installed CLI. Foundation hardening is archived; see its [verification record](openspec/changes/archive/2026-11-06-foundation-hardening/verification.md). See [foundation review](docs/foundation-review.md) for historical discrepancies, design references, and verification limits.
 
 ## Troubleshooting
 
