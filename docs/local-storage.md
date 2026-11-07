@@ -17,12 +17,14 @@ This keeps the storage directory predictable for both development and production
 data/
   library.sqlite
   screenshots/
+  staging/
 ```
 
-- `library.sqlite`: SQLite database file for local metadata initialization.
-- `screenshots/`: directory for local screenshot assets and future imports.
+- `library.sqlite`: SQLite metadata, including match, screenshot and durable import tables.
+- `screenshots/`: committed local screenshot assets with generated relative filenames.
+- `staging/`: owned incomplete uploads/imports and retained recovery evidence.
 
-The storage layer is intentionally scoped to foundation setup and does not create match or screenshot schema tables yet.
+Match Library Milestones 1–2 add transactional schema migration and a server-only import engine. See [import engine limits, recovery and staging maintenance](import-engine.md). Import endpoints and UI are not yet implemented.
 
 ## Development and production behavior
 

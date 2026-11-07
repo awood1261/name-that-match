@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "captureId": "sample",
+  "source": {
+    "platform": "youtube",
+    "videoId": "abcdefghijk",
+    "canonicalUrl": "https://www.youtube.com/watch?v=abcdefghijk"
+  },
+  "capture": {
+    "playbackSeconds": 42.25,
+    "capturedAt": "2026-11-06T12:34:56.789Z",
+    "method": "video-frame-capture"
+  },
+  "image": {
+    "filename": "sample.png",
+    "width": 2,
+    "height": 1,
+    "format": "png"
+  },
+  "extensionField": {
+    "retained": true
+  }
+}
