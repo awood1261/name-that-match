@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { BatchStatus, ImportItem, ScreenshotSummary } from '../../shared/src/imports';
 import { ImportDialog } from '../../client/src/library/ImportDialog';
 import { MatchLibraryPage } from '../../client/src/library/MatchLibraryPage';
-import { libraryApi, confirmationId } from '../../client/src/library/api';
+import { libraryApi, matchApi, confirmationId } from '../../client/src/library/api';
 import { scanSelection } from '../../client/src/library/selection';
 import { DEFAULT_IMPORT_LIMITS } from '../../server/src/library/imports/limits';
 const item: ImportItem = { id: '00000000-0000-4000-8000-000000000001', ordinal: 0, candidateLabel: 'video/sample.json', state: 'ready', retryable: false,
@@ -20,6 +20,7 @@ function files(folder = false) {
   return [json, png];
 }
 beforeEach(() => {
+  vi.spyOn(matchApi, 'list').mockResolvedValue({ matches: [], matchedCount: 0, asOf: '' });
   vi.spyOn(libraryApi, 'recent').mockResolvedValue([]);
   vi.spyOn(libraryApi, 'status').mockResolvedValue(batch());
   vi.spyOn(libraryApi, 'create').mockResolvedValue(batch([{ ...item, state: 'awaiting_upload' }], 'uploading'));
@@ -103,6 +104,7 @@ it('traps focus, cancels with Escape semantics, aborts requests, and returns foc
 });
 it('renders loading/empty/error queue states and refreshes after import navigation', async () => {
   render(<MatchLibraryPage />); expect(screen.getByRole('status')).toHaveTextContent('Loading');
+  fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
   await screen.findByText(/No unassigned screenshots yet/);
   vi.mocked(libraryApi.unassigned).mockRejectedValueOnce(new Error('offline'));
   fireEvent.click(screen.getByRole('button', { name: 'Reload screenshots' })); expect(await screen.findByRole('alert')).toHaveTextContent(/local server/);
@@ -116,6 +118,7 @@ it('keeps screenshot geometry, provenance, and unavailable-image feedback in the
   const record = { id: 'saved', provenance: { captureId: 'sample', source: { videoId: 'abcdefghijk' }, capture: { playbackSeconds: 42, capturedAt: '2026-11-06' } },
     image: { width: 476, height: 360, url: '/api/screenshots/saved/image' }, difficulty: null, reviewStatus: 'pending', assetStatus: 'available' } as ScreenshotSummary;
   vi.mocked(libraryApi.unassigned).mockResolvedValue({ screenshots: [record], matchedCount: 1, asOf: '' }); render(<MatchLibraryPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
   const image = await screen.findByRole('img'); expect(image).toHaveAttribute('width', '476'); expect(image).toHaveAttribute('height', '360');
   expect(screen.getByText('Unassigned · unrated · pending')).toBeInTheDocument(); fireEvent.error(image); expect(screen.getByText(/Image unavailable/)).toBeInTheDocument();
 });

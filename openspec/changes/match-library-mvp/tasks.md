@@ -37,13 +37,13 @@ Implementation authorization is per milestone. Every checkbox starts incomplete.
 
 ## 4. Milestone 4 — Match management
 
-- [ ] 4.1 Implement list/create/update match HTTP contracts with runtime validation, expected revisions and atomic invalidation results; verify incomplete drafts, flexible participant text, partial dates, field errors, stale edits and no-op behavior (ML-01, ML-02, ML-05, ML-08, SR-04; D2/D6/D7).
-- [ ] 4.2 Add basic match selection and inspector create/edit form with independent match and screenshot drafts, explicit Save/Cancel, field feedback and unknown labels; verify draft creation/edit/reload without roster/promotion management or source-title inference (ML-02, ML-10; D8).
-- [ ] 4.3 Expose and connect individual screenshot assignment/unassignment/reassignment with target and screenshot revisions; verify moving between matches/queue preserves provenance and enforces approval invalidation, and invalid targets leave data unchanged (ML-04, ML-05, SR-04; D6/D7).
-- [ ] 4.4 Implement basic multi-selection and the all-or-none assignment endpoint/control; verify bounded unique selection, one target, all revision checks, atomic rollback and no bulk difficulty/review actions (ML-04, ML-05, SR-03; D6/D8).
-- [ ] 4.5 Implement Save/Discard/Stay guards for selection, view, in-app navigation and inspector closure, plus supported browser unload prompts; verify independent draft saves, failed-save retention, cancel semantics and no silent draft loss (ML-10; D8).
-- [ ] 4.6 Implement stale-edit presentation with preserved drafts, deliberate reload/reconciliation and no automatic overwrite; test two concurrent editor requests and component conflict flows, including match invalidation changing screenshot revisions (ML-05, ML-10, SR-04; D7/D8).
-- [ ] 4.7 Complete Milestone 4 verification using D9 gates, repository/HTTP/component assignment and editing tests; verify persisted relationships across restart and STOP for review before Milestone 5 (ML-01–ML-05, ML-10, ML-12).
+- [x] 4.1 Implement list/create/update match HTTP contracts with runtime validation, expected revisions and atomic invalidation results; verify incomplete drafts, flexible participant text, partial dates, field errors, stale edits and no-op behavior (ML-01, ML-02, ML-05, ML-08, SR-04; D2/D6/D7).
+- [x] 4.2 Add basic match selection and inspector create/edit form with independent match and screenshot drafts, explicit Save/Cancel, field feedback and unknown labels; verify draft creation/edit/reload without roster/promotion management or source-title inference (ML-02, ML-10; D8).
+- [x] 4.3 Expose and connect individual screenshot assignment/unassignment/reassignment with target and screenshot revisions; verify moving between matches/queue preserves provenance and enforces approval invalidation, and invalid targets leave data unchanged (ML-04, ML-05, SR-04; D6/D7).
+- [x] 4.4 Implement basic multi-selection and the all-or-none assignment endpoint/control; verify bounded unique selection, one target, all revision checks, atomic rollback and no bulk difficulty/review actions (ML-04, ML-05, SR-03; D6/D8).
+- [x] 4.5 Implement Save/Discard/Stay guards for selection, view, in-app navigation and inspector closure, plus supported browser unload prompts; verify independent draft saves, failed-save retention, cancel semantics and no silent draft loss (ML-10; D8).
+- [x] 4.6 Implement stale-edit presentation with preserved drafts, deliberate reload/reconciliation and no automatic overwrite; test two concurrent editor requests and component conflict flows, including match invalidation changing screenshot revisions (ML-05, ML-10, SR-04; D7/D8).
+- [x] 4.7 Complete Milestone 4 verification using D9 gates, repository/HTTP/component assignment and editing tests; verify persisted relationships across restart and STOP for review before Milestone 5 (ML-01–ML-05, ML-10, ML-12).
 
 ## 5. Milestone 5 — Screenshot review
 

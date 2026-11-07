@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isHealthResponse, type HealthResponse } from '../../shared/src/health';
 import styles from './App.module.css';
 import { MatchLibraryPage } from './library/MatchLibraryPage';
+import type { NavigationGuard } from './library/useMatchWorkspace';
 
 const EMPTY_HEALTH: HealthResponse = {
   status: 'ok',
@@ -16,6 +17,8 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('System');
+  const libraryGuard = useRef<NavigationGuard | null>(null);
+  const registerNavigationGuard = useCallback((guard: NavigationGuard | null) => { libraryGuard.current = guard; }, []);
 
   useEffect(() => {
     const fetchHealth = async () => {
@@ -56,7 +59,10 @@ function App() {
           {navItems.map((item) => (
             <button key={item} type="button" className={styles.navButton}
               disabled={item === 'Play' || item === 'Game Settings'}
-              aria-current={view === item ? 'page' : undefined} onClick={() => setView(item)}>
+              aria-current={view === item ? 'page' : undefined} onClick={() => {
+                if (view === 'Image Library' && item !== view && libraryGuard.current) libraryGuard.current(() => setView(item));
+                else setView(item);
+              }}>
               {item}
             </button>
           ))}
@@ -68,7 +74,7 @@ function App() {
         </div>
       </header>
 
-      {view === 'Image Library' ? <MatchLibraryPage /> : <section className={styles.panel} aria-live="polite">
+      {view === 'Image Library' ? <MatchLibraryPage registerNavigationGuard={registerNavigationGuard} /> : <section className={styles.panel} aria-live="polite">
         <div className={styles.panelHeader}>
           <p className={styles.kicker}>Local server</p>
           <h2>System status</h2>

@@ -28,6 +28,11 @@ export function imageBytes(storage: StorageSession, id: string): Buffer {
     `ASSET_${result.status.toUpperCase()}`, `Screenshot image is ${result.status}.`);
   return result.bytes!;
 }
+export function publicScreenshot(storage: StorageSession, record: StoredScreenshot): ScreenshotSummary {
+  const { imagePath, originalMetadataJson, ...publicRecord } = record;
+  void imagePath; void originalMetadataJson;
+  return { ...publicRecord, image: { ...record.image, url: `/api/screenshots/${record.id}/image` }, assetStatus: assessAsset(storage, record).status };
+}
 export function listScreenshots(storage: StorageSession, query: URLSearchParams) {
   const where: string[] = []; const values: string[] = [];
   for (const key of query.keys()) if (!['matchId', 'difficulty', 'review'].includes(key) || query.getAll(key).length !== 1) throw new HttpError(400, 'INVALID_QUERY', 'Unsupported or repeated screenshot query.');
@@ -46,10 +51,7 @@ export function listScreenshots(storage: StorageSession, query: URLSearchParams)
   const rows = storage.db.prepare(`SELECT id FROM screenshots ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY captured_at ASC,id ASC`).all(...values) as Array<{ id: string }>;
   const repository = createLibraryRepository(storage.db);
   const screenshots: ScreenshotSummary[] = rows.map(({ id }) => {
-    const record = repository.getScreenshot(id);
-    const { imagePath, originalMetadataJson, ...publicRecord } = record;
-    void imagePath; void originalMetadataJson;
-    return { ...publicRecord, image: { ...record.image, url: `/api/screenshots/${id}/image` }, assetStatus: assessAsset(storage, record).status };
+    return publicScreenshot(storage, repository.getScreenshot(id));
   });
   return { screenshots, matchedCount: screenshots.length, asOf: new Date().toISOString() };
 }

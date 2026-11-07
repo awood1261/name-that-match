@@ -31,4 +31,4 @@ export interface ScreenshotSummary extends Omit<Screenshot, 'originalMetadataJso
   assetStatus: 'available' | 'missing' | 'corrupt' | 'unavailable';
 }
 export interface ScreenshotList { screenshots: ScreenshotSummary[]; matchedCount: number; asOf: string }
-export interface ApiFailure { code: string; message: string; retryable?: boolean; fieldErrors?: Record<string, string>; currentRevision?: number }
+export interface ApiFailure { code: string; message: string; retryable?: boolean; fieldErrors?: Record<string, string>; currentRevision?: number; currentMatchRevision?: number; itemId?: string }

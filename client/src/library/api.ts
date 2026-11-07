@@ -26,3 +26,15 @@ export const libraryApi = {
   confirm: (id: string, value: ImportConfirmation, signal: AbortSignal) => request<BatchStatus>(`/api/imports/${id}/confirm`, signal, 'POST', value),
   unassigned: (signal: AbortSignal) => request<ScreenshotList>('/api/screenshots?matchId=unassigned', signal),
 };
+
+import type { MatchInput, MatchList, MatchSummary, MatchUpdate } from '../../../shared/src/matches';
+import type { ScreenshotSummary } from '../../../shared/src/imports';
+export const matchApi = {
+  list: (signal: AbortSignal) => request<MatchList>('/api/matches', signal),
+  create: (fields: MatchInput, signal: AbortSignal) => request<MatchSummary>('/api/matches', signal, 'POST', fields),
+  update: (match: MatchSummary, fields: MatchInput, signal: AbortSignal) => request<MatchUpdate>(`/api/matches/${match.id}`, signal, 'PATCH', { expectedRevision: match.revision, changes: fields }),
+  screenshots: (matchId: string | null, signal: AbortSignal) => request<ScreenshotList>(`/api/screenshots${matchId ? `?matchId=${encodeURIComponent(matchId)}` : ''}`, signal),
+  assign: (records: ScreenshotSummary[], target: { id: string; revision: number } | null, signal: AbortSignal) => target
+    ? request<{ screenshots: ScreenshotSummary[] }>('/api/screenshots/assignments', signal, 'POST', { targetMatchId: target.id, expectedMatchRevision: target.revision, screenshots: records.map((item) => ({ id: item.id, expectedRevision: item.revision })) }).then((result) => result.screenshots)
+    : request<ScreenshotSummary>(`/api/screenshots/${records[0].id}`, signal, 'PATCH', { expectedRevision: records[0].revision, changes: { matchId: null } }).then((result) => [result]),
+};

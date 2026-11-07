@@ -6,6 +6,7 @@ import { getImportEngine } from '../imports/engine.js';
 import { knownFields, object, requireId, requireRevision } from '../validation.js';
 import { imageBytes, listScreenshots } from '../assets.js';
 import { body, chunks, errorResponse, HttpError, json, media, mutationPolicy } from './protocol.js';
+import { matchRoutes } from './matches.js';
 
 export function createLibraryHttp(storage: StorageSession, origins: Set<string>) {
   const engine = getImportEngine(storage); const active = new Map<string, Promise<void>>(); const shutdown = new AbortController();
@@ -38,14 +39,20 @@ export function createLibraryHttp(storage: StorageSession, origins: Set<string>)
         const batchRoute = path.match(/^\/api\/imports\/([^/]+)(?:\/(preview|confirm))?$/);
         const uploadRoute = path.match(/^\/api\/imports\/([^/]+)\/items\/([^/]+)\/image$/);
         const imageRoute = path.match(/^\/api\/screenshots\/([^/]+)\/image$/);
+        const matchRoute = /^\/api\/matches\/[^/]+$/.test(path);
+        const assignmentRoute = path === '/api/screenshots/assignments';
+        const screenshotEdit = !assignmentRoute && /^\/api\/screenshots\/[^/]+$/.test(path);
         const methods = path === '/api/imports' ? ['GET', 'POST'] : batchRoute ? batchRoute[2] ? ['POST'] : ['GET']
-          : uploadRoute ? ['PUT'] : imageRoute ? ['GET', 'HEAD'] : path === '/api/screenshots' ? ['GET'] : [];
+          : uploadRoute ? ['PUT'] : imageRoute ? ['GET', 'HEAD'] : path === '/api/screenshots' ? ['GET']
+          : path === '/api/matches' ? ['GET', 'POST'] : matchRoute || screenshotEdit ? ['PATCH'] : assignmentRoute ? ['POST'] : [];
         if (req.method === 'OPTIONS') mutationPolicy(req, origins);
         if (!methods.length) throw new HttpError(404, 'NOT_FOUND', 'Library route not found.');
         if (!methods.includes(req.method ?? '')) throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed.', methods.join(', '));
         if (!['GET', 'HEAD'].includes(req.method!)) mutationPolicy(req, origins);
         if (path !== '/api/screenshots' && [...url.searchParams].length) throw new HttpError(400, 'INVALID_QUERY', 'This route accepts no query parameters.');
-        if (path === '/api/imports') {
+        if (path === '/api/matches' || matchRoute || screenshotEdit || assignmentRoute) {
+          await matchRoutes(req, res, url, storage, engine.limits.jsonBytes);
+        } else if (path === '/api/imports') {
           if (req.method === 'POST') {
             const batch = engine.createBatch(await body(req, engine.limits.jsonBytes)); json(res, 201, { data: projectBatch(batch.id) });
           } else {

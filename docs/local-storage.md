@@ -24,7 +24,7 @@ data/
 - `screenshots/`: committed local screenshot assets with generated relative filenames.
 - `staging/`: owned incomplete uploads/imports and retained recovery evidence.
 
-Match Library Milestones 1–3 add transactional schema migration, a durable import engine, import endpoints/dialog and the basic unassigned screenshot queue. See [import engine limits, recovery and staging maintenance](import-engine.md).
+Match Library Milestones 1–4 add transactional schema migration, a durable import engine, import endpoints/dialog, match management and screenshot assignment. See [import engine limits, recovery and staging maintenance](import-engine.md) and [match management](match-management.md). Milestone 4 reuses the existing schema; it adds no migration or image-file moves.
 
 ## Development and production behavior
 

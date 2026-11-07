@@ -7,6 +7,7 @@ import { ImportError, storageUnavailable } from '../imports/contracts.js';
 export class HttpError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly allow?: string) { super(message); }
 }
+export class HttpFieldError extends DomainValidationError {}
 export function json(res: http.ServerResponse, status: number, body: unknown, headers: http.OutgoingHttpHeaders = {}) {
   if (res.destroyed || res.writableEnded) return;
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers });
@@ -15,9 +16,10 @@ export function json(res: http.ServerResponse, status: number, body: unknown, he
 export function errorResponse(res: http.ServerResponse, error: unknown) {
   let status = 500; let detail: ApiFailure = { code: 'INTERNAL_ERROR', message: 'Unable to complete the library request.' }; let allow: string | undefined;
   if (error instanceof HttpError) { status = error.status; detail = { code: error.code, message: error.message }; allow = error.allow; }
-  else if (error instanceof DomainValidationError) { status = 400; detail = { code: 'INVALID_REQUEST', message: error.message, fieldErrors: error.fieldErrors }; }
-  else if (error instanceof RecordNotFoundError) { status = 404; detail = { code: 'NOT_FOUND', message: 'Screenshot not found.' }; }
-  else if (error instanceof RevisionConflictError) { status = 409; detail = { code: 'REVISION_CONFLICT', message: 'Record changed; reload before retrying.', currentRevision: error.currentRevision }; }
+  else if (error instanceof DomainValidationError) { status = error instanceof HttpFieldError ? 422 : 400; detail = { code: 'INVALID_REQUEST', message: error.message, fieldErrors: error.fieldErrors }; }
+  else if (error instanceof RecordNotFoundError) { status = 404; detail = { code: 'NOT_FOUND', message: `${error.recordType === 'match' ? 'Match' : 'Screenshot'} not found.` }; }
+  else if (error instanceof RevisionConflictError) { status = 409; detail = { code: 'REVISION_CONFLICT', message: 'Record changed; reload before retrying.', currentRevision: error.currentRevision,
+    ...(error.recordType === 'match' ? { currentMatchRevision: error.currentRevision } : { itemId: error.id }) }; }
   else if (error instanceof ImportError) {
     status = error.code === 'NOT_FOUND' ? 404 : error.code === 'STAGING_EXPIRED' ? 410
       : ['IMAGE_TOO_LARGE', 'BODY_TOO_LARGE', 'BATCH_TOO_LARGE', 'ITEM_LIMIT', 'METADATA_TOO_LARGE'].includes(error.code) ? 413
