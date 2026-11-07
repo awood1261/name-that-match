@@ -46,7 +46,7 @@ describe('storage configuration and initialization', () => {
     expect(getConfiguredPort()).toBe(4200);
   });
 
-  it('initializes a SQLite database and screenshot directory without creating feature tables', () => {
+  it('initializes a SQLite database and screenshot directory with the approved library schema', () => {
     const root = createTempDirectory();
     const session = openStorage(root);
 
@@ -57,7 +57,7 @@ describe('storage configuration and initialization', () => {
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all() as Array<{ name: string }>;
 
-    expect(tables.some((entry) => entry.name === 'matches' || entry.name === 'screenshots')).toBe(false);
+    expect(tables.map((entry) => entry.name).sort()).toEqual(['import_batches', 'import_items', 'matches', 'screenshots']);
   });
 
   it('is idempotent and closes both sessions before cleanup', async () => {

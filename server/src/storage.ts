@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { applyLibraryMigrations } from './library/migrations.js';
 
 export const STORAGE_ENV_VAR = 'NAME_THAT_MATCH_DATA_DIR';
 export const DEFAULT_DATA_DIRECTORY = path.resolve(process.cwd(), 'data');
@@ -79,6 +80,7 @@ export function initializeStorage(options: StorageOptions = {}): StorageSession 
     db.pragma('journal_mode = WAL');
     db.pragma('synchronous = NORMAL');
     db.pragma('foreign_keys = ON');
+    applyLibraryMigrations(db);
   } catch (error) {
     try {
       db.close();
