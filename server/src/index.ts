@@ -3,6 +3,8 @@ import http from 'node:http';
 import path from 'node:path';
 import { isHealthResponse, type HealthResponse } from '../../shared/src/health.js';
 import { closeStorage, initializeStorage, type StorageOptions, type StorageSession } from './storage.js';
+import { createLibraryHttp } from './library/http/dispatcher.js';
+import { configuredOrigins, errorResponse, requestUrl as parseRequestUrl } from './library/http/protocol.js';
 
 export const DEFAULT_PORT = 3001;
 export const DEFAULT_HOST = '127.0.0.1';
@@ -115,11 +117,14 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
   const productionMode = Boolean(
     options.production ?? (process.argv.includes('--production') || process.env.NODE_ENV === 'production'),
   );
+  const origins = configuredOrigins(productionMode);
   const storage = initializeStorage(options);
+  const library = createLibraryHttp(storage, origins);
   let storageReleased = false;
   const releaseStorage = () => {
     if (!storageReleased) {
       storageReleased = true;
+      library.stop();
       closeStorage(storage);
     }
   };
@@ -127,7 +132,9 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
 
   const server = http.createServer((req, res) => {
     const requestUrl = req.url ?? '/';
-    const url = new URL(requestUrl, 'http://localhost');
+    let url: URL;
+    try { url = parseRequestUrl(requestUrl); }
+    catch (error) { errorResponse(res, error); return; }
 
     if (url.pathname === '/health' || url.pathname === '/api/health') {
       const payload = createHealthResponse();
@@ -136,6 +143,11 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
         'Access-Control-Allow-Origin': '*',
       });
       res.end(JSON.stringify(payload));
+      return;
+    }
+
+    if (decodeURIComponent(url.pathname) === '/api' || decodeURIComponent(url.pathname).startsWith('/api/')) {
+      void library.handle(req, res, url).catch((error: unknown) => errorResponse(res, error));
       return;
     }
 

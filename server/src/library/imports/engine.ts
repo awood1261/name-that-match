@@ -173,12 +173,17 @@ export class CaptureImportEngine {
     this.checkpoint('after_confirmation', batchId);
     return this.status(batchId);
   }
-  async processBatch(batchId: string) {
+  async processBatch(batchId: string, signal?: AbortSignal) {
     this.available(batchId); this.processing.add(batchId);
     try {
       // Imports precede skipped duplicate results, so candidate references can resolve to real records.
       const items = this.store.items(batchId).sort((a, b) => Number(a.confirmed_decision === 'skip') - Number(b.confirmed_decision === 'skip') || a.ordinal - b.ordinal);
-      for (const item of items) { this.processor.process(item); await setImmediate(); }
+      for (const item of items) {
+        // Shutdown occurs between synchronous per-item commits; remaining durable intent resumes at startup.
+        if (signal?.aborted) return;
+        this.processor.process(item); await setImmediate();
+      }
+      if (signal?.aborted) return;
       this.store.summarize(batchId);
       return this.status(batchId);
     } catch (error) {

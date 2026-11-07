@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isHealthResponse, type HealthResponse } from '../../shared/src/health';
 import styles from './App.module.css';
+import { MatchLibraryPage } from './library/MatchLibraryPage';
 
 const EMPTY_HEALTH: HealthResponse = {
   status: 'ok',
@@ -14,6 +15,7 @@ function App() {
   const [health, setHealth] = useState<HealthResponse>(EMPTY_HEALTH);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('System');
 
   useEffect(() => {
     const fetchHealth = async () => {
@@ -52,7 +54,9 @@ function App() {
 
         <nav className={styles.nav} aria-label="Primary navigation">
           {navItems.map((item) => (
-            <button key={item} type="button" className={styles.navButton}>
+            <button key={item} type="button" className={styles.navButton}
+              disabled={item === 'Play' || item === 'Game Settings'}
+              aria-current={view === item ? 'page' : undefined} onClick={() => setView(item)}>
               {item}
             </button>
           ))}
@@ -64,7 +68,7 @@ function App() {
         </div>
       </header>
 
-      <section className={styles.panel} aria-live="polite">
+      {view === 'Image Library' ? <MatchLibraryPage /> : <section className={styles.panel} aria-live="polite">
         <div className={styles.panelHeader}>
           <p className={styles.kicker}>Local server</p>
           <h2>System status</h2>
@@ -95,7 +99,7 @@ function App() {
             ? `Last heartbeat: ${new Date(health.timestamp).toLocaleTimeString()}`
             : 'Waiting for the local Node server to respond before the shell can finish booting.'}
         </p>
-      </section>
+      </section>}
     </main>
   );
 }

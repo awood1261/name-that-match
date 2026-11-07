@@ -1,12 +1,12 @@
 # Name That Match
 
-Name That Match is a local-first wrestling trivia application foundation built with React, Vite, and a local Node server. The project is intentionally focused on a scalable local foundation: an app shell, local persistence, browser-safe static serving, and reusable design tokens.
+Name That Match is a local-first wrestling trivia application built with React, Vite, and a local Node server. The current application supports capture import and an unassigned screenshot queue alongside the foundation's system status, portable storage, and design tokens.
 
 ## Overview
 
-- React + TypeScript client shell for the foundation UI
-- Local Node.js server for health checks and production static serving
-- SQLite-backed local metadata initialization without feature tables yet
+- React + TypeScript shell, capture import dialog and unassigned screenshot queue
+- Local Node.js HTTP server for imports, committed images, health and production static serving
+- SQLite-backed match, screenshot and durable import metadata with migrations
 - Configurable local data directory for SQLite and screenshot assets
 - Offline-safe startup with no cloud dependency
 
@@ -61,10 +61,18 @@ Network binding can be configured explicitly:
 To expose the app on the local Wi‑Fi network intentionally, set:
 
 ```bash
-NAME_THAT_MATCH_HOST=0.0.0.0 npm run prod
+NAME_THAT_MATCH_HOST=0.0.0.0 NAME_THAT_MATCH_UI_ORIGINS='http://localhost:3001,http://127.0.0.1:3001,http://192.168.1.50:3001' npm run prod
 ```
 
 This should only be used in trusted environments. Exposing the local server to a Wi‑Fi network can allow other devices on that network to reach the app if the machine is configured to accept external connections. The server is not a remote admin interface and should remain local-first.
+
+Replace the example IP with the laptop's actual address. `NAME_THAT_MATCH_UI_ORIGINS` is a comma-separated list of exact HTTP(S) origins, without paths or wildcards. Production defaults allow `http://localhost:3001` and `http://127.0.0.1:3001`; development also explicitly allows their port-5173 Vite origins. Set the list deliberately for different ports, Vite preview, or tablet access. Mutation requests require the application's custom header and an allowed browser Origin; this prevents foreign browser writes but does not authenticate programs on the LAN. Forwarded headers never extend the list. Health CORS remains unchanged.
+
+## Capture import
+
+Open **Image Library → Import captures**. Choose a folder or multiple PNG/JSON pairs on the current browser device. Review validation, ignored files and duplicate decisions, then explicitly confirm. New screenshots are unassigned, unrated and pending; use **View unassigned screenshots** to inspect the imported copies. Match editing and review controls are reserved for later approved milestones.
+
+Closing the dialog keeps durable server progress. Reopen **Recent imports** to resume; interrupted uploads can re-select missing files, while changed metadata requires a new selection/batch. Original captures are preserved. See [limits, recovery and staging maintenance](docs/import-engine.md). Run only one server process per data root.
 
 ## Local storage
 
@@ -74,6 +82,7 @@ The project stores local runtime files outside source control and build output:
 data/
   library.sqlite
   screenshots/
+  staging/
 ```
 
 This keeps SQLite and screenshot assets portable and avoids source-control churn.
@@ -90,6 +99,8 @@ npm run typecheck
 npm run lint
 npm run build
 openspec validate application-foundation --type spec --strict
+openspec validate match-library-mvp --strict
+openspec validate --all --strict
 ```
 
 The OpenSpec command validates the current capability. For an active change, use `openspec validate <change-name> --type change --strict` with the installed CLI. Foundation hardening is archived; see its [verification record](openspec/changes/archive/2026-11-06-foundation-hardening/verification.md). See [foundation review](docs/foundation-review.md) for historical discrepancies, design references, and verification limits.

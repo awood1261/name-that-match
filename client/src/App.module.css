@@ -77,6 +77,7 @@
 }
 
 .navButton {
+  min-height: 44px;
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.03);
   color: var(--color-text);
@@ -93,6 +94,13 @@
   background: rgba(185, 109, 255, 0.12);
   transform: translateY(-1px);
 }
+
+.navButton[aria-current='page'] {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.navButton:disabled { opacity: 0.5; cursor: default; }
 
 .statusBadge {
   display: inline-flex;

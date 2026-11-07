@@ -302,4 +302,11 @@ describe('capture import engine durability', () => {
     expect(count()).toBe(0); await engine.uploadImage(batch.id, item.id, [png]);
     expect(preview(batch.id).items[0].classification).toBe('valid'); expect(count()).toBe(0);
   });
+  it('stops between committed items before storage closes and recovers remaining intent at restart', async () => {
+    const batch = await staged([capture('one'), capture('two')]); engine.confirm(batch.id, confirmation(batch.id, 'keepDuplicate'));
+    const controller = new AbortController(); const work = engine.processBatch(batch.id, controller.signal);
+    expect(count()).toBe(1); controller.abort(); session.db.close();
+    await expect(work).resolves.toBeUndefined(); restart(); expect(count()).toBe(2);
+    expect(engine.status(batch.id).counts.imported).toBe(2);
+  });
 });
