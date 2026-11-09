@@ -101,6 +101,11 @@ A correct host judgment SHALL award exactly the frozen round tier's 1/2/3 base p
 - **WHEN** the same accepted judgment is retried or another command tries to score a resolved round
 - **THEN** no additional points are awarded and the original receipt or explicit conflict is returned
 
+#### Scenario: Committed award before filmed result reveal
+- **WHEN** a correct judgment is committed but the host has not selected Reveal Result
+- **THEN** host totals and persisted awards include it immediately while the public contestant projection withholds that round's score increment and outcome
+- **AND** Reveal Result publishes the existing award without adding another score event or changing rankings/ownership rules
+
 #### Scenario: Score ownership after a later selection
 - **WHEN** a judgment for contestant A committed, the host advanced and selected contestant B, and the original judgment is retried or its receipt arrives late
 - **THEN** the original award still belongs only to A, B receives none of those points, and no additional award occurs

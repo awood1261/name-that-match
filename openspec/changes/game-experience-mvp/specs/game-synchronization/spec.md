@@ -58,6 +58,11 @@ Static UI, branding and committed game image bytes SHALL load from the laptop wi
 - **WHEN** external internet is disconnected but the tablet can reach the laptop
 - **THEN** a built, already installed application can prepare, display, judge and complete games using local assets and transport
 
+#### Scenario: Unrevealed judgment privacy
+- **WHEN** a contestant receives an adjudicated snapshot before the host's Reveal Result action
+- **THEN** its allowlisted HTTP snapshot and DOM omit the current outcome, earned award, resulting score increment and answer identity
+- **AND** host capabilities and private judgment data are never sent to the contestant for concealment by CSS
+
 ### Requirement: GN-07 Controller coordination and explicit recovery
 Only the current controller lease SHALL mutate a session. Another host tab SHALL observe a busy/read-only state unless deliberate recovery transfers control. Lease possession SHALL not be claimed to authenticate people on an untrusted network. After uncertain command delivery or server restart, the host SHALL review current snapshot/receipt state before deliberate retry or recovery.
 

@@ -63,6 +63,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
     if (round?.phase === 'paused') allowedActions = ['VOID_EXPOSED', ...(primaryDisplay.ready ? ['RESUME' as const] : [])];
     if (round?.phase === 'awaiting_judgment') allowedActions = ['CORRECT_BEFORE_BUZZER', 'CONFIRM_TIMEOUT', 'VOID_EXPOSED'];
     if (round?.phase === 'interrupted') allowedActions = ['VOID_INTERRUPTED'];
+    if (round?.phase === 'adjudicated') allowedActions = ['REVEAL_ANSWER'];
     return { protocolVersion: 1, serverEpoch, sequence: ++sequence, snapshot: state ? hostSnapshot(state) : null, availability, allowedActions,
       candidateValid, primaryDisplay,
       timing: observation && 'remainingMs' in observation.snapshot ? { serverMonoMs: observation.serverMonoMs, remainingMs: observation.snapshot.remainingMs } : null,

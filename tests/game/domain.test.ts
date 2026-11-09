@@ -146,6 +146,21 @@ describe('pure authoritative transitions and projections', () => {
     expect(display).toMatchObject({ phase: 'answer_revealed', answer: candidate.answer });
     const host = hostSnapshot(game.state); host.session.contestants[0].name = 'mutated'; expect(game.state.contestants[0].name).not.toBe('mutated');
   });
+  it('withholds only the current unrevealed judgment and score change, retaining private and earlier revealed scores', () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.step({ type: 'CORRECT' });
+    const concealed = displaySnapshot(game.state, null, 0);
+    expect(concealed.phase).toBe('adjudicated'); expect(concealed).not.toHaveProperty('outcome'); expect(concealed).not.toHaveProperty('award'); expect(concealed).not.toHaveProperty('answer');
+    expect(concealed.scores.every((s) => s.total === 0)).toBe(true); expect(hostSnapshot(game.state).scores[0].total).toBe(1); expect(game.state.awards).toHaveLength(1);
+    game.step({ type: 'REVEAL_ANSWER' }); expect(displaySnapshot(game.state, null, 0).scores[0].total).toBe(1);
+    game.step({ type: 'ADVANCE' }); const next = context(); next.image.sha256 = 'b'.repeat(64);
+    game.ready(next); game.step({ type: 'REVEAL_AND_START' }); game.step({ type: 'CORRECT' });
+    expect(displaySnapshot(game.state, null, 0).scores[0].total).toBe(1); expect(hostSnapshot(game.state).scores[0].total).toBe(2);
+    game.step({ type: 'REVEAL_ANSWER' }); expect(displaySnapshot(game.state, null, 0).scores[0].total).toBe(2); expect(game.state.awards).toHaveLength(2);
+  });
+  it('keeps final completion totals authoritative even when the last judged answer was not revealed', () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.step({ type: 'CORRECT' }); game.step({ type: 'END_GAME' });
+    expect(displaySnapshot(game.state, null, 0)).toMatchObject({ phase: 'completed', scores: [{ total: 1 }, { total: 0 }] });
+  });
   it('bounds private recent history while retaining totals from the full immutable ledger', () => {
     const game = pureGame(); game.step({ type: 'START' });
     for (let i = 0; i < 5; i++) {

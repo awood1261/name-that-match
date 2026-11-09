@@ -21,7 +21,20 @@ The display SHALL support solo and head-to-head layouts for the approved one or 
 
 #### Scenario: Countdown and feedback
 - **WHEN** a ready round starts and is later adjudicated
-- **THEN** the display presents a contained screenshot and readable countdown followed by the authoritative outcome without awarding points locally
+- **THEN** the display presents a contained screenshot and readable countdown, then a neutral concealed waiting state
+- **AND** only the host's subsequent Reveal Result presents the authoritative outcome, earned points and frozen match identity without awarding points locally
+
+#### Scenario: Dramatic correct or incorrect reveal
+- **WHEN** a connected contestant display observes the host-controlled transition to answer-revealed
+- **THEN** a correct outcome presents prominent CORRECT! text, the committed earned points and a green success treatment with a brief energetic entrance
+- **AND** an incorrect outcome presents prominent INCORRECT! text, zero earned points and a distinct red failure entrance
+- **AND** participant/team description, promotion/event and available date/year, stipulation and championship fields use only the frozen answer snapshot
+- **AND** timeout and void retain their distinct zero-point outcomes rather than being relabeled incorrect
+
+#### Scenario: Reduced motion and restored presentation
+- **WHEN** reduced motion is requested, or a viewer initially loads/reconnects into an already revealed result
+- **THEN** the result remains readable and stable without an entrance animation
+- **AND** animation completion neither mutates game state nor triggers audio, answer changes, progression or scoring
 
 #### Scenario: Covered preparation
 - **WHEN** the display loads and decodes a candidate in Preparing/Ready

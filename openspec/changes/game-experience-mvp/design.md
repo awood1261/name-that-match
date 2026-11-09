@@ -27,7 +27,7 @@ All eight comps were inventoried; seven game comps were visually inspected:
 | `CA849EE2-D22F-4608-9D00-31E5B7C452B7.PNG` | Hidden challenge placeholder and reveal affordance | One shuffle button does not define timer/host authority. |
 | `575F3CFE-1CE3-4B4A-A16A-6019994EBF0C.PNG` | Large screenshot/timer; centered 1080×960 reel-safe annotation | File dimensions/guide artwork are not a production framebuffer specification. |
 | `989C475C-D7F3-4085-A2AA-5F04BF4C8974.PNG` | Tier choice and point prominence | Its Easy/Medium/Hard tier captions must not replace independent visual difficulty. |
-| `5D88B9D9-C4CF-4DC2-9E45-83B1E9FE6000.PNG` | Correct feedback and answer details | Outcome and answer reveal remain separate controlled steps. |
+| `5D88B9D9-C4CF-4DC2-9E45-83B1E9FE6000.PNG` | Correct feedback and answer details | Judgment and filmed result/answer presentation are separate controlled steps (approved task 5.1 refinement). |
 | `122CF989-63D3-4943-9D0E-CA6C78ACA68F.PNG` | Incorrect feedback/answer reveal | No automatic grading, fixed date precision or required promotion logo asset. |
 | `9BD6879B-FE7A-44E5-A0EF-17B21F59F03A.PNG` | Scoreboard hierarchy and legend | Example ranking places a 5 below a 3; actual ranking must sort real totals, not copy it. Three columns do not define game length. |
 | `Neon Wrestling Match Library.png` | Existing administration only | Not a contestant game screen. |
@@ -58,7 +58,7 @@ The owner has approved P1–P3 below. P4–P9 and the WebSocket dependency remai
 | P6 | Recommended | Persist session, immutable owners, exposure/history, outcomes, score events and receipts. Recover unfinished games with explicit host action; guessing at crash becomes interrupted/void-only, known paused remainder stays paused. | No countdown reset or wall-clock inference. Committed judgments remain final; repeated commands cannot score again. See D6 recovery table. |
 | P7 | Recommended; read-only display already approved | Host enters verbal Squash Match / Competitive Match / Deathmatch choice, which selects the eligible pool. The unchanged matrix derives each screenshot's tier/points. | Host selects a requested pool, not an editable tier on a screenshot; no contestant mutations or extra confirmation framework. |
 | P8 | Recommended | Defer event/year/discretionary bonus points, undo and retroactive score editing; keep a deterministic auditable base-score ledger. | No speculative extension registry or score-correction framework. A later feature needs approval. |
-| P9 | Recommended; C2–C4/manual end already approved | Host explicitly reveals the answer and explicitly advances. Correct/Incorrect apply in guessing; Correct before buzzer applies only after expiry. Reveal/Advance never award points. Host manually ends and sees winner/tie. | Outcome feedback is separate from answer reveal; Advance retains contestant selection. Existing answer-before-Advance/void exception is recommended below, not newly approved. |
+| P9 | Approved through consolidated-plan approval; result gate refined by owner for task 5.1 | Host explicitly selects Reveal Result to publish the saved outcome/points and frozen answer together, then explicitly advances. Correct/Incorrect apply in guessing; Correct before buzzer applies only after expiry. Reveal/Advance never award points. Host manually ends and sees winner/tie. | Judgment commits privately before the separate result/answer reveal; Advance retains contestant selection. Existing answer-before-Advance/void exception is recommended below, not newly approved. |
 
 Existing technical defaults retained for artifact approval: unique trimmed case-insensitive names ≤60 Unicode code points, fixed roster after Start, one nonterminal session; pause covers the clue; answer reveal before Advance except explicit void; and atomic screenshot Reveal & start after primary decode. The previous P9 referred to that last screenshot/timer recommendation. P9 now names answer reveal/advancement as requested; the separate screenshot-exposure recommendation stays in GR-02/D6 pending final artifact approval. No scheduled-future-reveal barrier is added. Manual completion has no fixed round quota under confirmed C3.
 
@@ -119,7 +119,7 @@ stateDiagram-v2
   AwaitingJudgment --> Adjudicated: VOID_EXPOSED
   Guessing --> Interrupted: process restart
   Interrupted --> Adjudicated: VOID_INTERRUPTED
-  Adjudicated --> AnswerRevealed: REVEAL_ANSWER
+  Adjudicated --> AnswerRevealed: REVEAL_ANSWER (host Reveal Result)
   AnswerRevealed --> BetweenRounds: ADVANCE
   Adjudicated --> BetweenRounds: ADVANCE if void
   BetweenRounds --> Completed: END_GAME
@@ -141,7 +141,7 @@ stateDiagram-v2
 | PAUSE / RESUME | Cover image and preserve exact remaining monotonic time. Resume requires decoded/synchronized primary display; only preserved remainder. At zero use expiry. |
 | CANCEL_UNEXPOSED | Preparing/ready only; retain cancelled attempt/receipt, release reservation and return between rounds with the same contestant. No exposure/turn/score. A pre-exposure decision to pass uses this cancellation path; it is not an exposed void. |
 | VOID_EXPOSED(reason) / VOID_INTERRUPTED | Explicit confirmation, unresolved exposed round only; record outcome void with reason skip (host passes clue), void (invalid/abandoned attempt) or interrupted (recovery). All share the same zero-award finalization and retain used match/image/history. No distinct SKIP state/engine, automatic Advance, destructive delete or reversal of accepted awards. VOID_INTERRUPTED is the restricted recovery form. |
-| REVEAL_ANSWER | Resolved only; publish pinned answer, preserving optional date precision and unknown fields. |
+| REVEAL_ANSWER (Reveal Result) | Adjudicated only; publish the saved outcome/award and pinned answer together, preserving optional date precision/unknown fields. No new score or timer. |
 | ADVANCE | Answer revealed, or explicit void; clear public image/answer and retain activeContestantId. Return between rounds with Switch contestant available; do not select a different contestant, prepare or start automatically. |
 | END_GAME | Between rounds or resolved round; confirmation. Final totals/winner IDs immutable. From unresolved states, resolve/void first. A started game with no scored turns can end with all totals tied at zero. |
 | NEW_GAME | Only after completed/discarded; create new UUID/zero totals/empty use history, preserve previous game/library. No in-place reset or reopen. |
@@ -158,7 +158,7 @@ State/command summary (all host mutations require the current lease, expected re
 | Paused | Resume preserved remainder after readiness, Skip/Void | No ordinary judgment or fresh timer. |
 | Awaiting judgment | Correct before buzzer, Confirm timeout, Skip/Void | No ordinary Correct, extra guessing, automatic answer or award. |
 | Interrupted | Void interrupted | No resumed unknown countdown or automatic award. |
-| Adjudicated | Answer Reveal, End game; Advance only if void | No new judgment, score edit or contestant switch. |
+| Adjudicated (public concealed) | Reveal Result, End game; Advance only if void | No new judgment, score edit or contestant switch. |
 | Answer revealed | Advance, End game | No second award or round-owner change. |
 | Completed / discarded | Explicit New game | No changes to prior scores/history. |
 
@@ -249,7 +249,7 @@ HTTP uses `Authorization: Bearer <capability>` and `X-Name-That-Match: game` on 
 
 Envelope: `{protocolVersion:1, commandId, sessionId, roundId?, expectedStateVersion, type, payload}` plus current server epoch metadata. Validate runtime discriminants, UUIDs, safe revisions, exact enums, string/array bounds and unknown fields. Native browser WebSocket cannot set an arbitrary Authorization header: its first bounded HELLO sends the role capability in the message body, never URL query/logs. HTTP image fetch can set Authorization before converting bytes to a Blob. Do not render private data in contestant alt text or data attributes.
 
-Private HostSnapshot includes answers, candidate diagnostics, allowed actions, current display readiness, totals and latest bounded turn history. Public DisplaySnapshot is an explicit phase-discriminated allowlist: session/round IDs, explicit activeContestantId and current round contestantId with public names, selected tier, scores and phase; current-round labels/outcomes use the round owner and between-round labels use active selection; image access only for the current prepared/exposed round, timing only as needed, answer fields only after Reveal Answer. Final results omit internal setup notes, tokens, library IDs/provenance and private errors. Host-only data must not reach a display and then be hidden with CSS.
+Private HostSnapshot includes answers, candidate diagnostics, allowed actions, current display readiness, totals and latest bounded turn history. Public DisplaySnapshot is an explicit phase-discriminated allowlist: session/round IDs, explicit activeContestantId and current round contestantId with public names, selected tier, scores and phase; current-round labels/outcomes use the round owner and between-round labels use active selection; adjudicated omits outcome/award/answer and withholds only the current round's score increment until Reveal Result; image access only for the current prepared/exposed round, timing only as needed, outcome, earned award and answer fields together only after Reveal Result (existing REVEAL_ANSWER/answer_revealed); final completion still publishes authoritative final totals. Final results omit internal setup notes, tokens, library IDs/provenance and private errors. Host-only data must not reach a display and then be hidden with CSS.
 
 Capabilities/leases are random server-held, process-scoped and role/session-bound; the host controller capability can create/bind the current session. Host renews every second with proposed 3s liveness and 10s control-claim expiry. A disconnected host pauses play at detection; a returning host reviews recovery instead of competing silently. Another tab sees busy/read-only. Deliberate takeover uses release by the current owner, or a new claim after lease expiry/server restart; it invalidates old capabilities/generations and requires current-state review. There is no unauthenticated force-takeover action for an actively renewed lease. Display capabilities are minted by the host and shared through a fragment join link, retained per tab for reconnect; server restart requires a fresh join/rebind. Tokens never enter logs or persistent game history.
 
@@ -333,3 +333,12 @@ The owner approved the consolidated plan (including P4–P9 and retained technic
 After completing Milestone 1 manual verification, the owner explicitly authorized Milestone 2 in the “Game Experience MVP, Milestone 2” implementation request: tasks 3.1–3.6 only. This extends the implementation authorization through the host-controls/screenshot-selection checkpoint; it does not authorize Milestone 3, dependencies or archival. See `milestone-2-verification.md` for its implementation and verification evidence.
 
 The “Game Experience MVP, Milestone 3” request records Milestone 2 manual acceptance and explicitly authorizes tasks 4.1–4.7: contestant display/countdown and required live host controls only. Portrait composition keeps the screenshot above the timer; the full uniform reel-safe staging, Studio launcher/fullscreen, full-game progression and WebSocket milestones remain unstarted. No dependencies or archival are authorized. See `milestone-3-verification.md` for evidence.
+
+
+### Task 5.1 authorization and result-presentation refinement
+
+The owner reviewed Milestone 3 and explicitly approved updating and implementing task 5.1 only. Earlier immediate adjudication feedback is superseded: judgment still commits once privately, but the public adjudicated projection/DOM is neutral and concealed until host **Reveal Result**. Reuse REVEAL_ANSWER and answer_revealed; no new persisted phase, database migration, command name, scoring logic or transport is needed. Private host outcomes/totals stay current; public totals omit only the unrevealed current award to avoid leaking its result. Existing completed-session final totals, void-before-Advance exception, timeout, late credit and immutable round ownership are preserved.
+
+A result panel renders the authoritative outcome and award with the frozen participants, promotion/event, exact known date precision, stipulation and championship fields. Correct uses prominent CORRECT!/green; ordinary incorrect uses INCORRECT!/red and zero. Timeout and void keep distinct neutral/zero presentations. Brief finite CSS transform/opacity entrances use existing tokens, do not move surrounding layout, do not trigger game transitions or sound, and are disabled under prefers-reduced-motion. Animate only an observed connected transition into answer_revealed; initial loads or reconnects into that phase restore a static result. Unknown metadata is omitted, never inferred.
+
+Acceptance follows GR-07/GD-02/GD-05/GN-06 and task 5.1's focused breakdown. WebSocket work remains tasks 7.x (Milestone 6 in the repository), regardless of the owner's shorthand milestone label. Do not start 5.2 scoreboard, progression/End/New Game, Studio launch, Road integration or dependencies. Historical Milestone 3 evidence remains unchanged.

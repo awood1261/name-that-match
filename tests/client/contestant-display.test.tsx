@@ -6,11 +6,14 @@ import { Countdown } from '../../client/src/game/Countdown';
 import { displayApi, gameApi, GameApiError } from '../../client/src/game/api';
 import type { DisplayObservation } from '../../shared/src/game/display';
 import type { DisplaySnapshot } from '../../shared/src/game/contracts';
+import { isPartialDate } from '../../server/src/library/validation';
 
 const sessionId = randomUUID(); const roundId = randomUUID(); const contestantId = randomUUID();
 const credential = { token: 'a'.repeat(64), serverEpoch: randomUUID(), displayId: randomUUID() };
 const base = { protocolVersion: 1 as const, sessionId, stateVersion: 2, activeContestantId: contestantId, contestants: [{ id: contestantId, name: 'Contestant One' }], scores: [] };
 const round = { ...base, roundId, contestantId, requestedTier: 'deathmatch' as const, turnOrdinal: 1 };
+const date: unknown = '2024-08'; if (!isPartialDate(date)) throw new Error('Invalid test date');
+const answer = { participantDescription: 'Alpha vs Beta', promotion: 'Fixture Wrestling', event: 'Winter Event', matchDate: date, stipulation: null, championshipInfo: null };
 let phase: DisplaySnapshot; let sequence: number; let decode: () => Promise<void>;
 let createUrl: ReturnType<typeof vi.fn>; let revokeUrl: ReturnType<typeof vi.fn>;
 function observation(): DisplayObservation {
@@ -59,12 +62,37 @@ describe('isolated contestant stage and image lifecycle', () => {
     await waitFor(() => expect(vi.mocked(displayApi.status).mock.calls.some(([, , report]) => report.type === 'status' && !report.decoded)).toBe(true));
     expect(gameApi.command).not.toHaveBeenCalled();
   });
-  it('renders expiry and outcome feedback without rendering private answer fields', async () => {
+  it('renders expiry then conceals judgment until the host reveals the result and answer', async () => {
     phase = { ...round, phase: 'awaiting_judgment', remainingMs: 0 };
     render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'Time up' }); expect(screen.getByRole('timer')).toHaveTextContent('00');
     expect(displayApi.image).not.toHaveBeenCalled();
-    phase = { ...round, stateVersion: 3, phase: 'adjudicated', outcome: 'correct', award: 3 };
-    await screen.findByRole('heading', { name: 'Correct!' }); expect(screen.queryByRole('timer')).not.toBeInTheDocument(); expect(gameApi.command).not.toHaveBeenCalled();
+    phase = { ...round, stateVersion: 3, phase: 'adjudicated' };
+    await screen.findByRole('heading', { name: 'Waiting for the host' }); expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    expect(screen.queryByText('CORRECT!')).not.toBeInTheDocument(); expect(document.body.innerHTML).not.toContain('Alpha');
+    phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer };
+    await screen.findByRole('heading', { name: 'CORRECT!' }); expect(screen.getByText('3 POINTS EARNED')).toBeInTheDocument(); expect(screen.getByText('Alpha vs Beta')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'true');
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false'));
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('restores an already revealed result statically after refresh and reconnect', async () => {
+    phase = { ...round, phase: 'answer_revealed', outcome: 'incorrect', award: 0, answer };
+    const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'INCORRECT!' });
+    expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false');
+    view.unmount(); render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'INCORRECT!' });
+    expect(screen.getByText('0 POINTS EARNED')).toBeInTheDocument(); expect(screen.getByText('2024-08')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false');
+    vi.mocked(displayApi.status).mockRejectedValueOnce(new TypeError('connection lost'));
+    await screen.findByRole('heading', { name: 'Display unavailable' }); expect(screen.queryByText('Alpha vs Beta')).not.toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'INCORRECT!' }); expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false');
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('animates a connected reveal even when polling skips the brief adjudicated snapshot', async () => {
+    phase = { ...round, phase: 'guessing', imageKey: roundId, remainingMs: 5000 };
+    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByAltText('Current wrestling match clue');
+    phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer };
+    await screen.findByRole('heading', { name: 'CORRECT!' }); expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'true');
+    expect(gameApi.command).not.toHaveBeenCalled();
   });
   it('restores the current remaining window rather than ten seconds on reload', async () => {
     phase = { ...round, phase: 'guessing', remainingMs: 2300, imageKey: roundId };

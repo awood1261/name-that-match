@@ -97,7 +97,7 @@ export type DisplaySnapshot = PublicBase & (
   | (PublicRound & { phase: 'ready'; imageKey: string })
   | (PublicRound & { phase: 'guessing'; imageKey: string; remainingMs: number })
   | (PublicRound & { phase: 'paused' | 'awaiting_judgment' | 'interrupted'; remainingMs: number })
-  | (PublicRound & { phase: 'adjudicated'; outcome: Judgment['outcome']; award: number })
+  | (PublicRound & { phase: 'adjudicated' })
   | (PublicRound & { phase: 'answer_revealed'; outcome: Judgment['outcome']; award: number; answer: Answer })
 );
 export interface HostSnapshot {

@@ -94,7 +94,40 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     await reveal(); const result = await command(type, type === 'VOID_EXPOSED' ? { reason: 'skip' } : {});
     expect(result.status).toBe(200); expect((await command(type, {}, result.envelope)).data.replayed).toBe(true);
     await report(); expect(observation.snapshot.phase).toBe('adjudicated'); expect(JSON.stringify(observation)).not.toContain('Alpha');
+    expect(observation.snapshot).not.toHaveProperty('outcome'); expect(observation.snapshot).not.toHaveProperty('award'); expect(observation.snapshot.scores.every((s) => s.total === 0)).toBe(true);
     expect(storage.db.prepare('SELECT COUNT(*) n FROM game_score_events').get()).toEqual({ n: type === 'CORRECT' ? 1 : 0 });
+  });
+  it.each(['CORRECT', 'INCORRECT', 'VOID_EXPOSED'])('reveals %s only by host command, preserving frozen metadata and once-only scores', async (type) => {
+    await reveal(); await command(type, type === 'VOID_EXPOSED' ? { reason: 'void' } : {}); await report();
+    expect(observation.snapshot.phase).toBe('adjudicated'); expect(state.allowedActions).toContain('REVEAL_ANSWER');
+    expect((await request(sessionPath() + '/commands', { type: 'REVEAL_ANSWER' }, viewer)).status).toBe(403);
+    const frozen = state.snapshot!.currentRound!;
+    if (!('context' in frozen) || !frozen.context) throw new Error('Missing frozen answer');
+    storage.db.prepare("UPDATE matches SET participant_description='Edited later',event='Changed event',obscurity='high',revision=revision+1 WHERE id=?").run(frozen.context.matchId);
+    const result = await command('REVEAL_ANSWER'); expect(result.status).toBe(200);
+    const retry = await command('REVEAL_ANSWER', {}, result.envelope); expect(retry.status).toBe(200); expect(retry.data.replayed).toBe(true);
+    expect((await command('REVEAL_ANSWER')).status).toBe(409);
+    await report(); expect(observation.snapshot).toMatchObject({ phase: 'answer_revealed', outcome: type === 'CORRECT' ? 'correct' : type === 'INCORRECT' ? 'incorrect' : 'void', award: type === 'CORRECT' ? 1 : 0,
+      answer: { participantDescription: 'Alpha vs Beta', event: 'Fixture Show', promotion: 'Local Wrestling' } });
+    expect(JSON.stringify(observation.snapshot)).not.toContain('Edited later');
+    expect(storage.db.prepare('SELECT COUNT(*) n FROM game_score_events').get()).toEqual({ n: type === 'CORRECT' ? 1 : 0 });
+    connectionId = randomUUID(); await connect(); expect(observation.snapshot.phase).toBe('answer_revealed');
+    game.stop(); game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now });
+    owner = (await request('/control-lease', {})).data; await current();
+    expect(state.snapshot!.currentRound?.phase).toBe('answer_revealed');
+    expect((await command('REVEAL_ANSWER', {}, result.envelope)).data.replayed).toBe(true);
+    viewer = (await request(sessionPath() + '/displays', {})).data; connectionId = randomUUID(); await connect();
+    expect(observation.snapshot).toMatchObject({ phase: 'answer_revealed', answer: frozen.context.answer });
+    expect(storage.db.prepare('SELECT COUNT(*) n FROM game_score_events').get()).toEqual({ n: type === 'CORRECT' ? 1 : 0 });
+  });
+  it('rejects early and stale result reveals without changing the saved judgment', async () => {
+    await prepare(); expect((await command('REVEAL_ANSWER')).status).toBe(409);
+    await connect(); await report(); await current(); await command('REVEAL_AND_START');
+    const previous = state.snapshot!.session.stateVersion;
+    await command('CORRECT');
+    const stale = { protocolVersion: 1, commandId: randomUUID(), sessionId: state.snapshot!.session.id, roundId: state.snapshot!.session.currentRoundId, expectedStateVersion: previous, type: 'REVEAL_ANSWER', payload: {} };
+    expect((await command('REVEAL_ANSWER', {}, stale)).status).toBe(409); await report(); expect(observation.snapshot.phase).toBe('adjudicated');
+    expect(storage.db.prepare('SELECT COUNT(*) n FROM game_score_events').get()).toEqual({ n: 1 });
   });
   it('settles expiry before late ordinary Correct and permits distinct pre-buzzer attestation once', async () => {
     await reveal(); now = 10000; await report(); expect(observation.snapshot.phase).toBe('awaiting_judgment');

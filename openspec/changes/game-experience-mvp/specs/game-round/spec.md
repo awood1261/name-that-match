@@ -79,11 +79,20 @@ Under approved P3, cancelling preparation before exposure SHALL release the rese
 - **THEN** it records a void zero-point turn and that match cannot be redrawn in the session
 
 ### Requirement: GR-07 Outcome, answer reveal and advance
-Under recommended P9, judgment feedback and answer reveal SHALL be distinct host-controlled steps. Screenshot Reveal & start is a different action from answer Reveal. Answer Reveal and Advance SHALL never create score awards or reapply a judgment. The answer SHALL include the pinned participant/promotion/event fields and only the known precision of optional metadata. Advancing SHALL require answer reveal or an explicitly voided turn and SHALL clear the public round image/answer without resetting scores or used history or changing activeContestantId or historical round contestantId. Ending a game SHALL also be allowed from a resolved round without forcing an answer reveal.
+Under the owner-approved task 5.1 refinement of P9, judgment and contestant result presentation SHALL be separate host-controlled steps. Judgment SHALL commit the existing outcome/award once and enter concealed adjudicated state. Only a subsequent host **Reveal Result** action, using the existing `REVEAL_ANSWER` command and `answer_revealed` phase, SHALL publish the outcome, earned points and frozen answer together. Screenshot Reveal & start remains a different action. The public adjudicated projection SHALL omit outcome, award, answer and the current round's score increment; private host state SHALL retain the actual committed judgment/totals. Reveal Result and Advance SHALL never create score awards or reapply a judgment. The answer SHALL include the pinned participant/promotion/event fields and only the known precision of optional date/stipulation/championship metadata. Advancing SHALL still require result/answer reveal or an explicitly voided turn and SHALL clear the public round image/answer without resetting scores or used history or changing activeContestantId or historical round contestantId. Ending a game SHALL still be allowed from a resolved round without forcing a reveal; final completion totals remain authoritative.
 
 #### Scenario: Show the answer
-- **WHEN** the host reveals a resolved round's answer
-- **THEN** contestant displays show the saved answer snapshot rather than infer it from a video title or invent a date
+- **WHEN** the host explicitly selects Reveal Result after a valid judgment
+- **THEN** contestant displays show the saved outcome, earned points and answer snapshot together rather than infer metadata from a video title or invent a date
+
+#### Scenario: Conceal judgment until presentation
+- **WHEN** Correct, Incorrect, pre-buzzer credit, timeout confirmation or Skip/Void resolves the attempt
+- **THEN** the server preserves the existing scoring, ownership and repeat-history effects exactly once
+- **AND** the contestant sees a neutral covered waiting state with no dramatic result, match identity, outcome/award fields or current-round score increment until Reveal Result
+
+#### Scenario: Recover before or after result reveal
+- **WHEN** a contestant refreshes or reconnects in adjudicated or answer-revealed state
+- **THEN** the server restores respectively the concealed waiting state or the already revealed frozen result/answer without scoring, replaying a reveal command or automatically starting an entrance animation
 
 #### Scenario: Repeated Reveal and Advance do not score
 - **WHEN** the host reveals an adjudicated answer and advances, retries accepted commands, or sends new commands for an already completed transition
