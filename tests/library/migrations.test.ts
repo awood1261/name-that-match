@@ -22,8 +22,8 @@ describe('library schema migration lifecycle', () => {
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
     expect(db.pragma('journal_mode', { simple: true })).toBe('wal');
     expect(db.pragma('synchronous', { simple: true })).toBe(1);
-    expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all()).toEqual(tables.map((name) => ({ name })));
-    expect(db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%' ORDER BY name").all())
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'game_%' ORDER BY name").all()).toEqual(tables.map((name) => ({ name })));
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'game_%' ORDER BY name").all())
       .toEqual(['import_items_batch_state', 'screenshots_image_sha256', 'screenshots_match_id'].map((name) => ({ name })));
   });
   it('upgrades an existing empty foundation store without replacing its file or screenshot assets', () => {
@@ -45,7 +45,7 @@ describe('library schema migration lifecycle', () => {
     expect(second.db.prepare('SELECT id, participant_description FROM matches').all()).toEqual([{ id: 'kept', participant_description: 'A vs B' }]);
     expect(second.db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
   });
-  it.each([0, 3])('rejects unexpected version %i objects without losing existing rows', (version) => {
+  it.each([0, LIBRARY_SCHEMA_VERSION + 1])('rejects unexpected version %i objects without losing existing rows', (version) => {
     raw((db) => { db.exec("CREATE TABLE existing_data (value TEXT); INSERT INTO existing_data VALUES ('preserve')"); db.pragma(`user_version = ${version}`); });
     const close = vi.spyOn(Database.prototype, 'close');
     expect(open).toThrow(version ? /Unsupported database schema/ : /Unexpected objects/);

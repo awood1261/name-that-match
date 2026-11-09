@@ -54,7 +54,7 @@ describe('storage configuration and initialization', () => {
     expect(fs.existsSync(path.join(root, 'screenshots'))).toBe(true);
 
     const tables = session.db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'game_%'")
       .all() as Array<{ name: string }>;
 
     expect(tables.map((entry) => entry.name).sort()).toEqual(['import_batches', 'import_items', 'matches', 'screenshots']);

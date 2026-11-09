@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { applyLibraryMigrations } from './library/migrations.js';
+import { recoverGameSessions } from './game/recovery.js';
 import { getImportEngine } from './library/imports/engine.js';
 
 export const STORAGE_ENV_VAR = 'NAME_THAT_MATCH_DATA_DIR';
@@ -82,6 +83,7 @@ export function initializeStorage(options: StorageOptions = {}): StorageSession 
     db.pragma('synchronous = NORMAL');
     db.pragma('foreign_keys = ON');
     applyLibraryMigrations(db);
+    recoverGameSessions(db);
     getImportEngine({ rootDir, db }).recover();
   } catch (error) {
     try {

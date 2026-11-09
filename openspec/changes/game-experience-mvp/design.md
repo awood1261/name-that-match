@@ -325,3 +325,7 @@ Before operational upgrade: stop all writers/watchers/tools and verify a whole-r
 ## Approval checkpoint
 
 C1–C4 and P1–P3 are approved: 1–2 contestants, host-controlled selection/read-only displays, and pause/remainder/zero-point void-skip/no-restart controls. P4–P9 remain recommended for final approval except their already confirmed overlapping rules. The detailed technical defaults, schema/role/lease/recovery approach, retained atomic screenshot Reveal & start recommendation and proposed `ws` dependency remain pending artifact/dependency approval. These are explicit decisions to accept/revise before implementation, not deferrable unknowns disguised as tasks. No game implementation is authorized yet. Hardware/browser details can be recorded during manual verification; their absence is not filled in with passing claims.
+
+## Implementation authorization
+
+The owner approved the consolidated plan (including P4–P9 and retained technical defaults) with “ok this looks good” and subsequently authorized beginning Milestone 1 with “lets begin”. Earlier pending/plan-only wording records the proposal review stage; this approval supersedes it for the approved plan. Implement Milestone 1 only, stop for review before Milestone 2, and do not archive. No dependency is installed in Milestone 1; the dedicated Milestone 6 dependency-installation checkpoint remains.

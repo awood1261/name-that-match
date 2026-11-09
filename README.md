@@ -29,7 +29,7 @@ This starts:
 
 ## Production startup
 
-Before starting this version against existing data, follow the [stopped-writer whole-root backup procedure](docs/local-storage.md#backup-and-restore). Startup upgrades schema 1 to 2; see the [mapping and rollback guidance](docs/classification.md#migration).
+Before starting this version against existing data, follow the [stopped-writer whole-root backup procedure](docs/local-storage.md#backup-and-restore). Startup upgrades supported stores through schema 3: the existing schema-1→2 classification mapping is unchanged, and schema 3 adds game persistence. See [classification mapping](docs/classification.md#migration) and [Game Experience Milestone 1, verification and rollback](docs/game-foundation.md). Play remains disabled until later approved milestones.
 
 Build the client and server first:
 
