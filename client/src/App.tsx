@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isHealthResponse, type HealthResponse } from '../../shared/src/health';
 import styles from './App.module.css';
+import { HostPage } from './game/HostPage';
 import { MatchLibraryPage } from './library/MatchLibraryPage';
 import type { NavigationGuard } from './library/useMatchWorkspace';
 
@@ -56,7 +57,7 @@ function App() {
         <nav className={styles.nav} aria-label="Primary navigation">
           {navItems.map((item) => (
             <button key={item} type="button" className={styles.navButton}
-              disabled={item === 'Play' || item === 'Game Settings'}
+              disabled={item === 'Game Settings'}
               aria-current={view === item ? 'page' : undefined} onClick={() => {
                 if (view === 'Image Library' && item !== view && libraryGuard.current) libraryGuard.current(() => setView(item));
                 else setView(item);
@@ -72,7 +73,7 @@ function App() {
         </div>
       </header>
 
-      {view === 'Image Library' ? <MatchLibraryPage registerNavigationGuard={registerNavigationGuard} /> : <section className={styles.panel} aria-live="polite">
+      {view === 'Play' ? <HostPage /> : view === 'Image Library' ? <MatchLibraryPage registerNavigationGuard={registerNavigationGuard} /> : <section className={styles.panel} aria-live="polite">
         <div className={styles.panelHeader}>
           <p className={styles.kicker}>Local server</p>
           <h2>System status</h2>

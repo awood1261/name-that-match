@@ -329,3 +329,5 @@ C1–C4 and P1–P3 are approved: 1–2 contestants, host-controlled selection/r
 ## Implementation authorization
 
 The owner approved the consolidated plan (including P4–P9 and retained technical defaults) with “ok this looks good” and subsequently authorized beginning Milestone 1 with “lets begin”. Earlier pending/plan-only wording records the proposal review stage; this approval supersedes it for the approved plan. Implement Milestone 1 only, stop for review before Milestone 2, and do not archive. No dependency is installed in Milestone 1; the dedicated Milestone 6 dependency-installation checkpoint remains.
+
+After completing Milestone 1 manual verification, the owner explicitly authorized Milestone 2 in the “Game Experience MVP, Milestone 2” implementation request: tasks 3.1–3.6 only. This extends the implementation authorization through the host-controls/screenshot-selection checkpoint; it does not authorize Milestone 3, dependencies or archival. See `milestone-2-verification.md` for its implementation and verification evidence.

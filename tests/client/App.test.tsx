@@ -37,7 +37,7 @@ describe('application shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Image Library' }));
     expect(await screen.findByRole('heading', { name: 'Matches' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Image Library' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'System' }));
     expect(screen.getByRole('heading', { name: 'System status' })).toBeInTheDocument();
   });

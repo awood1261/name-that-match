@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { isHealthResponse, type HealthResponse } from '../../shared/src/health.js';
 import { closeStorage, initializeStorage, type StorageOptions, type StorageSession } from './storage.js';
+import { createGameHttp } from './game/http.js';
 import { createLibraryHttp } from './library/http/dispatcher.js';
 import { configuredOrigins, errorResponse, requestUrl as parseRequestUrl } from './library/http/protocol.js';
 
@@ -120,12 +121,15 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
   const origins = configuredOrigins(productionMode);
   const storage = initializeStorage(options);
   const library = createLibraryHttp(storage, origins);
+  let game: ReturnType<typeof createGameHttp>;
+  try { game = createGameHttp(storage, origins); }
+  catch (error) { library.stop(); closeStorage(storage); throw error; }
   let storageReleased = false;
   const releaseStorage = () => {
     if (!storageReleased) {
       storageReleased = true;
-      library.stop();
-      closeStorage(storage);
+      try { game.stop(); }
+      finally { library.stop(); closeStorage(storage); }
     }
   };
   const staticDir = options.staticDir ?? (productionMode ? path.resolve(process.cwd(), 'dist') : undefined);
@@ -143,6 +147,11 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
         'Access-Control-Allow-Origin': '*',
       });
       res.end(JSON.stringify(payload));
+      return;
+    }
+
+    if (decodeURIComponent(url.pathname) === '/api/game' || decodeURIComponent(url.pathname).startsWith('/api/game/')) {
+      void game.handle(req, res, url).catch((error: unknown) => errorResponse(res, error));
       return;
     }
 

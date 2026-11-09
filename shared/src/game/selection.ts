@@ -7,14 +7,14 @@ export interface GameCandidate {
   context: RoundContext | null; capturedAt: string;
   reviewStatus: 'pending' | 'approved' | 'rejected'; associated: boolean; imageAvailable: boolean;
 }
-export function exposedHistory(state: GameState) {
+export function exposedHistory(state: Pick<GameState, 'rounds'>) {
   const rounds = state.rounds.filter((round) => 'exposedAt' in round);
   return { matchIds: new Set(rounds.map((r) => 'context' in r && r.context ? r.context.matchId : '')),
     screenshotIds: new Set(rounds.map((r) => 'context' in r && r.context ? r.context.screenshotId : '')),
     hashes: new Set(rounds.map((r) => 'context' in r && r.context ? r.context.image.sha256 : '')) };
 }
 export interface EligibleGameCandidate extends GameCandidate { context: RoundContext }
-export function unseenPool(candidates: readonly GameCandidate[], state: GameState, tier: GameTier): EligibleGameCandidate[] {
+export function unseenPool(candidates: readonly GameCandidate[], state: Pick<GameState, 'rounds'>, tier: GameTier): EligibleGameCandidate[] {
   const used = exposedHistory(state);
   const assessed = candidates.flatMap((candidate) => {
     if (!candidate.context || candidate.reviewStatus !== 'approved' || !candidate.associated || !candidate.imageAvailable) return [];
@@ -30,6 +30,6 @@ export function unseenPool(candidates: readonly GameCandidate[], state: GameStat
   });
   return pool.sort((a, b) => a.capturedAt < b.capturedAt ? -1 : a.capturedAt > b.capturedAt ? 1 : a.context.screenshotId < b.context.screenshotId ? -1 : a.context.screenshotId > b.context.screenshotId ? 1 : 0);
 }
-export function chooseCandidate(candidates: readonly GameCandidate[], state: GameState, tier: GameTier, sample: number): EligibleGameCandidate | null {
+export function chooseCandidate(candidates: readonly GameCandidate[], state: Pick<GameState, 'rounds'>, tier: GameTier, sample: number): EligibleGameCandidate | null {
   return selectCandidate(unseenPool(candidates, state, tier), sample);
 }
