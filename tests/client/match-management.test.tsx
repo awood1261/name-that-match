@@ -297,6 +297,7 @@ describe('individual screenshot classification and review', () => {
     expect(images[0]).toMatchObject({ difficulty: 'easy', matchId: null });
   });
   it('keeps global statistics and view-specific filters separate', async () => {
+    vi.mocked(reviewApi.statistics).mockResolvedValue({ totalMatches: 4, totalScreenshots: 24, fullyClassifiedScreenshots: 24, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 3, competitive: 7, deathmatch: 14 }, eligibleByTier: { squash: 3, competitive: 6, deathmatch: 0 }, asOf: '' });
     render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ });
     fireEvent.click(screen.getByText('Search and filters')); change('Search matches', '100%_');
     fireEvent.click(within(screen.getByRole('group', { name: 'Filter obscurity' })).getByLabelText('Low'));
@@ -304,6 +305,17 @@ describe('individual screenshot classification and review', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' })); await waitFor(() => expect(libraryApi.unassigned).toHaveBeenLastCalledWith(expect.any(AbortSignal), ''));
     fireEvent.click(screen.getByRole('button', { name: 'Matches' })); await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveValue('100%_'));
     expect(within(screen.getByRole('region', { name: 'Entire library statistics' })).getByText('Fully classified')).toBeInTheDocument();
+    const totals = within(screen.getByRole('region', { name: 'Entire library statistics' }));
+    expect(totals.getByText('Screenshots').nextElementSibling).toHaveTextContent('24');
+    expect(totals.getByText('Classified Deathmatch').nextElementSibling).toHaveTextContent('14');
+    expect(totals.getByText('Eligible Deathmatch').nextElementSibling).toHaveTextContent('0');
+    expect(totals.getByText(/Pending or rejected screenshots are excluded/)).toBeInTheDocument();
+    images = []; fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
+    await screen.findByText('0 unassigned screenshots');
+    expect(screen.getByText(/Assigned screenshots are available in Matches/)).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('group', { name: 'Filter review' })).getByLabelText('pending'));
+    await screen.findByText(/No unassigned screenshots match the active filters/);
+    expect(totals.getByText('Screenshots').nextElementSibling).toHaveTextContent('24');
   });
   it('uses the same difficulty/review/tier subset for selection, thumbnails and navigation', async () => {
     images = [{ ...images[0], difficulty: 'easy', reviewStatus: 'approved' }, { ...images[1], difficulty: 'medium', reviewStatus: 'approved' }, { ...image('third'), matchId, difficulty: 'easy', matchRevision: 1 }];

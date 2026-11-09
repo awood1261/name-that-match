@@ -58,7 +58,8 @@ export function HostPage() {
             <span>{host.status!.availability.tiers[value].screenshots} eligible {host.status!.availability.tiers[value].screenshots === 1 ? 'screenshot' : 'screenshots'} · {host.status!.availability.tiers[value].matches} distinct {host.status!.availability.tiers[value].matches === 1 ? 'match' : 'matches'}</span>
           </label>)}
         </fieldset>
-        <p>Counts reflect the last server assessment. Matches can appear in more than one tier; counts are not a guaranteed number of rounds.</p>
+        <p>Available this game: approved screenshots with complete match details, both classifications and a valid image. Matches or identical images already shown in this game are excluded. Classified screenshots still pending review are not eligible.</p>
+        <p>Counts reflect the last server assessment. After library changes, use Refresh availability. Matches can appear in more than one tier; counts are not a guaranteed number of rounds.</p>
         {session?.status === 'active' && !round && host.status.availability.tiers[tier].screenshots === 0 && <p className={styles.warning}>No eligible unseen screenshots in this tier. Choose another tier or review the library.</p>}
         <button className={styles.primary} type="button" disabled={!can('PREPARE') || !host.status.availability.tiers[tier].screenshots}
           onClick={() => host.command({ type: 'PREPARE', roundId: clientId(), tier })}>Prepare screenshot</button>

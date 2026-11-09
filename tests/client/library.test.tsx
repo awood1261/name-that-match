@@ -106,7 +106,7 @@ it('renders loading/empty/error queue states and refreshes after import navigati
   vi.spyOn(reviewApi, 'statistics').mockResolvedValue({ totalMatches: 0, totalScreenshots: 0, fullyClassifiedScreenshots: 0, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 0, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 0, competitive: 0, deathmatch: 0 }, asOf: '' });
   render(<MatchLibraryPage />); expect(screen.getByText('Loading screenshots…')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
-  await screen.findByText(/No unassigned screenshots yet/);
+  await screen.findByText(/No unassigned screenshots\. Assigned screenshots are available in Matches/);
   vi.mocked(libraryApi.unassigned).mockRejectedValueOnce(new Error('offline'));
   fireEvent.click(screen.getByRole('button', { name: 'Reload screenshots' })); expect(await screen.findByRole('alert')).toHaveTextContent(/local server/);
   fireEvent.click(screen.getByRole('button', { name: 'Import captures' }));

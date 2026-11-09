@@ -120,9 +120,15 @@ describe('host setup and preparation UI', () => {
     expect(gameApi.create).toHaveBeenCalledTimes(2); expect(vi.mocked(gameApi.create).mock.calls[1][1]).toEqual(original);
   });
   it('ignores an older in-flight poll after a command returns a newer revision', async () => {
+    const timers = vi.spyOn(globalThis, 'setTimeout');
     await createSession(); let finish!: (value: HostStatus) => void; let old!: HostStatus;
     vi.mocked(gameApi.current).mockImplementationOnce(() => { old = status(); return new Promise((resolve) => { finish = resolve; }); });
-    await waitFor(() => expect(finish).toBeTypeOf('function'));
+    // Trigger the registered poll directly: its 1s period equals waitFor's default
+    // timeout, making a wall-clock wait race under concurrent suite load.
+    const poll = timers.mock.calls.find(([, delay]) => delay === 200)?.[0];
+    expect(poll).toBeTypeOf('function');
+    await act(async () => { if (typeof poll === 'function') poll(); });
+    expect(finish).toBeTypeOf('function');
     fireEvent.click(screen.getByRole('button', { name: 'Start game' })); await screen.findByText('Between rounds');
     await act(async () => { finish(old); }); expect(screen.getByText('Between rounds')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Save setup' })).not.toBeInTheDocument();
   });

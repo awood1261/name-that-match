@@ -15,6 +15,8 @@ Open **Play** from the application navigation. This milestone supports session s
 
 An empty selected tier disables Prepare with an explanation. If content changes after the counts were assessed, the server returns an explicit empty-pool/stale-candidate error; refresh or review the library and deliberately prepare again. There is no automatic fallback tier or grouping by video. Pending/rejected, incomplete, unassigned, unrated or invalid/missing images are excluded. Uncertain storage produces an error, not invented zero counts.
 
+Image Library shows both **classified** and **eligible** totals for each tier. A classified Deathmatch screenshot can still be pending review and unavailable to Play. Open its match, select **Review screenshot** and explicitly approve it after checking its saved metadata and image. Play additionally excludes matches or identical image content already exposed in the current game, so its remaining availability can be lower than whole-library eligibility. The Unassigned screenshots view is a queue; zero entries does not mean the library is empty. Assigned captures are under Matches.
+
 ## Host control and request recovery
 
 - The current controller renews while Play is open. **Release host control** permits another tab/device to claim. Leaving Play stops renewals; control becomes claimable after 10 seconds without renewal. A host-liveness loss is detected after 3 seconds; it never awards points or advances a round. There is no force-takeover of an actively renewed lease.
