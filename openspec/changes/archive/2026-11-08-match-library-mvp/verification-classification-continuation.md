@@ -61,7 +61,7 @@ No specified behavior was dropped or expanded into gameplay. Group-7 rows stay u
 
 ## Manual verification
 
-Follow [classification manual checks](../../../docs/classification.md#manual-checks), starting with backup/migration precautions, then import/assignment, Low/High matrix checks, explicit review, statistics/search, draft guards/conflicts and restart. Use disposable managed copies for missing/corrupt-image exercises; never alter original captures.
+Follow [classification manual checks](../../../../docs/classification.md#manual-checks), starting with backup/migration precautions, then import/assignment, Low/High matrix checks, explicit review, statistics/search, draft guards/conflicts and restart. Use disposable managed copies for missing/corrupt-image exercises; never alter original captures.
 
 ## Files and Git audit
 

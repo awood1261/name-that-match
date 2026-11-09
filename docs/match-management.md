@@ -42,4 +42,4 @@ Use the already imported screenshots or a disposable data root with authored fix
 7. Use keyboard Tab/Space/Enter, inspect visible focus and named controls, and repeat at tablet width. At narrow widths the inspector replaces the browsing area; Back to screenshots returns to the retained selection.
 8. Stop/restart the server with the same root. Verify saved match IDs, fields, partial dates and associations remain.
 
-Automated coverage and actual browser evidence are recorded in the active change's Milestone 4 verification record. Physical Android/Wi-Fi and real-collection acceptance remain separate opt-in checks. See the classification continuation verification record for review/eligibility evidence.
+Automated coverage and actual browser evidence are recorded in the [archived Milestone 4 verification record](../openspec/changes/archive/2026-11-08-match-library-mvp/milestone-4-verification.md). Physical Android/Wi-Fi and real-collection acceptance remain separate opt-in checks. See the classification continuation verification record for review/eligibility evidence.

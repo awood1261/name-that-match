@@ -4,7 +4,7 @@
 
 Private, portable, offline-first wrestling screenshot trivia for filming at events and schools. Prioritize reliability, maintainability, and efficient filming workflows. Planned environments: Studio Mode (laptop and TV) and Road Mode (laptop and Android tablet over local Wi-Fi).
 
-Read `README.md` for setup, `docs/local-storage.md` for storage, and relevant `openspec/` artifacts for intended behavior. Inspect actual code, Git status, recent history, and existing instructions before editing. Preserve unrelated user changes. Verify current status: the foundation is archived; Match Library and gameplay require separate approved changes.
+Read `README.md` for setup, `docs/local-storage.md` for storage, and relevant `openspec/` artifacts for intended behavior. Inspect actual code, Git status, recent history, and existing instructions before editing. Preserve unrelated user changes. Verify current status: the foundation and Match Library MVP are archived; further features and gameplay require separate approved changes. See the Match Library archive summary for deferred real-collection/device acceptance checks.
 
 ## OpenSpec workflow
 

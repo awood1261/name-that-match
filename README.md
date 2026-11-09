@@ -107,11 +107,11 @@ npm run typecheck
 npm run lint
 npm run build
 openspec validate application-foundation --type spec --strict
-openspec validate match-library-mvp --strict
+openspec validate --specs --strict
 openspec validate --all --strict
 ```
 
-The OpenSpec command validates the current capability. For an active change, use `openspec validate <change-name> --type change --strict` with the installed CLI. Foundation hardening is archived; see its [verification record](openspec/changes/archive/2026-11-06-foundation-hardening/verification.md). See [foundation review](docs/foundation-review.md) for historical discrepancies, design references, and verification limits.
+The OpenSpec commands validate the current capability specifications. Match Library MVP is archived; see its [archive checkpoint and deferred acceptance work](openspec/changes/archive/2026-11-08-match-library-mvp/archive-summary.md). For an active change, use `openspec validate <change-name> --type change --strict` with the installed CLI. Foundation hardening is archived; see its [verification record](openspec/changes/archive/2026-11-06-foundation-hardening/verification.md). See [foundation review](docs/foundation-review.md) for historical discrepancies, design references, and verification limits.
 
 ## Troubleshooting
 

@@ -38,4 +38,4 @@ To roll back the app version, use compatible old code with a verified pre-upgrad
 6. Search/filter without changing global counts; check literal `%`/`_`, unset values, source grouping and empty results. Try two stale editors and Save/Discard/Stay for match, image and assignment drafts.
 7. Use keyboard navigation and a 768px viewport. Verify contained portrait/landscape previews, thumbnail navigation, focus and usable controls. Restart with the same root and confirm persistence.
 
-The active OpenSpec change remains unarchived. Prior milestone verification records describe their historical input model; this document describes the approved continuation. Physical Android, Wi-Fi and real-collection acceptance require their separate review gate.
+The Match Library MVP change is [archived](../openspec/changes/archive/2026-11-08-match-library-mvp/archive-summary.md). Its seven optional group-7 acceptance checks remain explicitly deferred. Prior milestone verification records describe their historical input model; this document describes the approved continuation. Physical Android, Wi-Fi and real-collection acceptance require their separate review gate.
