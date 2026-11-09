@@ -29,7 +29,7 @@ This starts:
 
 ## Production startup
 
-Before starting this version against existing data, follow the [stopped-writer whole-root backup procedure](docs/local-storage.md#backup-and-restore). Startup upgrades supported stores through schema 3: the existing schema-1→2 classification mapping is unchanged, and schema 3 adds game persistence. See [classification mapping](docs/classification.md#migration) and [Game Experience Milestone 1, verification and rollback](docs/game-foundation.md). Game Experience Milestone 2 enables host setup and hidden preparation; contestant displays and live countdown controls remain deferred. See [host operation and manual acceptance](docs/game-host.md).
+Before starting this version against existing data, follow the [stopped-writer whole-root backup procedure](docs/local-storage.md#backup-and-restore). Startup upgrades supported stores through schema 3: the existing schema-1→2 classification mapping is unchanged, and schema 3 adds game persistence. See [classification mapping](docs/classification.md#migration) and [Game Experience Milestone 1, verification and rollback](docs/game-foundation.md). Game Experience Milestone 3 adds a separate contestant tab, countdown and live host controls; full-game progression remains deferred. See [host operation and manual acceptance](docs/game-host.md).
 
 Build the client and server first:
 
@@ -78,7 +78,7 @@ Closing the dialog keeps durable server progress. Reopen **Recent imports** to r
 
 ## Game host
 
-Open **Play** to create a solo or head-to-head session, explicitly select the active contestant and prepare a verified screenshot from a derived game tier. Preparation stays hidden and does not start time or consume a match. Reveal requires a contestant display, which is deferred to the next milestone. Host leases, authoritative revisions and command receipts protect concurrent/retried requests. See [host operation, recovery and manual acceptance](docs/game-host.md).
+Open **Play** to configure contestants, explicitly select the active contestant and create a primary contestant-display link **before preparing**. Paste it into a separate tab. Prepare stays hidden until the primary has decoded/synchronized and the host selects **Reveal & start**. The server owns the ten-second clock, pause/resume and judgment; display reload/disconnect never resets it. Host leases, revisions and receipts protect concurrent/retried requests. Scoreboard, answer reveal, next-round and End/New Game UI remain deferred to Milestone 4. See [host operation, recovery and manual acceptance](docs/game-host.md).
 
 ## Match management
 

@@ -1,6 +1,6 @@
 # Game Experience Milestone 1
 
-This document records the Milestone 1 checkpoint: domain engine, clock/service boundary and SQLite persistence. Milestone 2 now adds host HTTP/setup/preparation; see [current host operation](game-host.md). Contestant windows, countdown UI and WebSockets remain deferred.
+This document records the Milestone 1 checkpoint: domain engine, clock/service boundary and SQLite persistence. Milestones 2–3 now add host HTTP/setup/preparation, the read-only contestant tab, countdown and live judgments; see [current host operation](game-host.md). Full-game progression, Studio launching and WebSockets remain deferred.
 
 ## Storage and upgrade
 
@@ -18,7 +18,7 @@ One or two contestants are supported. The host explicitly switches contestants b
 
 The service accepts versioned UUID commands with expected state revisions, records durable receipts and publishes accepted state only after commit. A retry uses the same command ID and business content, including its original expected revision. Resolve its stored receipt/current state rather than inventing a second command ID. A changed payload under the same ID conflicts. Score events are unique by round and tied to that round's contestant. Reveal and Advance do not award points.
 
-The game service uses trusted server observation ports for eligibility, current candidate/image and primary readiness. They default to false. The later library/display adapters must provide real validation; a browser cannot supply these observations in a command. Milestone 1 did not implement those adapters or controller authorization/network routes; Milestone 2 now supplies library observations and host HTTP/leases while display readiness remains unavailable. Operational code must use one game service/server per data root and close the service before closing its SQLite connection.
+The game service uses trusted server observation ports for eligibility, current candidate/image and primary readiness. They default to false; a browser cannot override them in a command. Milestone 1 did not implement those adapters or authorization/network routes. Milestones 2–3 now supply real library observations, HTTP/leases and decoded-image/clock/connection readiness. Operational code must use one game service/server per data root and close the service before closing its SQLite connection.
 
 ## Timer and recovery
 
@@ -66,4 +66,4 @@ try {
 }
 ```
 
-Review service recovery and late-judgment behavior through `tests/game/service.test.ts`; live countdown gameplay still awaits later milestones. The [Milestone 2 host checklist](game-host.md#manual-acceptance) covers current setup/preparation UI. Photo Library hardware/offline acceptance remains deferred as recorded in its archive.
+Review service recovery and late-judgment behavior through `tests/game/service.test.ts`; the [current host checklist](game-host.md#manual-acceptance) covers setup, the contestant tab and live countdown/judgment UI. Full-game progression and Photo Library hardware/offline acceptance remain deferred.

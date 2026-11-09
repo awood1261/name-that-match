@@ -133,6 +133,10 @@ export class GameService {
   snapshot(sessionId: string, role: 'host' | 'display') {
     const state = this.state(sessionId); return role === 'host' ? hostSnapshot(state) : displaySnapshot(state, this.clock, this.now());
   }
+  observation(sessionId: string) {
+    const state = this.state(sessionId); const serverMonoMs = this.now();
+    return { state, snapshot: displaySnapshot(state, this.clock, serverMonoMs), serverMonoMs };
+  }
   close(): void {
     if (this.stopped) return;
     try {

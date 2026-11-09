@@ -3,6 +3,8 @@ import { GAME_TIERS, GAME_TIER_DETAILS, type GameTier } from '../../../shared/sr
 import { clientId } from '../ids';
 import { useGameHost } from './useGameHost';
 import { HostSetup } from './HostSetup';
+import { HostDisplayPanel } from './HostDisplayPanel';
+import { HostRoundControls } from './HostRoundControls';
 import styles from './HostPage.module.css';
 
 export function HostPage() {
@@ -15,7 +17,7 @@ export function HostPage() {
   const stateLabel = !session ? 'No session' : session.status === 'setup' ? 'Setup' : round?.phase === 'preparing' ? 'Preparing screenshot'
     : round?.phase === 'ready' ? 'Screenshot ready · hidden' : session.status === 'active' && !round ? 'Between rounds' : round?.phase.split('_').join(' ') ?? session.status;
   return <section className={styles.host} aria-labelledby="game-host-title">
-    <header className={styles.header}><div><p className={styles.kicker}>Play · host controls</p><h2 id="game-host-title">Game setup & preparation</h2></div>
+    <header className={styles.header}><div><p className={styles.kicker}>Play · host controls</p><h2 id="game-host-title">Game host</h2></div>
       {host.credential && <button type="button" disabled={host.busy || host.pending} onClick={() => { void host.release(); }}>Release host control</button>}
     </header>
     <p className={styles.state} role="status">{host.loading ? 'Connecting to game server…' : host.busy ? 'Saving command…' : stateLabel}</p>
@@ -29,6 +31,7 @@ export function HostPage() {
     </div>}
     {!host.loading && !host.credential && <button type="button" className={styles.primary} onClick={() => { void host.connect(); }}>Take host control / reconnect</button>}
     {host.credential && host.status && <>
+      {session && <HostDisplayPanel key={`${session.id}:${host.credential!.serverEpoch}`} credential={host.credential!} status={host.status} disabled={host.busy || host.pending || !host.connected} refresh={host.refresh} />}
       <div className={styles.grid}>
         {(!session || session.status === 'setup') && <HostSetup key={session ? `${session.id}:${session.stateVersion}` : 'new'} session={session} disabled={host.busy || host.pending} onSave={host.setup} onDirty={setSetupDirty} />}
         {session && <section className={styles.card} aria-labelledby="game-session-title">
@@ -39,7 +42,7 @@ export function HostPage() {
             onChange={(event) => host.command({ type: 'SELECT_CONTESTANT', contestantId: event.target.value })}>
             {session.contestants.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <p>{session.status === 'setup' ? 'Choose the starting contestant in setup.' : round ? unexposed ? 'Cancel the unexposed preparation before changing contestants.' : 'This recovered round keeps its original contestant. Live-round recovery controls are not available yet.' : 'The selected contestant stays active until you change this selection.'}</p>
+          <p>{session.status === 'setup' ? 'Choose the starting contestant in setup.' : round ? unexposed ? 'Cancel the unexposed preparation before changing contestants.' : 'This round keeps its original contestant. Switching is available between rounds.' : 'The selected contestant stays active until you change this selection.'}</p>
           {session.status === 'setup' && <div className={styles.actions}>
             <button type="button" className={styles.primary} disabled={!can('START') || setupDirty} onClick={() => host.command({ type: 'START' })}>Start game</button>
             <button type="button" disabled={!can('DISCARD_SETUP')} onClick={() => { if (window.confirm('Discard this setup? Your Image Library will be kept.')) host.command({ type: 'DISCARD_SETUP' }); }}>Discard setup</button>
@@ -65,16 +68,15 @@ export function HostPage() {
           onClick={() => host.command({ type: 'PREPARE', roundId: clientId(), tier })}>Prepare screenshot</button>
       </section>
       {round && <section className={styles.card} aria-labelledby="game-round-title">
-        <h3 id="game-round-title">{round.phase === 'preparing' ? 'Preparing a verified screenshot…' : unexposed ? 'Prepared round' : 'Recovered round'}</h3>
+        <h3 id="game-round-title">{round.phase === 'preparing' ? 'Preparing a verified screenshot…' : unexposed ? 'Prepared round' : 'Current round'}</h3>
         <p>Assigned contestant: <strong>{roundOwner?.name}</strong> · {GAME_TIER_DETAILS[round.requestedTier].label}</p>
-        <p>{unexposed ? 'The screenshot remains hidden. Preparation does not start the countdown or consume a match.' : 'This previously exposed round retains its history and contestant. Countdown and judgment controls are not available yet.'}</p>
+        <p>{unexposed ? 'The screenshot remains hidden. Preparation does not start the countdown or consume a match.' : 'This exposed round retains its history and contestant. The server controls its time and outcome.'}</p>
         {round.phase === 'ready' && <><p className={styles.cover}>Screenshot stays hidden until Reveal</p>
-          <details><summary>Private host answer</summary><p>{round.context.answer.participantDescription} · {round.context.answer.promotion} · {round.context.answer.event}</p></details>
           {!host.status.candidateValid && <p className={styles.warning}>The prepared record changed or needs revalidation. Cancel and prepare again.</p>}
         </>}
-        <div className={styles.actions}><button type="button" disabled={!can('CANCEL_UNEXPOSED')} onClick={() => host.command({ type: 'CANCEL_UNEXPOSED' })}>Cancel preparation</button>
-          <button type="button" className={styles.primary} disabled aria-describedby="game-display-required">Reveal & start</button></div>
-        <p id="game-display-required">{host.status.primaryDisplay.message}</p>
+        {'context' in round && round.context && <details><summary>Private host answer</summary><p>{round.context.answer.participantDescription} · {round.context.answer.promotion} · {round.context.answer.event}</p></details>}
+        {unexposed && <button type="button" disabled={!can('CANCEL_UNEXPOSED')} onClick={() => host.command({ type: 'CANCEL_UNEXPOSED' })}>Cancel preparation</button>}
+        <HostRoundControls status={host.status} can={can} command={host.command} />
       </section>}
       {host.status.preparationError && <p role="alert" className={styles.error}>{host.status.preparationError}</p>}
     </>}

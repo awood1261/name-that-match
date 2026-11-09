@@ -71,6 +71,14 @@ export class GameLibrary {
     if (!bytes) throw new HttpError(409, 'CANDIDATE_CHANGED', 'The selected screenshot changed or became unavailable. Cancel preparation and try again.');
     this.pinned = { sessionId, roundId, context, bytes };
   }
+  restore(sessionId: string, roundId: string, context: RoundContext): boolean {
+    const bytes = this.inspect(context, true);
+    if (!bytes) return false;
+    this.pinned = { sessionId, roundId, context, bytes }; return true;
+  }
+  bytes(sessionId: string, roundId: string): Buffer | null {
+    return this.pinned?.sessionId === sessionId && this.pinned.roundId === roundId ? this.pinned.bytes : null;
+  }
   current(context: RoundContext, purpose: 'prepare' | 'reveal' | 'resume'): boolean {
     const bytes = this.inspect(context, purpose === 'resume');
     if (!bytes) return false;

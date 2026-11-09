@@ -1,6 +1,6 @@
-# Game host — Milestone 2
+# Game host — Milestone 3
 
-Open **Play** from the application navigation. This milestone supports session setup and hidden screenshot preparation. Contestant displays, countdown controls, scoreboard/answer presentation, Studio windows and Road WebSockets are later milestones. Reveal is intentionally disabled until a real connected display is ready.
+Open **Play** from the application navigation. This checkpoint supports setup, hidden preparation, a separate read-only contestant tab, the authoritative countdown and host judgment/pause controls. Scoreboard, answer reveal, next-round progression and End/New Game UI remain Milestone 4 work. Automatic Studio launching/fullscreen and Road WebSockets remain later work. Use disposable test data when checking several alternative round outcomes; this milestone's UI stops after adjudication.
 
 ## Setup and preparation
 
@@ -17,6 +17,21 @@ An empty selected tier disables Prepare with an explanation. If content changes 
 
 Image Library shows both **classified** and **eligible** totals for each tier. A classified Deathmatch screenshot can still be pending review and unavailable to Play. Open its match, select **Review screenshot** and explicitly approve it after checking its saved metadata and image. Play additionally excludes matches or identical image content already exposed in the current game, so its remaining availability can be lower than whole-library eligibility. The Unassigned screenshots view is a queue; zero entries does not mean the library is empty. Assigned captures are under Matches.
 
+## Connect a contestant and run an attempt
+
+1. **Before preparing**, select **Create contestant display link**, leaving **Use new link as the primary display** checked. Copy the read-only link into a separate tab. This manual join is the current workflow; it does not automatically open a window. If an existing Milestone 2 session is already Ready, select **Cancel preparation** first, create the primary link, then prepare again.
+2. The viewer removes the join fragment from the address bar and retains its own capability in tab session storage. It renders no administrative shell or host controls. Keep the original link available for deliberately rejoining another tab. Links are process-local; a server restart needs a fresh link.
+3. Prepare an eligible tier. The display fetches/decodes the current clue into a Blob while keeping it out of the rendered page. **Ready** remains covered. Wait for **Primary display decoded and synchronized**. Missing/failed images or excessive/stale clock observations block reveal. Extra viewers do not gate the round; only the host can designate a primary between rounds or while paused.
+4. Select **Reveal & start**. The server commits exposure and the 10,000ms deadline together. The image appears with a large countdown. The host sees authoritative timing and can select **Correct**, **Incorrect** or **Pause**. Incorrect ends the attempt immediately for zero. Correct commits the frozen tier's base points once; it does not reveal the answer or advance.
+5. Pause covers the clue and freezes its actual remaining time. Wait for primary readiness, then explicitly **Resume**; it never grants a new ten seconds. **Skip / Void** records zero with the chosen reason and retains exposed-match history.
+6. At zero, guessing ends and **Time up** appears. **Confirm timeout · no credit** resolves zero. **Correct before buzzer — I confirm a timely answer** is a separate explicit attestation for an answer spoken before expiry; ordinary Correct cannot be used after expiry. No client timer awards points.
+
+The primary and host loss threshold is 3 seconds, checked by the server's one-second liveness sweep and on requests. Detection consumes elapsed time; an already-due deadline expires instead of refunding time. The viewer covers on a failed request or a synchronization gap over 3 seconds. Reconnection never resumes automatically. Reloading the primary during guessing creates a new connection generation and pauses at detection; fresh decode/synchronization and host Resume are required. Losing a secondary display does not pause.
+
+On a graceful server stop a known running remainder is paused. After an unknown running crash the restored round is Interrupted and can only be explicitly voided. A known pause survives restart with the same remainder if its original managed bytes validate; missing/changed bytes become Interrupted. Reclaim host control and create a fresh primary link while paused. Pasting it into the same viewer tab also rebinds; no manual database reset is needed. Already committed judgments are retained.
+
+Counts, readiness and clock observations use bounded temporary HTTP polling (200ms during live/ready/paused states; 1s while idle). Clock readiness requires a recent echoed server nonce, reported round trip no greater than 500ms and current image/connection identity. Browser countdown interpolation uses monotonic time and clamps at zero; it cannot extend the server deadline. Measured transport/paint latency can reduce the perceived answer window. Physical frame simultaneity and Road certification are not claimed.
+
 ## Host control and request recovery
 
 - The current controller renews while Play is open. **Release host control** permits another tab/device to claim. Leaving Play stops renewals; control becomes claimable after 10 seconds without renewal. A host-liveness loss is detected after 3 seconds; it never awards points or advances a round. There is no force-takeover of an actively renewed lease.
@@ -25,7 +40,7 @@ Image Library shows both **classified** and **eligible** totals for each tier. A
 - A lost response shows an uncertain-request panel and blocks new commands. Use **Check command status**. An accepted receipt restores the current state. If no receipt exists, the client checks current state before offering **Retry original request**, preserving the same command/session/round IDs and original revision. If state changed, deliberately dismiss only after that review; do not manufacture a second command to guess whether the first succeeded.
 - Sessions, attempts, owner IDs and receipts live in SQLite; controller/viewer capabilities are process-local and never stored in game history. This is trusted-LAN coordination, not account authentication or an anti-cheat sandbox. Existing library administration remains reachable under its existing policy.
 
-The native HTTP adapter exposes the existing M1 command lane plus private/public role snapshots and receipt lookup. Read-only viewer capabilities provide protocol groundwork; they do not implement a contestant page, image endpoint, readiness acknowledgment, countdown or display join workflow. No network request can supply a readiness override in this milestone. There is no End-game/scoreboard UI yet; continue the existing started session rather than deleting data to reset it. New-game completion controls belong to later approved work.
+The native HTTP adapter exposes the existing M1 command lane plus private/public snapshots and receipt lookup. Display status accepts only connection/readiness/clock observations, and the opaque current-round image route requires a role capability. Host commands cannot override readiness. There is no End-game/scoreboard/next-round UI yet; retain the existing session after adjudication rather than deleting data to reset it. Use a separate disposable data root for independent acceptance runs.
 
 ## Manual acceptance
 
@@ -36,10 +51,14 @@ Use an already backed-up collection or a disposable configured data root. Start 
 - Try duplicate/blank names; verify actionable feedback and no saved invalid session. Edit a saved setup and verify Start is disabled until Save setup.
 - Start with approved eligible content. Switch the active contestant and verify it stays selected.
 - Confirm three tier labels/point values and separate screenshot/match counts. Choose an empty tier and verify Prepare is disabled with an explanation.
-- Prepare a populated tier: verify Ready/hidden, disabled contestant switching, disabled Reveal with its display-required explanation and no visible timer/image/score controls.
+- Create a primary display link before preparing and paste it into a separate tab. Prepare a populated tier: verify Ready/hidden and disabled contestant switching. Reveal stays disabled until that display decodes/synchronizes; then it enables without exposing the clue early.
+- Reveal: check the clue appears only in the contestant tab and the countdown starts at the authoritative window. Pause: check clue coverage and frozen time. Resume: verify only the saved remainder is available.
+- Reload or disconnect the primary during guessing: verify pause/cover or expiry, and explicit readiness-gated Resume. Check an extra viewer cannot submit host commands or cause a pause when only it disconnects.
+- Let time expire: check Time up/zero and the distinct late-judgment versus no-credit actions. On separate disposable runs check Correct, Incorrect and Skip/Void. Each outcome is saved once with no automatic answer reveal or progression.
+- Restart while paused: reclaim host control, create a fresh primary link and paste it into the same contestant tab. Check rebind/readiness, the same round and preserved remainder, followed by explicit Resume. No fresh ten-second window is offered.
 - Cancel: verify the same contestant remains active and capacity is not consumed. Prepare again, then reload/restart and check the same persisted session/owner/hidden Ready state.
 - Open Play in a separate fresh tab: verify host-busy handling. Release control in the first tab; explicitly claim it in the second and verify no new session was created.
 - Use keyboard focus, native select/radio keys and Enter/Space on buttons. Check visible focus and readable controls at laptop and tablet widths, without horizontal overflow. This does not certify an actual tablet or Road Mode.
 - Revisit Image Library and confirm existing import, editing, classification, approval and filtering workflows still work.
 
-Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's milestone-2 verification record for actual executed results and browser-check limits.
+Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's milestone-3 verification record for actual executed results and browser-check limits. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.

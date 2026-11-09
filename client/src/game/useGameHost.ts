@@ -70,7 +70,7 @@ export function useGameHost() {
       catch (failure) { if (!signal.aborted) controlError(failure, credential); }
       finally {
         reading = false;
-        if (!stopped) timer = setTimeout(() => { void read(); }, latest.current?.snapshot?.currentRound?.phase === 'preparing' ? 200 : 1000);
+        if (!stopped) timer = setTimeout(() => { void read(); }, ['preparing', 'ready', 'guessing', 'paused', 'awaiting_judgment'].includes(latest.current?.snapshot?.currentRound?.phase ?? '') ? 200 : 1000);
       }
     };
     timer = setTimeout(() => { void read(); }, 200);
