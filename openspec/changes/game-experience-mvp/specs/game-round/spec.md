@@ -5,7 +5,7 @@ Control the filmed round lifecycle with a server-owned ten-second window, explic
 ## ADDED Requirements
 
 ### Requirement: GR-01 Explicit authoritative progression
-The game SHALL expose explicit between-round, preparing, ready, guessing, paused, awaiting-judgment, adjudicated, answer-revealed and interrupted phases within an active session. Only allowed commands SHALL advance a phase. Rendering, animation completion, reconnecting and browser timers SHALL not adjudicate or advance a round. Each attempt SHALL have stable session/round identities and a monotonic state revision.
+The game SHALL expose explicit between-round, preparing, ready, guessing, paused, awaiting-judgment, adjudicated, answer-revealed and interrupted phases within an active session. Only allowed commands SHALL advance a phase. Rendering, animation completion, reconnecting and browser timers SHALL not adjudicate or advance a round. Each attempt SHALL have stable session/round identities, an immutable assigned contestantId and a monotonic state revision. The authoritative session SHALL separately retain activeContestantId; round progression SHALL not automatically change that selection.
 
 #### Scenario: Normal round
 - **WHEN** the host prepares eligible content, waits for readiness, reveals it, judges, reveals the answer and advances
@@ -67,7 +67,7 @@ Cancelling preparation before exposure SHALL release the reservation without con
 - **THEN** it records a void zero-point turn and that match cannot be redrawn in the session
 
 ### Requirement: GR-07 Outcome, answer reveal and advance
-Judgment feedback and answer reveal SHALL be distinct host-controlled steps. The answer SHALL include the pinned participant/promotion/event fields and only the known precision of optional metadata. Advancing SHALL require answer reveal or an explicitly voided turn and SHALL clear the public round image/answer without resetting scores or used history. Ending a game SHALL also be allowed from a resolved round without forcing an answer reveal.
+Judgment feedback and answer reveal SHALL be distinct host-controlled steps. The answer SHALL include the pinned participant/promotion/event fields and only the known precision of optional metadata. Advancing SHALL require answer reveal or an explicitly voided turn and SHALL clear the public round image/answer without resetting scores or used history or changing activeContestantId or historical round contestantId. Ending a game SHALL also be allowed from a resolved round without forcing an answer reveal.
 
 #### Scenario: Show the answer
 - **WHEN** the host reveals a resolved round's answer

@@ -4,7 +4,7 @@ The approved Photo Library and official branding are implemented, but Play is st
 
 ## What Changes
 
-- Add session setup, named contestants, active-contestant/tier selection, fresh eligible-pool selection, durable rounds and host-controlled completion with scores, winner or tie.
+- Add session setup, named contestants, active-contestant/tier selection, fresh eligible-pool selection, durable rounds and host-controlled completion with scores, winner or tie. Approved P2 makes contestant selection host-controlled: provide a convenient Switch contestant action between rounds, retain the selection until explicitly changed, and never automatically alternate after a round. Freeze each round's contestant ownership at preparation so later selections cannot redirect scores.
 - Preserve the exact shared obscurity/visual-difficulty matrix, approval/complete-match/image gates and original captures. No classification conversion is needed on the current schema-2 dataset.
 - Enforce the owner's confirmed rules: no repeat match within a session; an incorrect judgment ends the attempt for zero points; the host ends a game manually; the host may explicitly credit an answer spoken before the buzzer after time expires.
 - Add an explicit typed round machine with an authoritative 10-second clock, idempotent revisioned commands, once-only scoring, answer reveal and controlled progression. Recommended pause/cancel/skip/restart and recovery policies remain review decisions in design D2.

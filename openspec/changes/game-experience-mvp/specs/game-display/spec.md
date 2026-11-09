@@ -5,11 +5,16 @@ Provide separate host controls and a readable branded contestant experience for 
 ## ADDED Requirements
 
 ### Requirement: GD-01 Separate host and contestant roles
-The host view SHALL provide setup, current contestant/tier, pool availability, private answer context, valid phase commands and connection/readiness feedback. The contestant view SHALL show only its public phase projection, with no library controls, host actions or private answer/provenance before answer reveal. Under the proposed MVP, the host SHALL enter the contestant's verbal tier choice; the contestant display SHALL be read-only.
+The host view SHALL provide setup, current contestant/tier, pool availability, private answer context, valid phase commands and connection/readiness feedback. Approved P2 SHALL provide a convenient, keyboard-accessible Switch contestant action between rounds, disabled with a clear explanation during an attempt. Current-round contestant and outcome labels SHALL use the round owner rather than a later active selection. The contestant view SHALL show only its public phase projection, with no library controls, host actions or private answer/provenance before answer reveal. Under the still-proposed P7 verbal-tier-input policy, the host SHALL enter the contestant's verbal tier choice. Contestant displays SHALL remain read-only under approved P2 and SHALL not select contestants or submit host commands.
 
 #### Scenario: A contestant display opens
 - **WHEN** the display is opened on a TV window or tablet
 - **THEN** it does not expose the administrative application shell, host controls, debug state or hidden answer fields
+
+#### Scenario: Host-only contestant switching
+- **WHEN** the host switches the active contestant between rounds using the keyboard-reachable control
+- **THEN** the display reflects the server-confirmed selection without offering a selection control of its own
+- **AND** earlier round labels and score ownership remain unchanged
 
 ### Requirement: GD-02 Phase-specific game presentation
 The display SHALL support waiting/setup, tier choice, abstract shuffle/preparation, hidden-image ready, screenshot/countdown, pause/reconnecting cover, correct/incorrect/timeout feedback, explicit answer reveal, scoreboard and final results. The scoreboard SHALL use real committed outcomes and descending score order, preserve ties and show no fabricated comp example scores or fixed-round limit.

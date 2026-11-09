@@ -47,7 +47,7 @@ Selection SHALL choose uniformly among eligible unseen screenshot candidates of 
 - **THEN** selection returns the same candidate without requiring production randomness to be predictable
 
 ### Requirement: GS-04 Reservation and immutable round context
-A prepared candidate SHALL be reserved within the active session and revalidated before exposure. The round SHALL retain its selected contestant, screenshot/match identities, image identity and answer/classification input snapshot. After exposure, saved library edits SHALL not change the round's answer, base points or already earned score. Future selections SHALL use fresh library data. Session use history SHALL be committed before exposure is published.
+A prepared candidate SHALL be reserved within the active session and revalidated before exposure. The round SHALL retain its selected contestant, screenshot/match identities, image identity and answer/classification input snapshot. Its contestantId SHALL be copied from the session activeContestantId at attempt creation and SHALL remain immutable through preparation, exposure, adjudication and history. After exposure, saved library edits SHALL not change the round's answer, base points or already earned score. Future selections SHALL use fresh library data. Session use history SHALL be committed before exposure is published.
 
 #### Scenario: Library changes before reveal
 - **WHEN** a selected asset, review, association or relevant record revision changes before exposure
@@ -58,18 +58,36 @@ A prepared candidate SHALL be reserved within the active session and revalidated
 - **THEN** the current round and score history retain their pinned context while subsequent preparations observe the edits
 
 ### Requirement: GS-05 Contestant turn control
-The current contestant and chosen tier SHALL be visible. Under the proposed progression policy, advancing a resolved exposed turn SHALL suggest the next contestant cyclically in setup order, with explicit host override only between turns. Unexposed cancellation SHALL keep the contestant and turn number unchanged. A skipped or cancelled exposed turn SHALL remain recorded as a zero-point turn.
+Under approved P2, the host SHALL explicitly select the active contestant through a convenient Switch contestant action between rounds. Authoritative session activeContestantId and round contestantId SHALL represent selection and ownership separately. The selected contestant SHALL stay active until the host explicitly changes it; advancing or resolving a round SHALL not automatically alternate contestants. Selection changes SHALL be rejected outside between-round state and SHALL never reassign an existing round or score. The current contestant and chosen tier SHALL be visible. Unexposed cancellation SHALL keep the contestant and turn number unchanged. A skipped or cancelled exposed turn SHALL remain recorded as a zero-point turn.
 
-#### Scenario: Alternate contestants
-- **WHEN** the host advances after a completed exposed turn
-- **THEN** the next contestant is selected in order, including wraparound, without automatically starting a new timer
+#### Scenario: Keep the contestant across consecutive rounds
+- **WHEN** a host advances a resolved turn and prepares another without selecting a different contestant
+- **THEN** the same contestant remains active and owns the new round without any automatic alternation
+
+#### Scenario: Explicitly switch contestants
+- **WHEN** the host uses Switch contestant between rounds to select another contestant in this session
+- **THEN** the server records that selection and uses it for subsequent attempts
+- **AND** prior round owners, outcomes and scores remain unchanged
+
+#### Scenario: Prevent reassignment during an attempt
+- **WHEN** a host requests a contestant change while an attempt is preparing, ready, guessing, paused, awaiting judgment, adjudicated, answer-revealed or interrupted
+- **THEN** the request fails without changing selection, round owner, deadline, outcome or scores
+- **AND** the host must first cancel the unexposed attempt or resolve and advance the exposed round
+
+#### Scenario: Recover explicit contestant state
+- **WHEN** a session is reopened after the host switched contestants between rounds
+- **THEN** its last committed activeContestantId and every historical round contestantId are separately preserved without reassignment
 
 ### Requirement: GS-06 Once-only score totals
-A correct host judgment SHALL award exactly the frozen round tier's 1/2/3 base points once. Incorrect, timeout and void outcomes SHALL award zero. Totals SHALL derive from committed outcomes/awards and SHALL not be editable client fields. Rankings SHALL sort descending by total and preserve equal-score ties; setup order SHALL only stabilize display order. The proposed MVP SHALL have no bonus execution, score override or adjudication undo.
+A correct host judgment SHALL award exactly the frozen round tier's 1/2/3 base points once to that round's immutable contestantId, never to a later session activeContestantId. Incorrect, timeout and void outcomes SHALL award zero. Totals SHALL derive from committed outcomes/awards and SHALL not be editable client fields. Rankings SHALL sort descending by total and preserve equal-score ties; setup order SHALL only stabilize display order. The proposed MVP SHALL have no bonus execution, score override or adjudication undo.
 
 #### Scenario: Repeated correct command
 - **WHEN** the same accepted judgment is retried or another command tries to score a resolved round
 - **THEN** no additional points are awarded and the original receipt or explicit conflict is returned
+
+#### Scenario: Score ownership after a later selection
+- **WHEN** a judgment for contestant A committed, the host advanced and selected contestant B, and the original judgment is retried or its receipt arrives late
+- **THEN** the original award still belongs only to A, B receives none of those points, and no additional award occurs
 
 #### Scenario: Host judges a verbal answer
 - **WHEN** the host accepts identification of the wrestlers and match
