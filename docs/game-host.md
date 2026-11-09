@@ -1,6 +1,6 @@
-# Game host — Task 5.1
+# Game host — Task 5.2
 
-Open **Play** from the application navigation. This checkpoint supports setup, hidden preparation, a separate read-only contestant tab, the authoritative countdown, host judgment/pause controls and explicit **Reveal Result**. Scoreboard, next-round progression and End/New Game UI remain later Milestone 4 tasks. Automatic Studio launching/fullscreen and Road WebSockets remain later work. Use disposable test data when checking alternative round outcomes; the current UI stops after result/answer presentation.
+Open **Play** from the application navigation. This checkpoint supports setup, hidden preparation, a separate read-only contestant tab, the authoritative countdown, host judgment/pause controls and explicit **Reveal Result**. Scoreboard and final-total presentation are implemented. Next-round progression and End/New Game UI remain later Milestone 4 tasks. Automatic Studio launching/fullscreen and Road WebSockets remain later work. Use disposable test data when checking alternative round outcomes; the current UI stops after result/answer presentation.
 
 ## Setup and preparation
 
@@ -37,6 +37,16 @@ On a graceful server stop a known running remainder is paused. After an unknown 
 
 Counts, readiness and clock observations use bounded temporary HTTP polling (200ms during live/ready/paused states; 1s while idle). Clock readiness requires a recent echoed server nonce, reported round trip no greater than 500ms and current image/connection identity. Browser countdown interpolation uses monotonic time and clamps at zero; it cannot extend the server deadline. Measured transport/paint latency can reduce the perceived answer window. Physical frame simultaneity and Road certification are not claimed.
 
+## Scoreboard and final totals
+
+The host scoreboard uses the complete server score ledger, updates immediately after judgment, and shows the explicitly selected active contestant. The contestant scoreboard appears between rounds and alongside a revealed result. Its totals and latest outcomes exclude unrevealed judgments during play. Ready/guessing/paused and concealed-result screens do not add a scoreboard over the clue or disclose the new result.
+
+Rows are sorted by descending score; tied scores retain roster order and share a rank. Each contestant has their latest visible outcome, committed award and actual global turn number. Turns count exposed attempts, including zero-point outcomes, rather than cancelled hidden preparations. There is no three-round quota or automatic contestant rotation.
+
+Completed sessions show final totals and the server's winner or tied winners, including zero-score ties and solo games. The host retains the last observed completed session across polling/reload; an actual current session takes priority. The final renderer is implemented, but this checkpoint does not yet expose End game, New game or Advance buttons. These lifecycle controls remain tasks 5.3–5.4; do not delete operational data to simulate them.
+
+For manual verification with the currently available UI, create a head-to-head setup and confirm zero totals/shared ranks. Start a round and judge it: host totals/latest outcome update immediately, while the contestant waits without disclosure. Select Reveal Result and confirm the same committed points and turn identity appear on the contestant scoreboard. Reload/reconnect and confirm totals stay unchanged. Repeat alternative outcomes/tiers only with a disposable data directory; multi-round/final UI acceptance follows the lifecycle controls.
+
 ## Host control and request recovery
 
 - The current controller renews while Play is open. **Release host control** permits another tab/device to claim. Leaving Play stops renewals; control becomes claimable after 10 seconds without renewal. A host-liveness loss is detected after 3 seconds; it never awards points or advances a round. There is no force-takeover of an actively renewed lease.
@@ -45,7 +55,7 @@ Counts, readiness and clock observations use bounded temporary HTTP polling (200
 - A lost response shows an uncertain-request panel and blocks new commands. Use **Check command status**. An accepted receipt restores the current state. If no receipt exists, the client checks current state before offering **Retry original request**, preserving the same command/session/round IDs and original revision. If state changed, deliberately dismiss only after that review; do not manufacture a second command to guess whether the first succeeded.
 - Sessions, attempts, owner IDs and receipts live in SQLite; controller/viewer capabilities are process-local and never stored in game history. This is trusted-LAN coordination, not account authentication or an anti-cheat sandbox. Existing library administration remains reachable under its existing policy.
 
-The native HTTP adapter exposes the existing M1 command lane plus private/public snapshots and receipt lookup. Display status accepts only connection/readiness/clock observations, and the opaque current-round image route requires a role capability. Host commands cannot override readiness. There is no End-game/scoreboard/next-round UI yet; retain the existing session after result presentation rather than deleting data to reset it. Use a separate disposable data root for independent acceptance runs.
+The native HTTP adapter exposes the existing M1 command lane plus private/public snapshots and receipt lookup. Display status accepts only connection/readiness/clock observations, and the opaque current-round image route requires a role capability. Host commands cannot override readiness. There is no End-game/next-round UI yet; retain the existing session after result presentation rather than deleting data to reset it. Use a separate disposable data root for independent acceptance runs.
 
 ## Manual acceptance
 
@@ -60,11 +70,11 @@ Use an already backed-up collection or a disposable configured data root. Start 
 - Reveal: check the clue appears only in the contestant tab and the countdown starts at the authoritative window. Pause: check clue coverage and frozen time. Resume: verify only the saved remainder is available.
 - Reload or disconnect the primary during guessing: verify pause/cover or expiry, and explicit readiness-gated Resume. Check an extra viewer cannot submit host commands or cause a pause when only it disconnects.
 - Let time expire: check Time up/zero and the distinct late-judgment versus no-credit actions. On separate disposable runs check Correct, Incorrect and Skip/Void. Each outcome is saved once with no automatic answer reveal or progression.
-- After judging, wait: the contestant must remain concealed while the host sees the saved outcome. Select Reveal Result and check the appropriate treatment, committed points and frozen metadata. Reload before/after reveal and check concealed/static-revealed restoration. Enable reduced motion and confirm the same result without an entrance. No scoreboard or next-round control appears.
+- After judging, wait: the contestant must remain concealed while the host sees the saved outcome. Select Reveal Result and check the appropriate treatment, committed points and frozen metadata. Reload before/after reveal and check concealed/static-revealed restoration. Enable reduced motion and confirm the same result without an entrance. The contestant scoreboard appears with the revealed result; no next-round control appears.
 - Restart while paused: reclaim host control, create a fresh primary link and paste it into the same contestant tab. Check rebind/readiness, the same round and preserved remainder, followed by explicit Resume. No fresh ten-second window is offered.
 - Cancel: verify the same contestant remains active and capacity is not consumed. Prepare again, then reload/restart and check the same persisted session/owner/hidden Ready state.
 - Open Play in a separate fresh tab: verify host-busy handling. Release control in the first tab; explicitly claim it in the second and verify no new session was created.
 - Use keyboard focus, native select/radio keys and Enter/Space on buttons. Check visible focus and readable controls at laptop and tablet widths, without horizontal overflow. This does not certify an actual tablet or Road Mode.
 - Revisit Image Library and confirm existing import, editing, classification, approval and filtering workflows still work.
 
-Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's task-5.1 verification record for current results and browser-check limits. Historical milestone-3 evidence is retained. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.
+Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's task-5.2 verification record for current results and browser-check limits. Historical milestone-3 evidence is retained. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.

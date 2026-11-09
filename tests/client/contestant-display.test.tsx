@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { ContestantDisplay } from '../../client/src/game/ContestantDisplay';
@@ -10,7 +10,7 @@ import { isPartialDate } from '../../server/src/library/validation';
 
 const sessionId = randomUUID(); const roundId = randomUUID(); const contestantId = randomUUID();
 const credential = { token: 'a'.repeat(64), serverEpoch: randomUUID(), displayId: randomUUID() };
-const base = { protocolVersion: 1 as const, sessionId, stateVersion: 2, activeContestantId: contestantId, contestants: [{ id: contestantId, name: 'Contestant One' }], scores: [] };
+const base = { protocolVersion: 1 as const, sessionId, stateVersion: 2, activeContestantId: contestantId, contestants: [{ id: contestantId, name: 'Contestant One' }], scores: [], turnsExposed: 0 };
 const round = { ...base, roundId, contestantId, requestedTier: 'deathmatch' as const, turnOrdinal: 1 };
 const date: unknown = '2024-08'; if (!isPartialDate(date)) throw new Error('Invalid test date');
 const answer = { participantDescription: 'Alpha vs Beta', promotion: 'Fixture Wrestling', event: 'Winter Event', matchDate: date, stipulation: null, championshipInfo: null };
@@ -141,5 +141,27 @@ describe('countdown presentation', () => {
     await act(async () => { vi.advanceTimersByTime(1000); }); expect(screen.getByRole('timer')).toHaveTextContent('00');
     view.rerender(<Countdown remainingMs={2500} running={false} observedAt={performance.now()} />);
     await act(async () => { vi.advanceTimersByTime(10000); }); expect(screen.getByRole('timer')).toHaveTextContent('03'); expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'off');
+  });
+});
+
+describe('contestant scoreboard visibility and recovery', () => {
+  it('shows between-turn totals, keeps current judgment concealed, then publishes revealed totals', async () => {
+    const zero = [{ contestantId, name: 'Contestant One', total: 0 }];
+    phase = { ...base, phase: 'between_rounds', scores: zero };
+    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('region', { name: 'Scoreboard' }); expect(screen.getByText('Exposed turns: 0')).toBeInTheDocument();
+    phase = { ...round, stateVersion: 3, phase: 'adjudicated', scores: zero, turnsExposed: 1 };
+    await screen.findByRole('heading', { name: 'Waiting for the host' }); expect(screen.queryByRole('region', { name: 'Scoreboard' })).not.toBeInTheDocument(); expect(document.body.textContent).not.toContain('Correct');
+    phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer, turnsExposed: 1,
+      scores: [{ contestantId, name: 'Contestant One', total: 3, lastOutcome: { outcome: 'correct', award: 3, turnOrdinal: 1 } }] };
+    const board = await screen.findByRole('region', { name: 'Scoreboard' }); expect(within(board).getByRole('listitem')).toHaveTextContent('3 points'); expect(within(board).getByText('Turn 1: Correct · 3 points')).toBeInTheDocument();
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('restores final ties without showing an active player, missing winner or reset controls', async () => {
+    const b = randomUUID(); phase = { ...base, phase: 'completed', turnsExposed: 8, contestants: [{ id: contestantId, name: 'Alex' }, { id: b, name: 'Jordan' }],
+      scores: [{ contestantId, name: 'Alex', total: 5 }, { contestantId: b, name: 'Jordan', total: 5 }], winnerIds: [contestantId, b] };
+    const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('region', { name: 'Final totals' }); expect(screen.getByRole('status')).toHaveTextContent('Tie: Alex & Jordan');
+    expect(screen.getAllByText('Tied 1')).toHaveLength(2); expect(screen.queryByText('Active contestant')).not.toBeInTheDocument(); expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    view.unmount(); render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('region', { name: 'Final totals' });
+    expect(screen.getByText('Exposed turns: 8')).toBeInTheDocument(); expect(displayApi.image).not.toHaveBeenCalled(); expect(gameApi.command).not.toHaveBeenCalled();
   });
 });

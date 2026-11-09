@@ -1,0 +1,20 @@
+.scoreboard { width: 100%; min-width: 0; color: var(--color-text); background: var(--color-panel-strong); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); padding: var(--space-5); }
+.heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); }
+.heading h3 { margin: 0; font-family: var(--font-display); font-size: var(--font-size-lg); }
+.heading p, .scoreboard .latest, .scoreboard .caption { margin: 0; padding: 0; font-size: var(--font-size-sm); color: var(--color-muted); }
+.rows { display: grid; gap: var(--space-3); margin: var(--space-3) 0; padding: 0; list-style: none; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-4); padding: var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); }
+.row[data-active='true'] { border-color: var(--color-primary); }
+.identity { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.rank { color: var(--color-muted); font-size: var(--font-size-sm); }
+.name { overflow-wrap: anywhere; font-size: clamp(1rem, 2vw, 1.5rem); }
+.active { color: var(--color-primary); font-size: var(--font-size-sm); }
+.scoreboard .total { margin: 0; padding: 0; color: var(--color-primary); font-family: var(--font-display); font-size: clamp(1.5rem, 3vw, 2.5rem); white-space: nowrap; }
+.total span { font-family: var(--font-body); font-size: var(--font-size-sm); }
+.latest { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.scoreboard .winner { color: var(--color-success); font-size: clamp(1.5rem, 3.5vw, 3rem); font-family: var(--font-display); margin: var(--space-3) 0; padding: 0; overflow-wrap: anywhere; }
+.scoreboard[data-compact='true'] { padding: var(--space-3); }
+.scoreboard[data-compact='true'] .rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-2) 0; }
+.scoreboard[data-compact='true'] .row:only-child { grid-column: 1 / -1; }
+.scoreboard[data-compact='true'] .row { padding: var(--space-2); gap: var(--space-1) var(--space-2); }
+@media (max-width: 500px) { .scoreboard { padding: var(--space-3); } .scoreboard[data-compact='true'] .rows { grid-template-columns: 1fr; } }

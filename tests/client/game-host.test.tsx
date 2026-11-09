@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HostPage } from '../../client/src/game/HostPage';
 import { gameApi, GameApiError } from '../../client/src/game/api';
@@ -7,7 +7,7 @@ import { createState, currentRound, phase, transition } from '../../shared/src/g
 import { hostSnapshot } from '../../shared/src/game/projections';
 import type { CommandEnvelope, GameState, HostIntent } from '../../shared/src/game/contracts';
 import type { HostStatus } from '../../shared/src/game/host';
-import { context, NOW, setup } from '../game/fixtures';
+import { context, NOW, setup, pureGame } from '../game/fixtures';
 import { randomUUID } from 'node:crypto';
 
 let state: GameState | null; let sequence: number;
@@ -148,5 +148,31 @@ describe('host setup and preparation UI', () => {
     state = createState(setup(1), NOW); state.contestants[0].name = 'Restored'; sessionStorage.setItem('ntm.game.controller', JSON.stringify(credential));
     const view = render(<HostPage />); await screen.findByText('Active contestant: Restored'); expect(gameApi.create).not.toHaveBeenCalled(); expect(gameApi.claim).not.toHaveBeenCalled();
     view.unmount(); expect(vi.mocked(gameApi.current).mock.calls[0][1].aborted).toBe(true);
+  });
+  it('shows saved host totals immediately before the contestant result reveal', async () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.step({ type: 'CORRECT' }); state = game.state;
+    render(<HostPage />); const board = await screen.findByRole('region', { name: 'Scoreboard' });
+    expect(within(board).getAllByRole('listitem')[0]).toHaveTextContent('1 point'); expect(within(board).getByText('Turn 1: Correct · 1 point')).toBeInTheDocument();
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('keeps final totals visible through polling and reload using only the existing session read', async () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.step({ type: 'CORRECT' }); game.step({ type: 'END_GAME' }); state = game.state;
+    sessionStorage.setItem('ntm.game.observedSession', JSON.stringify(state.id));
+    vi.mocked(gameApi.current).mockImplementation(async () => ({ ...status(), snapshot: null }));
+    vi.spyOn(gameApi, 'session').mockImplementation(async () => status());
+    const view = render(<HostPage />); await screen.findByRole('region', { name: 'Final totals' });
+    expect(screen.getByText('Winner: Contestant 1')).toBeInTheDocument(); expect(screen.getByText('Game complete')).toBeInTheDocument();
+    await waitFor(() => expect(gameApi.session).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('region', { name: 'Final totals' })).toHaveTextContent('1 point');
+    view.unmount(); render(<HostPage />); await screen.findByRole('region', { name: 'Final totals' });
+    expect(gameApi.create).not.toHaveBeenCalled(); expect(gameApi.command).not.toHaveBeenCalled(); expect(screen.queryByRole('button', { name: 'New game' })).not.toBeInTheDocument();
+  });
+  it('discards a missing or invalid completed-session observation', async () => {
+    const session = vi.spyOn(gameApi, 'session').mockRejectedValue(new GameApiError({ code: 'NOT_FOUND', message: 'Session not found.' }, 404));
+    sessionStorage.setItem('ntm.game.observedSession', JSON.stringify(randomUUID()));
+    const view = render(<HostPage />); await screen.findByRole('button', { name: 'Create session' }); expect(session).toHaveBeenCalledOnce();
+    expect(sessionStorage.getItem('ntm.game.observedSession')).toBeNull(); view.unmount();
+    sessionStorage.setItem('ntm.game.observedSession', JSON.stringify('invalid'));
+    render(<HostPage />); await screen.findByRole('button', { name: 'Create session' }); expect(session).toHaveBeenCalledOnce(); expect(gameApi.create).not.toHaveBeenCalled();
   });
 });

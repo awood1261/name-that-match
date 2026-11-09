@@ -1,15 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CommandEnvelope, CreateGame, HostIntent } from '../../../shared/src/game/contracts';
 import type { ControllerCredential, HostStatus } from '../../../shared/src/game/host';
-import { parseCommand } from '../../../shared/src/game/validation';
+import { id, parseCommand } from '../../../shared/src/game/validation';
 import { clientId } from '../ids';
 import { gameApi, GameApiError } from './api';
 
-const CONTROL_KEY = 'ntm.game.controller'; const PENDING_KEY = 'ntm.game.pending';
+const CONTROL_KEY = 'ntm.game.controller'; const PENDING_KEY = 'ntm.game.pending'; const OBSERVED_SESSION_KEY = 'ntm.game.observedSession';
 type Pending = { kind: 'create'; input: CreateGame } | { kind: 'command'; input: CommandEnvelope };
 function saved<T>(key: string): T | null { try { const value = sessionStorage.getItem(key); return value ? JSON.parse(value) as T : null; } catch { return null; } }
 function store(key: string, value: unknown) { try { if (value === null) sessionStorage.removeItem(key); else sessionStorage.setItem(key, JSON.stringify(value)); } catch { /* Current-tab operation remains available; no persistent secret in server history. */ } }
 const message = (error: unknown) => error instanceof Error ? error.message : 'Unable to contact the local game server.';
+
+/** Keep final totals visible using the existing read endpoint, without creating/resuming a game. */
+async function observedStatus(owner: ControllerCredential, signal: AbortSignal, refresh = false): Promise<HostStatus> {
+  const current = await gameApi.current(owner, signal, refresh);
+  if (current.snapshot) return current;
+  let sessionId: string;
+  try { sessionId = id(saved<unknown>(OBSERVED_SESSION_KEY)); }
+  catch { store(OBSERVED_SESSION_KEY, null); return current; }
+  try {
+    const previous = await gameApi.session(owner, sessionId, signal);
+    if (previous.snapshot?.session.status === 'completed') return previous;
+  } catch (failure) { if (!(failure instanceof GameApiError) || failure.status !== 404) throw failure; }
+  store(OBSERVED_SESSION_KEY, null); return current;
+}
 
 export function useGameHost() {
   const [status, setStatus] = useState<HostStatus | null>(null);
@@ -27,6 +41,7 @@ export function useGameHost() {
     if (before && before.serverEpoch === value.serverEpoch && (before.sequence > value.sequence
       || (before.snapshot?.session.id === value.snapshot?.session.id && (before.snapshot?.session.stateVersion ?? 0) > (value.snapshot?.session.stateVersion ?? 0)))) return;
     latest.current = value; setStatus(value); setConnected(true);
+    store(OBSERVED_SESSION_KEY, value.snapshot && value.snapshot.session.status !== 'discarded' ? value.snapshot.session.id : null);
     if (transportLost.current && !saved(PENDING_KEY)) setError(null); transportLost.current = false;
   }, []);
   const controlError = useCallback((failure: unknown, owner: ControllerCredential) => {
@@ -49,7 +64,7 @@ export function useGameHost() {
       if (!owner) owner = await gameApi.claim(signal);
       if (!active.current || lifetime.current !== life) return;
       currentCredential.current = owner; setCredential(owner); store(CONTROL_KEY, owner); latest.current = null;
-      accept(await gameApi.current(owner, signal), owner);
+      accept(await observedStatus(owner, signal), owner);
       if (saved(PENDING_KEY)) setError('A previous request has an uncertain outcome. Check command status before sending another command.');
     } catch (failure) { if (active.current && lifetime.current === life && !signal.aborted) setError(message(failure)); }
     finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setLoading(false); } }
@@ -66,7 +81,7 @@ export function useGameHost() {
     const read = async () => {
       if (stopped || reading) return;
       reading = true;
-      try { accept(await gameApi.current(credential, signal), credential); }
+      try { accept(await observedStatus(credential, signal), credential); }
       catch (failure) { if (!signal.aborted) controlError(failure, credential); }
       finally {
         reading = false;
@@ -131,7 +146,7 @@ export function useGameHost() {
   async function refresh() {
     const owner = currentCredential.current; const life = lifetime.current; if (!owner || mutation.current) return;
     mutation.current = true; setBusy(true);
-    try { accept(await gameApi.current(owner, lifetime.current.signal, true), owner); setError(null); }
+    try { accept(await observedStatus(owner, lifetime.current.signal, true), owner); setError(null); }
     catch (failure) { controlError(failure, owner); }
     finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setBusy(false); } }
   }

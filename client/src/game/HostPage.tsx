@@ -5,6 +5,7 @@ import { useGameHost } from './useGameHost';
 import { HostSetup } from './HostSetup';
 import { HostDisplayPanel } from './HostDisplayPanel';
 import { HostRoundControls } from './HostRoundControls';
+import { GameScoreboard } from './GameScoreboard';
 import styles from './HostPage.module.css';
 
 export function HostPage() {
@@ -14,7 +15,7 @@ export function HostPage() {
   const active = session?.contestants.find((p) => p.id === session.activeContestantId);
   const unexposed = round?.phase === 'preparing' || round?.phase === 'ready';
   const roundOwner = session?.contestants.find((p) => p.id === round?.contestantId);
-  const stateLabel = !session ? 'No session' : session.status === 'setup' ? 'Setup' : round?.phase === 'preparing' ? 'Preparing screenshot'
+  const stateLabel = !session ? 'No session' : session.status === 'completed' ? 'Game complete' : session.status === 'setup' ? 'Setup' : round?.phase === 'preparing' ? 'Preparing screenshot'
     : round?.phase === 'ready' ? 'Screenshot ready · hidden' : session.status === 'active' && !round ? 'Between rounds' : round?.phase.split('_').join(' ') ?? session.status;
   return <section className={styles.host} aria-labelledby="game-host-title">
     <header className={styles.header}><div><p className={styles.kicker}>Play · host controls</p><h2 id="game-host-title">Game host</h2></div>
@@ -32,6 +33,9 @@ export function HostPage() {
     {!host.loading && !host.credential && <button type="button" className={styles.primary} onClick={() => { void host.connect(); }}>Take host control / reconnect</button>}
     {host.credential && host.status && <>
       {session && <HostDisplayPanel key={`${session.id}:${host.credential!.serverEpoch}`} credential={host.credential!} status={host.status} disabled={host.busy || host.pending || !host.connected} refresh={host.refresh} />}
+      {snapshot && session?.status !== 'discarded' && <GameScoreboard scores={snapshot.scores} activeContestantId={snapshot.session.activeContestantId}
+        turnsExposed={snapshot.session.nextTurnOrdinal - 1} currentTurn={round && 'turnOrdinal' in round ? { turnOrdinal: round.turnOrdinal, contestantId: round.contestantId } : null}
+        winnerIds={snapshot.winnerIds} privateView />}
       <div className={styles.grid}>
         {(!session || session.status === 'setup') && <HostSetup key={session ? `${session.id}:${session.stateVersion}` : 'new'} session={session} disabled={host.busy || host.pending} onSave={host.setup} onDirty={setSetupDirty} />}
         {session && <section className={styles.card} aria-labelledby="game-session-title">

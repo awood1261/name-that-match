@@ -96,3 +96,7 @@ Task 5.1 acceptance criteria are satisfied by the evidence above. No unresolved 
 Physical device and full filming acceptance remain deferred to their existing tasks. Scoreboard, next-round progression, End/New Game UI, Studio launching, WebSockets/Road integration, bonuses/leaderboards, sound and dependencies were not added. Existing trusted-LAN security and four viewer-capability limits remain unchanged.
 
 Only **5.1** is newly checked: **23/42 complete**, 19 remaining. Tasks **5.2 onward remain unchecked**. Stop for owner review; do not archive or proceed automatically. All changes remain uncommitted.
+
+## Subsequent owner acceptance
+
+The owner confirmed that the secondary-device origin configuration worked and that task 5.1 manual validation was complete. The earlier checkpoint above is retained as historical evidence. The subsequent request to begin authorizes task 5.2; it does not complete the remaining game change or make it eligible for archive.

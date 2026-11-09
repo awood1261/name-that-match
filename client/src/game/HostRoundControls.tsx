@@ -29,7 +29,7 @@ export function HostRoundControls({ status, can, command }: { status: HostStatus
     {round.phase === 'interrupted' && <><p role="status">This interrupted round cannot restart. Void it while preserving its exposure history.</p><button disabled={!can('VOID_INTERRUPTED')} onClick={() => command({ type: 'VOID_INTERRUPTED' })}>Void interrupted round</button></>}
     {round.phase === 'adjudicated' && <><p role="status">Judgment saved: {round.outcome} · {round.award} {round.award === 1 ? 'point' : 'points'}. The contestant is waiting; result and match identity remain concealed.</p>
       <button type="button" className={styles.primary} disabled={!can('REVEAL_ANSWER')} onClick={() => command({ type: 'REVEAL_ANSWER' })}>Reveal Result</button></>}
-    {round.phase === 'answer_revealed' && <p role="status">Result and match identity revealed. Scoreboard and next-round controls are not available yet.</p>}
+    {round.phase === 'answer_revealed' && <p role="status">Result and match identity revealed. Next-round controls are not available yet.</p>}
     <p id="game-display-required">{status.primaryDisplay.message}</p>
   </section>;
 }

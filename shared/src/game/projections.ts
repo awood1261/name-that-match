@@ -1,8 +1,16 @@
 import type { DisplaySnapshot, GameState, HostSnapshot, Round, RunningClock, ScoreRow } from './contracts.js';
 import { currentRound } from './engine.js';
 
-export function scoreboard(state: GameState): ScoreRow[] {
-  return state.contestants.map((p) => ({ contestantId: p.id, name: p.name, total: state.awards.filter((a) => a.contestantId === p.id).reduce((sum, a) => sum + a.points, 0) }))
+export function scoreboard(state: GameState, audience: 'host' | 'display' = 'host'): ScoreRow[] {
+  const visible = state.rounds.filter((round) => (round.phase === 'adjudicated' || round.phase === 'answer_revealed')
+    && (audience === 'host' || state.status === 'completed' || round.phase === 'answer_revealed'));
+  const visibleIds = new Set(visible.map((round) => round.id));
+  const awards = audience === 'host' || state.status === 'completed' ? state.awards : state.awards.filter((award) => visibleIds.has(award.roundId));
+  return state.contestants.map((p) => {
+    const last = visible.filter((round) => round.contestantId === p.id).slice(-1)[0];
+    return { contestantId: p.id, name: p.name, total: awards.filter((a) => a.contestantId === p.id).reduce((sum, a) => sum + a.points, 0),
+      ...(last && (last.phase === 'adjudicated' || last.phase === 'answer_revealed') ? { lastOutcome: { outcome: last.outcome, award: last.award, turnOrdinal: last.turnOrdinal } } : {}) };
+  })
     .sort((a, b) => b.total - a.total);
 }
 export function winnerIds(state: GameState): string[] {
@@ -21,7 +29,8 @@ export function hostSnapshot(state: GameState): HostSnapshot {
   // Current clue plus at most three historical rounds; totals use the complete ledger.
   // Never put the full aggregate/receipt history on the future wire projection.
   const snapshot: HostSnapshot = { protocolVersion: 1, role: 'host', session,
-    currentRound: round, recentRounds: history.slice(-3), historyTruncated: history.length > 3, scores: scoreboard(state) };
+    currentRound: round, recentRounds: history.slice(-3), historyTruncated: history.length > 3, scores: scoreboard(state),
+    ...(state.status === 'completed' ? { winnerIds: winnerIds(state) } : {}) };
   return JSON.parse(JSON.stringify(snapshot)) as HostSnapshot;
 }
 function publicRound(round: Round) {
@@ -30,12 +39,9 @@ function publicRound(round: Round) {
 /** Constructed allowlist, never a private-object spread or hidden-by-CSS projection. */
 export function displaySnapshot(state: GameState, clock: RunningClock | null, nowMonoMs: number): DisplaySnapshot {
   const round = currentRound(state);
-  // Judgment is committed privately. Withhold its score change as well as the
-  // result fields until the host's explicit result/answer reveal.
-  const publicState = state.status === 'active' && round?.phase === 'adjudicated'
-    ? { ...state, awards: state.awards.filter((award) => award.roundId !== round.id) } : state;
+  // Public totals and latest outcomes disclose only revealed turns during play.
   const base = { protocolVersion: 1 as const, sessionId: state.id, stateVersion: state.stateVersion, activeContestantId: state.activeContestantId,
-    contestants: state.contestants.map((p) => ({ id: p.id, name: p.name })), scores: scoreboard(publicState) };
+    contestants: state.contestants.map((p) => ({ id: p.id, name: p.name })), scores: scoreboard(state, 'display'), turnsExposed: state.nextTurnOrdinal - 1 };
   if (state.status === 'completed') return { ...base, phase: 'completed', winnerIds: winnerIds(state) };
   if (state.status !== 'active') return { ...base, phase: state.status };
   if (!round) return { ...base, phase: 'between_rounds' };

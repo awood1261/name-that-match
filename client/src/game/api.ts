@@ -18,6 +18,7 @@ export const gameApi = {
   renew: (credential: ControllerCredential, signal: AbortSignal) => request<{ serverEpoch: string }>('/control-lease/renew', signal, credential, {}),
   release: (credential: ControllerCredential, signal: AbortSignal) => request('/control-lease/release', signal, credential, {}),
   current: (credential: ControllerCredential, signal: AbortSignal, refresh = false) => request<HostStatus>(`/current${refresh ? '?refresh=true' : ''}`, signal, credential),
+  session: (credential: ControllerCredential, sessionId: string, signal: AbortSignal) => request<HostStatus>(`/sessions/${sessionId}`, signal, credential),
   create: (credential: ControllerCredential, input: CreateGame, signal: AbortSignal) => request<HostCommandResponse>('/sessions', signal, credential, input),
   command: (credential: ControllerCredential, input: CommandEnvelope, signal: AbortSignal) => request<HostCommandResponse>(`/sessions/${input.sessionId}/commands`, signal, credential, input),
   receipt: (credential: ControllerCredential, sessionId: string, commandId: string, signal: AbortSignal) => request<{ receipt: Receipt; status: HostStatus }>(`/sessions/${sessionId}/commands/${commandId}`, signal, credential),

@@ -84,10 +84,13 @@ export interface TransitionContext {
 }
 export interface Receipt { commandId: string; sessionId: string; roundId: string | null; acceptedVersion: number }
 export interface CommandResult { receipt: Receipt; replayed: boolean; state: GameState }
-export interface ScoreRow { contestantId: string; name: string; total: number }
+export interface ScoreRow {
+  contestantId: string; name: string; total: number;
+  lastOutcome?: { outcome: Judgment['outcome']; award: number; turnOrdinal: number };
+}
 interface PublicBase {
   protocolVersion: 1; sessionId: string; stateVersion: number; activeContestantId: string;
-  contestants: Contestant[]; scores: ScoreRow[];
+  contestants: Contestant[]; scores: ScoreRow[]; turnsExposed: number;
 }
 interface PublicRound { roundId: string; contestantId: string; requestedTier: GameTier; turnOrdinal: number | null }
 export type DisplaySnapshot = PublicBase & (
@@ -103,4 +106,5 @@ export type DisplaySnapshot = PublicBase & (
 export interface HostSnapshot {
   protocolVersion: 1; role: 'host'; session: Omit<GameState, 'rounds' | 'awards'>;
   currentRound: Round | null; recentRounds: Round[]; historyTruncated: boolean; scores: ScoreRow[];
+  winnerIds?: string[];
 }
