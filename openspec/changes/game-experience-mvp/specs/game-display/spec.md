@@ -17,11 +17,20 @@ The host view SHALL provide setup, current contestant/tier, pool availability, p
 - **AND** earlier round labels and score ownership remain unchanged
 
 ### Requirement: GD-02 Phase-specific game presentation
-The display SHALL support waiting/setup, tier choice, abstract shuffle/preparation, hidden-image ready, screenshot/countdown, pause/reconnecting cover, correct/incorrect/timeout feedback, explicit answer reveal, scoreboard and final results. The scoreboard SHALL use real committed outcomes and descending score order, preserve ties and show no fabricated comp example scores or fixed-round limit.
+The display SHALL support solo and head-to-head layouts for the approved one or two contestants, waiting/setup, tier choice, abstract shuffle/preparation, hidden-image ready, screenshot/countdown, pause/reconnecting cover, correct/incorrect/timeout feedback, explicit answer reveal, scoreboard and final results. The scoreboard SHALL use real committed outcomes and descending score order, preserve ties and show no fabricated comp example scores or fixed-round limit.
 
 #### Scenario: Countdown and feedback
 - **WHEN** a ready round starts and is later adjudicated
 - **THEN** the display presents a contained screenshot and readable countdown followed by the authoritative outcome without awarding points locally
+
+#### Scenario: Covered preparation
+- **WHEN** the display loads and decodes a candidate in Preparing/Ready
+- **THEN** the picture stays covered until accepted screenshot Reveal & start and no answer metadata appears before answer Reveal
+
+#### Scenario: Host enters a verbal tier choice
+- **WHEN** the host records Squash Match, Competitive Match or Deathmatch under recommended P7
+- **THEN** the corresponding server eligible pool is selected without changing any screenshot classification or point value
+- **AND** contestant devices have no tier-entry or other mutation control
 
 #### Scenario: Final tie
 - **WHEN** final totals tie

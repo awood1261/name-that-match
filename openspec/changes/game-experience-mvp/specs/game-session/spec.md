@@ -5,12 +5,20 @@ Run durable local wrestling trivia sessions with explicit contestants, fresh eli
 ## ADDED Requirements
 
 ### Requirement: GS-01 Explicit session setup
-The host SHALL be able to create a setup session, configure contestants and their order, select a starting contestant, and explicitly start the game. Setup SHALL permit correction before start; a started game's roster SHALL remain fixed. The proposed MVP SHALL permit one nonterminal session and one to eight distinct named contestants, with bounded validated names and no external accounts. Discarding setup SHALL not delete the library or award scores.
+The host SHALL be able to create a setup session, configure contestants and their order, select a starting contestant, and explicitly start the game. Setup SHALL permit correction before start; a started game's roster SHALL remain fixed. Under approved P1, the MVP SHALL accept exactly one contestant for solo or two for head-to-head and SHALL reject all other counts and malformed contestant lists. Tournament/bracket functionality SHALL be out of scope. The retained proposed technical defaults SHALL permit one nonterminal session with distinct bounded validated names and no external accounts. Discarding setup SHALL not delete the library or award scores.
 
 #### Scenario: Start a configured game
 - **WHEN** the host starts a valid setup session with at least one eligible match available
 - **THEN** it becomes active between rounds with the selected contestant and zero totals
 - **AND** starting or reloading another tab does not silently replace it
+
+#### Scenario: Solo and head-to-head counts
+- **WHEN** a host submits otherwise valid setups containing one or two contestants
+- **THEN** both supported configurations can start without tournament configuration or automatic rotation
+
+#### Scenario: Invalid contestant counts
+- **WHEN** setup contains zero, three or more contestants, a non-list value or malformed contestant entries
+- **THEN** runtime validation rejects it without creating or partially updating the session
 
 #### Scenario: Invalid or insufficient setup
 - **WHEN** names/order/starting contestant are invalid, another session is nonterminal, or no eligible match exists
@@ -30,12 +38,16 @@ Game preparation SHALL use the approved nine-cell obscurity/visual-difficulty ma
 - **THEN** preparation reports a storage failure rather than an empty pool or fabricated valid candidate
 
 ### Requirement: GS-03 Random selection without session repeats
-Selection SHALL choose uniformly among eligible unseen screenshot candidates of the requested tier, with independently testable randomness and deterministic candidate ordering. A match exposed once SHALL be excluded for the entire session across all screenshots, contestants and tiers. Exposed screenshot identities SHALL also be excluded. Under the proposed duplicate-content safeguard, exact previously exposed image content SHALL not reappear under another retained capture identity. No source-video uniqueness, tier quotas, weighting, automatic fallback or perceptual matching SHALL be added.
+Selection SHALL choose uniformly among eligible unseen screenshot candidates of the requested tier, with independently testable randomness and deterministic candidate ordering. A match exposed once SHALL be excluded for the entire session across all screenshots, contestants and tiers. Exposed screenshot identities SHALL also be excluded. Under recommended P4, exact previously exposed image content SHALL not reappear under another retained capture identity using saved SHA-256 and bounded selected-file verification during preparation, without image processing on the countdown/judgment path. This safeguard SHALL be distinct from already approved match-level exposure protection. No source-video uniqueness, tier quotas, weighting, automatic fallback or perceptual matching SHALL be added.
 
 #### Scenario: Multiple screenshots for one match
 - **WHEN** one screenshot is exposed and that match has other eligible screenshots, including other tiers or source videos
 - **THEN** none of those screenshots can be drawn again in this session
 - **AND** distinct matches from the same video remain selectable
+
+#### Scenario: Exact duplicate under different identities
+- **WHEN** a candidate belongs to a different match/capture ID but its saved and verified SHA-256 equals previously exposed content
+- **THEN** recommended P4 excludes it without treating shared video identity as a duplicate or hashing images during the countdown
 
 #### Scenario: Empty or exhausted tier
 - **WHEN** a tier has no eligible unseen candidate
@@ -47,7 +59,11 @@ Selection SHALL choose uniformly among eligible unseen screenshot candidates of 
 - **THEN** selection returns the same candidate without requiring production randomness to be predictable
 
 ### Requirement: GS-04 Reservation and immutable round context
-A prepared candidate SHALL be reserved within the active session and revalidated before exposure. The round SHALL retain its selected contestant, screenshot/match identities, image identity and answer/classification input snapshot. Its contestantId SHALL be copied from the session activeContestantId at attempt creation and SHALL remain immutable through preparation, exposure, adjudication and history. After exposure, saved library edits SHALL not change the round's answer, base points or already earned score. Future selections SHALL use fresh library data. Session use history SHALL be committed before exposure is published.
+A prepared candidate SHALL be reserved within the active session and revalidated before exposure. Preparing/Ready SHALL keep the clue covered on contestant displays; preload/decode SHALL not mark exposure. Exposure SHALL be committed only by accepted screenshot Reveal & start. The round SHALL retain its selected contestant, screenshot/match identities, image identity and answer/classification input snapshot. Its contestantId SHALL be copied from the session activeContestantId at attempt creation and SHALL remain immutable through preparation, exposure, adjudication and history. After exposure, saved library edits SHALL not change the round's answer, base points or already earned score. Future selections SHALL use fresh library data. Session use history SHALL be committed before exposure is published.
+
+#### Scenario: Cancel a covered prepared clue
+- **WHEN** an image has preloaded in Ready and the host cancels before screenshot Reveal & start
+- **THEN** the cancelled attempt/owner/receipt remain in history, no match is exposed or blocked by that attempt, and no visible turn or score is consumed
 
 #### Scenario: Library changes before reveal
 - **WHEN** a selected asset, review, association or relevant record revision changes before exposure
@@ -112,7 +128,23 @@ Session setup, transitions, used history, outcomes, awards and accepted command 
 - **WHEN** the server restarts after accepting a judgment but before its response reaches the host
 - **THEN** the committed outcome and totals are restored and resolving that command cannot score it again
 
+#### Scenario: Recover a known pause
+- **WHEN** the server restarts from a committed paused remainder and its pinned clue remains valid
+- **THEN** recommended P6 restores a covered paused round with the same owner and used history, requiring fresh readiness and explicit Resume without resetting time
+
+#### Scenario: Restart during preparation
+- **WHEN** the server restarts after accepting Prepare but before committing Ready
+- **THEN** recommended P6 retains a cancelled unexposed attempt/receipt, restores between-round selection and consumes no match, visible turn or score
+
+#### Scenario: Restart with a covered Ready round
+- **WHEN** the server restores an unexposed Ready round
+- **THEN** recommended P6 requires candidate/image revalidation, fresh decode and explicit host screenshot Reveal before exposure; invalid content must be cancelled rather than substituted
+
+#### Scenario: Missing clue after a committed judgment
+- **WHEN** image bytes are unavailable after a scored round is recovered
+- **THEN** the committed outcome, answer snapshot, contestant ownership and award remain intact while image availability is reported separately
+
 #### Scenario: Restart during a running window
-- **WHEN** the server restarts without a trustworthy persisted paused remainder
+- **WHEN** the server restarts with Guessing as the last committed phase and without a trustworthy persisted paused remainder
 - **THEN** the exposed round becomes interrupted, the display covers the image, and the host must deliberately void it under the proposed recovery policy
 - **AND** the match stays used and no automatic ten-second restart or point award occurs

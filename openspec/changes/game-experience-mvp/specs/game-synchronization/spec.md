@@ -5,7 +5,7 @@ Synchronize host and contestant views over local HTTP and WebSockets with one au
 ## ADDED Requirements
 
 ### Requirement: GN-01 One authority across transports and modes
-The local Node server SHALL own transitions, clocks, used sets, adjudication and scores for both modes. Host commands SHALL use one validated command service. Studio windows and Road devices SHALL consume the same versioned public/host projections and timing semantics. A browser-local store or inter-window message SHALL not become authoritative.
+The local Node server SHALL own transitions, clocks, used sets, adjudication and scores for both modes. Recommended P5/P6 specify interruption/recovery choices; the authoritative-server/read-only-role boundary does not depend on display availability. Host commands SHALL use one validated command service. Studio windows and Road devices SHALL consume the same versioned public/host projections and timing semantics. A browser-local store or inter-window message SHALL not become authoritative.
 
 #### Scenario: Studio and Road observe one round
 - **WHEN** two displays connect to the same session through supported local transports
@@ -32,12 +32,20 @@ Primary-display or controller-liveness loss during guessing SHALL automatically 
 - **WHEN** the primary tablet disconnects during guessing
 - **THEN** the server preserves its detected remainder or settles expiry, the host sees the interruption, and reconnect alone does not resume or score
 
+#### Scenario: Secondary display disconnects
+- **WHEN** a secondary viewer disconnects while the designated primary remains ready
+- **THEN** the recommended policy leaves the server deadline unchanged and creates no score, answer reveal or Advance
+
 #### Scenario: Controller disconnects
 - **WHEN** controller liveness expires during guessing while the primary display remains connected
 - **THEN** the round pauses at detection or expires if already due, and a recovered controller must review state and explicitly resume
 
 ### Requirement: GN-05 WebSocket role and transport validation
 The proposed real-time transport SHALL validate allowed local UI origins at upgrade, supported protocol, message type/shape/size and role permissions before side effects. Display connections SHALL accept only synchronization, readiness and liveness messages; host commands SHALL remain subject to controller lease and revision checks. Oversized/malformed/unsupported messages and excessive slow-client backlog SHALL be rejected or disconnected predictably.
+
+#### Scenario: Typed message runtime validation
+- **WHEN** a client submits a payload violating shared message discriminants, bounds or its read-only role
+- **THEN** runtime validation rejects it before domain effects even if a TypeScript caller claims it has the expected type
 
 #### Scenario: Display attempts a host command
 - **WHEN** a display socket submits a game mutation or an unapproved origin attempts an upgrade

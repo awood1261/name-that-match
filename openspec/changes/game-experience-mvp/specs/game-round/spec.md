@@ -20,7 +20,7 @@ Reveal and start SHALL be one host operation after the selected image is validat
 
 #### Scenario: Ready reveal
 - **WHEN** the host reveals a ready round with the current display acknowledgment
-- **THEN** the image becomes public, the match becomes used and one ten-second deadline starts
+- **THEN** the preloaded image becomes visible, the match becomes used and one ten-second deadline starts
 
 #### Scenario: Delayed callback or client drift
 - **WHEN** the host command arrives at or after the deadline even if a server timeout callback has not executed
@@ -48,30 +48,47 @@ While awaiting judgment, the host SHALL be able to explicitly attest that the co
 - **WHEN** the host confirms timeout/no credit
 - **THEN** the round resolves with zero points and cannot later receive another judgment
 
-### Requirement: GR-05 Proposed pause and resume policy
-The proposed MVP SHALL permit host pause while guessing, preserving the server-calculated remainder and covering the screenshot on contestant displays. Resume SHALL require a connected, synchronized, decoded primary display and an explicit host action. It SHALL use the saved remainder rather than grant another ten seconds. A pause arriving after expiry SHALL not restore guessing time.
+### Requirement: GR-05 Approved pause and resume controls
+Under approved P3, the MVP SHALL permit host pause while guessing, preserving the server-calculated remainder and covering the screenshot on contestant displays. Resume SHALL require a connected, synchronized, decoded primary display and an explicit host action. It SHALL use the saved remainder rather than grant another ten seconds. A pause arriving after expiry SHALL not restore guessing time.
 
 #### Scenario: Pause and resume
 - **WHEN** the host pauses with four seconds remaining and later resumes after readiness is restored
 - **THEN** the image is covered while paused and only the preserved remainder is available after resume
 
-### Requirement: GR-06 Proposed cancel, skip and restart policy
-Cancelling preparation before exposure SHALL release the reservation without consuming a match or turn. Cancelling/skipping after exposure SHALL void the turn for zero points while retaining screenshot/match use history. Replaying an exposed screenshot with a fresh timer SHALL not be offered. A replacement SHALL be a new eligible unseen draw; no action SHALL erase committed points under the guise of cancellation.
+#### Scenario: Pause at the deadline
+- **WHEN** a Pause request arrives at or after the authoritative deadline even if its timer callback is delayed
+- **THEN** expiry is settled first and no paused remainder or fresh guessing window is created
+
+### Requirement: GR-06 Approved cancel, skip, void and no-restart controls
+Under approved P3, cancelling preparation before exposure SHALL release the reservation without consuming a match or turn. Voiding/skipping an unresolved exposed attempt SHALL use one canonical zero-point void transition, with reason skip for a passed clue or void for an invalid/abandoned attempt, while retaining screenshot/match use history and immutable round ownership. Neither action SHALL automatically Advance. Cancelling, voiding and skipping SHALL retain historical attempts, exposure flags, reasons and accepted receipts rather than delete them. Replaying an exposed screenshot with a fresh timer SHALL not be offered. A replacement SHALL be a new eligible unseen draw; no action SHALL erase committed points under the guise of cancellation.
 
 #### Scenario: Cancel before reveal
 - **WHEN** an unexposed ready/preparing attempt is cancelled
 - **THEN** it returns to between-round state with the same active contestant and no consumed match
+
+#### Scenario: Void and Skip share finalization
+- **WHEN** the host chooses either Void or Skip on an unresolved exposed round and retries that command
+- **THEN** one zero-point void outcome with its reason is retained, the match stays blocked and there is no duplicate score, turn or automatic Advance
+
+#### Scenario: No same-round restart
+- **WHEN** the host requests a fresh timer for a prepared/exposed or resolved round
+- **THEN** restart is rejected without changing its history or awarding points; supported Resume uses only a paused remainder
 
 #### Scenario: Skip after reveal
 - **WHEN** the host deliberately skips an exposed unresolved attempt
 - **THEN** it records a void zero-point turn and that match cannot be redrawn in the session
 
 ### Requirement: GR-07 Outcome, answer reveal and advance
-Judgment feedback and answer reveal SHALL be distinct host-controlled steps. The answer SHALL include the pinned participant/promotion/event fields and only the known precision of optional metadata. Advancing SHALL require answer reveal or an explicitly voided turn and SHALL clear the public round image/answer without resetting scores or used history or changing activeContestantId or historical round contestantId. Ending a game SHALL also be allowed from a resolved round without forcing an answer reveal.
+Under recommended P9, judgment feedback and answer reveal SHALL be distinct host-controlled steps. Screenshot Reveal & start is a different action from answer Reveal. Answer Reveal and Advance SHALL never create score awards or reapply a judgment. The answer SHALL include the pinned participant/promotion/event fields and only the known precision of optional metadata. Advancing SHALL require answer reveal or an explicitly voided turn and SHALL clear the public round image/answer without resetting scores or used history or changing activeContestantId or historical round contestantId. Ending a game SHALL also be allowed from a resolved round without forcing an answer reveal.
 
 #### Scenario: Show the answer
 - **WHEN** the host reveals a resolved round's answer
 - **THEN** contestant displays show the saved answer snapshot rather than infer it from a video title or invent a date
+
+#### Scenario: Repeated Reveal and Advance do not score
+- **WHEN** the host reveals an adjudicated answer and advances, retries accepted commands, or sends new commands for an already completed transition
+- **THEN** accepted retries return receipts, inapplicable new commands conflict, and scores and round ownership never change
+- **AND** Advance preserves activeContestantId and never prepares or starts a round automatically
 
 ### Requirement: GR-08 Stale and duplicate command safety
 Host commands SHALL identify their intended session, applicable round, expected state revision and unique command identity. A retry with the same identity/content SHALL return the recorded result plus current state without repeating effects. Reusing an identity for different content SHALL conflict. Stale revisions, wrong rounds and invalid payloads SHALL leave prior outcomes intact. Unknown delivery after reconnect SHALL be resolved explicitly rather than blindly replayed.
