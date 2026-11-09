@@ -48,11 +48,9 @@ function App() {
     <main className={styles.appShell}>
       <header className={styles.topBar}>
         <div className={styles.brandBlock}>
-          <span className={styles.brandFrame} aria-hidden="true" />
-          <div className={styles.brandCopy}>
-            <h1 className={styles.brand}>Name That <span>Match</span></h1>
-            <p className={styles.tagline}>THE WRESTLING GUESSING GAME</p>
-          </div>
+          <h1 className={styles.brand}>
+            <img src="/images/name-that-match-horizontal-logo.png" alt="Name That Match" width={1387} height={226} />
+          </h1>
         </div>
 
         <nav className={styles.nav} aria-label="Primary navigation">
