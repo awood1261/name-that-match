@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { BatchStatus, ImportItem, ScreenshotSummary } from '../../shared/src/imports';
 import { ImportDialog } from '../../client/src/library/ImportDialog';
 import { MatchLibraryPage } from '../../client/src/library/MatchLibraryPage';
-import { libraryApi, matchApi, confirmationId } from '../../client/src/library/api';
+import { reviewApi, libraryApi, matchApi, confirmationId } from '../../client/src/library/api';
 import { scanSelection } from '../../client/src/library/selection';
 import { DEFAULT_IMPORT_LIMITS } from '../../server/src/library/imports/limits';
 const item: ImportItem = { id: '00000000-0000-4000-8000-000000000001', ordinal: 0, candidateLabel: 'video/sample.json', state: 'ready', retryable: false,
@@ -103,7 +103,8 @@ it('traps focus, cancels with Escape semantics, aborts requests, and returns foc
   const signal = vi.mocked(libraryApi.recent).mock.calls[0][0]; view.unmount(); expect(signal.aborted).toBe(true); expect(trigger).toHaveFocus(); trigger.remove();
 });
 it('renders loading/empty/error queue states and refreshes after import navigation', async () => {
-  render(<MatchLibraryPage />); expect(screen.getByRole('status')).toHaveTextContent('Loading');
+  vi.spyOn(reviewApi, 'statistics').mockResolvedValue({ totalMatches: 0, totalScreenshots: 0, fullyClassifiedScreenshots: 0, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 0, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 0, competitive: 0, deathmatch: 0 }, asOf: '' });
+  render(<MatchLibraryPage />); expect(screen.getByText('Loading screenshots…')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
   await screen.findByText(/No unassigned screenshots yet/);
   vi.mocked(libraryApi.unassigned).mockRejectedValueOnce(new Error('offline'));

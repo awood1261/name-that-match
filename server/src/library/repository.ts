@@ -2,10 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type Database from 'better-sqlite3';
 import type { CaptureMetadataV1 } from '../../../shared/src/capture.js';
-import type { Match, Screenshot, ScreenshotChanges } from '../../../shared/src/library.js';
+import type { Match, Screenshot, ScreenshotChanges, ReviewStatus } from '../../../shared/src/library.js';
 import {
   ANSWER_FIELDS, EMPTY_MATCH, invalid, knownFields, object, parseMatchChanges,
-  parseScreenshotChanges, requireId, requireRevision,
+  parseScreenshotChanges, requireId, requireRevision, isReviewStatus,
 } from './validation.js';
 
 export class RecordNotFoundError extends Error {
@@ -169,5 +169,22 @@ export function createLibraryRepository(db: Database.Database) {
       return records.map((record) => saveScreenshot(record, { matchId: targetMatchId }));
     }).immediate();
   }
-  return { createMatch, getMatch, updateMatch, getScreenshot, insertCommittedScreenshot, updateScreenshot, assignScreenshots };
+  function reviewScreenshot(id: string, expectedRevision: number, reviewStatus: ReviewStatus, expectedMatchRevision: number | undefined,
+    validateApproval: (record: StoredScreenshot, parent: Match) => void): StoredScreenshot {
+    requireId(id); requireRevision(expectedRevision);
+    if (!isReviewStatus(reviewStatus)) invalid('reviewStatus', 'Unsupported review status');
+    return db.transaction(() => {
+      const current = getScreenshot(id); checkRevision('screenshot', current, expectedRevision);
+      if (reviewStatus === 'approved') {
+        if (!current.matchId) invalid('reviewStatus', 'Assign a complete classified match before approval.');
+        const parent = getMatch(current.matchId);
+        checkRevision('match', parent, requireRevision(expectedMatchRevision, 'expectedMatchRevision'));
+        validateApproval(current, parent);
+      }
+      if (reviewStatus !== current.reviewStatus) db.prepare('UPDATE screenshots SET review_status=?, revision=revision+1, updated_at=? WHERE id=? AND revision=?')
+        .run(reviewStatus, new Date().toISOString(), id, expectedRevision);
+      return getScreenshot(id);
+    }).immediate();
+  }
+  return { createMatch, getMatch, updateMatch, getScreenshot, insertCommittedScreenshot, updateScreenshot, assignScreenshots, reviewScreenshot };
 }

@@ -25,9 +25,12 @@ export interface SelectionManifest {
   sourceLabel: string;
   files: Array<{ clientFileId: string; relativePath: string; byteSize: number; metadataText?: string }>;
 }
-/** Minimal committed read projection for Milestone 3. Review/eligibility is added in Milestone 5. */
+/** Committed read projection; derived fields describe saved inputs and current assets. */
 export interface ScreenshotSummary extends Omit<Screenshot, 'originalMetadataJson' | 'image'> {
   image: Screenshot['image'] & { url: string };
+  classification: import('./classification.js').Classification & { complete: boolean };
+  eligibility: { eligible: boolean; reasons: string[] };
+  matchRevision: number | null;
   assetStatus: 'available' | 'missing' | 'corrupt' | 'unavailable';
 }
 export interface ScreenshotList { screenshots: ScreenshotSummary[]; matchedCount: number; asOf: string }

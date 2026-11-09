@@ -16,7 +16,7 @@ describe('SQLite library constraints', () => {
   afterEach(async () => { await resources.cleanup(); });
 
   it.each([
-    ['difficulty', 'easy'], ['review_status', 'ready'], ['image_width', 0], ['image_height', -1],
+    ['difficulty', 'squash'], ['review_status', 'ready'], ['image_width', 0], ['image_height', -1],
     ['image_byte_size', 0], ['image_width', 1.5], ['playback_seconds', -1], ['playback_seconds', Infinity],
     ['schema_version', 2], ['capture_method', 'tab-capture'], ['source_platform', 'other'],
     ['image_sha256', 'A'.repeat(64)], ['image_sha256', 'short'], ['original_metadata_json', '{bad'],
@@ -31,13 +31,13 @@ describe('SQLite library constraints', () => {
   it('enforces classification/nullability, nonunique hashes and restricted match deletion', () => {
     const match = repo.createMatch(); const record = repo.insertCommittedScreenshot(screenshotInput('one'));
     expect(() => session.db.prepare("UPDATE matches SET obscurity='legendary' WHERE id=?").run(match.id)).toThrow();
-    for (const obscurity of ['iconic', 'familiar', 'obscure', null]) session.db.prepare('UPDATE matches SET obscurity=? WHERE id=?').run(obscurity, match.id);
+    for (const obscurity of ['low', 'medium', 'high', null]) session.db.prepare('UPDATE matches SET obscurity=? WHERE id=?').run(obscurity, match.id);
     expect(() => session.db.prepare("UPDATE screenshots SET review_status='approved' WHERE id=?").run(record.id)).toThrow();
     repo.updateScreenshot(record.id, 1, { matchId: match.id }, 1);
     expect(() => session.db.prepare("UPDATE screenshots SET review_status='approved' WHERE id=?").run(record.id)).toThrow();
-    for (const difficulty of ['squash', 'competitive', 'deathmatch', null]) session.db.prepare('UPDATE screenshots SET difficulty=? WHERE id=?').run(difficulty, record.id);
+    for (const difficulty of ['easy', 'medium', 'hard', null]) session.db.prepare('UPDATE screenshots SET difficulty=? WHERE id=?').run(difficulty, record.id);
     for (const status of ['pending', 'rejected']) session.db.prepare('UPDATE screenshots SET review_status=? WHERE id=?').run(status, record.id);
-    session.db.prepare("UPDATE screenshots SET difficulty='squash', review_status='approved' WHERE id=?").run(record.id);
+    session.db.prepare("UPDATE screenshots SET difficulty='easy', review_status='approved' WHERE id=?").run(record.id);
     expect(() => session.db.prepare('DELETE FROM matches WHERE id=?').run(match.id)).toThrow(/FOREIGN KEY/);
     const other = repo.insertCommittedScreenshot(screenshotInput('two'));
     expect(other.image.sha256).toBe(record.image.sha256);

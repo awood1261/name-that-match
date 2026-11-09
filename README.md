@@ -29,6 +29,8 @@ This starts:
 
 ## Production startup
 
+Before starting this version against existing data, follow the [stopped-writer whole-root backup procedure](docs/local-storage.md#backup-and-restore). Startup upgrades schema 1 to 2; see the [mapping and rollback guidance](docs/classification.md#migration).
+
 Build the client and server first:
 
 ```bash
@@ -70,7 +72,7 @@ Replace the example IP with the laptop's actual address. `NAME_THAT_MATCH_UI_ORI
 
 ## Capture import
 
-Open **Image Library → Import captures**. Choose a folder or multiple PNG/JSON pairs on the current browser device. Review validation, ignored files and duplicate decisions, then explicitly confirm. New screenshots are unassigned, unrated and pending; use **View unassigned screenshots** to inspect the imported copies. Difficulty editing and approval controls remain reserved for later approved milestones.
+Open **Image Library → Import captures**. Choose a folder or multiple PNG/JSON pairs on the current browser device. Review validation, ignored files and duplicate decisions, then explicitly confirm. New screenshots are unassigned, unrated and pending; use **View unassigned screenshots** to inspect the imported copies. Open **Review screenshot** to assign Easy/Medium/Hard visual difficulty, save, then explicitly approve when all prerequisites are met.
 
 Closing the dialog keeps durable server progress. Reopen **Recent imports** to resume; interrupted uploads can re-select missing files, while changed metadata requires a new selection/batch. Original captures are preserved. See [limits, recovery and staging maintenance](docs/import-engine.md). Run only one server process per data root.
 
@@ -78,7 +80,7 @@ Closing the dialog keeps durable server progress. Reopen **Recent imports** to r
 
 Image Library opens in **Matches**. Use **Unassigned screenshots** to select up to 256 captures and choose an existing target match. **Create match for selection** keeps those screenshots selected while you save a new match; **Use this match for selected screenshots**, **Back to screenshots**, and **Save assignment** finish the explicit association. Saving a match never assigns screenshots automatically.
 
-Incomplete match drafts and year/year-month/full dates are supported. Match obscurity is independent of screenshot difficulty. Match details and assignment have separate saves; unsaved navigation offers Save, Discard or Stay. Stale revisions retain the draft and selection for deliberate comparison with current records. See [match management and manual verification](docs/match-management.md).
+Incomplete match drafts and year/year-month/full dates are supported. Match obscurity (Low/Medium/High) and visual difficulty (Easy/Medium/Hard) are independent nullable inputs; together they derive read-only game tiers and points. The library shows global progress, eligible-tier counts, search and filters. Match details and assignment have separate saves; unsaved navigation offers Save, Discard or Stay. Stale revisions retain the draft and selection for deliberate comparison with current records. See [match management and manual verification](docs/match-management.md) and [classification, eligibility and migration](docs/classification.md).
 
 ## Local storage
 

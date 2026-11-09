@@ -1,6 +1,8 @@
 import type { Match, MatchFields } from './library.js';
-/** Basic Milestone 4 projection. Association counts and eligibility arrive with richer browsing. */
+/** Saved match with authoritative identification, classification and association counts. */
 export interface MatchSummary extends Match {
+  matchingScreenshotCount: number;
+  screenshotCount: number; approvedCount: number; eligibleCount: number; awaitingClassificationCount: number; classificationIncomplete: boolean;
   complete: boolean;
   missingFields: Array<'participantDescription' | 'promotion' | 'event'>;
 }

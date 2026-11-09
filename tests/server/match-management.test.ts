@@ -42,11 +42,11 @@ describe('match management HTTP', () => {
     const response = await patch(match, { event: 'Updated event', stipulation: 'Tag match', championshipInfo: 'Tag titles', notes: 'Editorial\nnotes' });
     expect(response.status).toBe(200); expect((await response.json()).data.match).toMatchObject({ matchDate, event: 'Updated event', revision: 2 });
   });
-  it.each(['iconic', 'familiar', 'obscure', null])('keeps obscurity %s independent of screenshot difficulty/review', async (obscurity) => {
+  it.each(['low', 'medium', 'high', null])('keeps obscurity %s independent of screenshot difficulty/review', async (obscurity) => {
     const match = await create(); const image = screenshot(); await assign(match, [image]);
-    storage.db.prepare("UPDATE screenshots SET difficulty='deathmatch',review_status='approved' WHERE id=?").run(image.id);
+    storage.db.prepare("UPDATE screenshots SET difficulty='hard',review_status='approved' WHERE id=?").run(image.id);
     const response = await patch(match, { obscurity }); expect(response.status).toBe(200);
-    expect(storage.db.prepare('SELECT difficulty,review_status,revision FROM screenshots WHERE id=?').get(image.id)).toEqual({ difficulty: 'deathmatch', review_status: 'approved', revision: 2 });
+    expect(storage.db.prepare('SELECT difficulty,review_status,revision FROM screenshots WHERE id=?').get(image.id)).toEqual({ difficulty: 'hard', review_status: 'approved', revision: 2 });
   });
   it.each([['matchDate', '2023-02-29'], ['matchDate', '2024-13'], ['obscurity', 'legendary'], ['promotion', 'x'.repeat(501)], ['event', 'bad\0value']])('returns field feedback for invalid %s', async (field, value) => {
     const match = await create(); const response = await patch(match, { [field]: value }); expect(response.status).toBe(422);
@@ -54,14 +54,14 @@ describe('match management HTTP', () => {
     expect(createLibraryRepository(storage.db).getMatch(match.id).revision).toBe(1);
   });
   it('rejects unknown fields, invalid revisions, absent records, unsupported methods and unapproved screenshot edits', async () => {
-    expect((await request('/api/matches', { difficulty: 'squash' })).status).toBe(400);
+    expect((await request('/api/matches', { difficulty: 'easy' })).status).toBe(400);
     const match = await create(); const record = screenshot();
     expect((await request(`/api/matches/${match.id}`, { expectedRevision: 0, changes: {} }, 'PATCH')).status).toBe(400);
     expect((await request(`/api/matches/${randomUUID()}`, { expectedRevision: 1, changes: {} }, 'PATCH')).status).toBe(404);
-    for (const changes of [{ difficulty: 'squash' }, { notes: 'future' }, { reviewStatus: 'approved' }]) expect((await request(`/api/screenshots/${record.id}`, { expectedRevision: 1, changes }, 'PATCH')).status).toBe(400);
-    expect((await request(`/api/screenshots/${record.id}`, { expectedRevision: 1, reviewStatus: 'approved' }, 'PATCH')).status).toBe(400);
+    for (const changes of [{ difficulty: 'squash' }, { tier: 'squash' }, { reviewStatus: 'approved' }]) expect((await request(`/api/screenshots/${record.id}`, { expectedRevision: 1, changes }, 'PATCH')).status).toBe(changes.difficulty ? 422 : 400);
+    expect((await request(`/api/screenshots/${record.id}`, { expectedRevision: 1, reviewStatus: 'approved' }, 'PATCH')).status).toBe(422);
     const wrong = await fetch(base + `/api/matches/${match.id}`); expect(wrong.status).toBe(405); expect(wrong.headers.get('allow')).toBe('PATCH');
-    expect((await fetch(base + '/api/matches?q=not-yet')).status).toBe(400);
+    expect((await fetch(base + '/api/matches?q=not-yet')).status).toBe(200);
   });
   it('rejects stale match updates and preserves no-op revisions and timestamps', async () => {
     const match = await create({ participantDescription: '  Wrestler A vs. Wrestler B  ' });
@@ -102,7 +102,7 @@ describe('match management HTTP', () => {
   });
   it('invalidates approved associations atomically and rejects a stale screenshot editor', async () => {
     const match = await create({ participantDescription: 'A vs B', promotion: 'P', event: 'E' }); const image = screenshot(); await assign(match, [image]);
-    storage.db.prepare("UPDATE screenshots SET difficulty='competitive',review_status='approved' WHERE id=?").run(image.id);
+    storage.db.prepare("UPDATE screenshots SET difficulty='medium',review_status='approved' WHERE id=?").run(image.id);
     const response = await patch(match, { event: 'New event' }); const data = (await response.json()).data;
     expect(data.invalidatedScreenshots).toEqual([{ id: image.id, revision: 3 }]);
     expect((await request(`/api/screenshots/${image.id}`, { expectedRevision: 2, changes: { matchId: null } }, 'PATCH')).status).toBe(409);
@@ -110,17 +110,17 @@ describe('match management HTTP', () => {
   });
   it('rolls back both match writes and approval resets if the transaction fails', async () => {
     const match = await create(); const image = screenshot(); await assign(match, [image]);
-    storage.db.prepare("UPDATE screenshots SET difficulty='squash',review_status='approved' WHERE id=?").run(image.id);
+    storage.db.prepare("UPDATE screenshots SET difficulty='easy',review_status='approved' WHERE id=?").run(image.id);
     storage.db.exec("CREATE TRIGGER fail_review BEFORE UPDATE ON screenshots BEGIN SELECT RAISE(ABORT,'test failure'); END");
     expect((await patch(match, { event: 'Must roll back' })).status).toBe(500);
     expect(createLibraryRepository(storage.db).getMatch(match.id)).toMatchObject({ event: null, revision: 1 });
     expect(createLibraryRepository(storage.db).getScreenshot(image.id).reviewStatus).toBe('approved');
   });
   it('preserves matches and assignments after stopping and reopening the server', async () => {
-    const match = await create({ participantDescription: 'A & B vs C & D', matchDate: '1999-03', obscurity: 'obscure' }); const image = screenshot(); await assign(match, [image]);
+    const match = await create({ participantDescription: 'A & B vs C & D', matchDate: '1999-03', obscurity: 'high' }); const image = screenshot(); await assign(match, [image]);
     await new Promise<void>((resolve) => server.close(() => resolve()));
     base = await listen(resources.server(createServer(0, { dataDir: resources.root })));
-    expect((await (await fetch(base + '/api/matches')).json()).data.matches[0]).toMatchObject({ id: match.id, matchDate: '1999-03', obscurity: 'obscure' });
+    expect((await (await fetch(base + '/api/matches')).json()).data.matches[0]).toMatchObject({ id: match.id, matchDate: '1999-03', obscurity: 'high' });
     expect((await (await fetch(base + `/api/screenshots?matchId=${match.id}`)).json()).data.screenshots[0].id).toBe(image.id);
   });
   it('applies origin/header protection to all new mutations before side effects', async () => {
@@ -134,12 +134,12 @@ describe('match management HTTP', () => {
   });
   it('resets approval on reassignment and unassignment without changing difficulty or provenance', async () => {
     const a = await create(); const b = await create(); const record = screenshot(); await assign(a, [record]);
-    storage.db.prepare("UPDATE screenshots SET difficulty='deathmatch',review_status='approved' WHERE id=?").run(record.id);
+    storage.db.prepare("UPDATE screenshots SET difficulty='hard',review_status='approved' WHERE id=?").run(record.id);
     const moved = (await (await request(`/api/screenshots/${record.id}`, { expectedRevision: 2, changes: { matchId: b.id }, expectedMatchRevision: 1 }, 'PATCH')).json()).data;
-    expect(moved).toMatchObject({ matchId: b.id, difficulty: 'deathmatch', reviewStatus: 'pending', revision: 3, provenance: record.provenance });
+    expect(moved).toMatchObject({ matchId: b.id, difficulty: 'hard', reviewStatus: 'pending', revision: 3, provenance: record.provenance });
     storage.db.prepare("UPDATE screenshots SET review_status='approved' WHERE id=?").run(record.id);
     const removed = (await (await request(`/api/screenshots/${record.id}`, { expectedRevision: 3, changes: { matchId: null } }, 'PATCH')).json()).data;
-    expect(removed).toMatchObject({ matchId: null, difficulty: 'deathmatch', reviewStatus: 'pending', revision: 4, provenance: record.provenance });
+    expect(removed).toMatchObject({ matchId: null, difficulty: 'hard', reviewStatus: 'pending', revision: 4, provenance: record.provenance });
   });
   it('rolls back earlier multi-assignment writes when a later SQL write fails', async () => {
     const match = await create(); const a = screenshot(); const b = screenshot();

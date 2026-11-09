@@ -32,7 +32,7 @@ describe('library schema migration lifecycle', () => {
     const assets = path.join(resources.root, 'screenshots'); fs.mkdirSync(assets);
     fs.writeFileSync(path.join(assets, 'keep.txt'), 'existing asset');
     const { db } = open();
-    expect(db.pragma('user_version', { simple: true })).toBe(1);
+    expect(db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
     expect(db.pragma('application_id', { simple: true })).toBe(1234);
     expect(fs.statSync(file).ino).toBe(inode);
     expect(fs.readFileSync(path.join(assets, 'keep.txt'), 'utf8')).toBe('existing asset');
@@ -43,9 +43,9 @@ describe('library schema migration lifecycle', () => {
     first.db.close();
     const second = open();
     expect(second.db.prepare('SELECT id, participant_description FROM matches').all()).toEqual([{ id: 'kept', participant_description: 'A vs B' }]);
-    expect(second.db.pragma('user_version', { simple: true })).toBe(1);
+    expect(second.db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
   });
-  it.each([0, 2])('rejects unexpected version %i objects without losing existing rows', (version) => {
+  it.each([0, 3])('rejects unexpected version %i objects without losing existing rows', (version) => {
     raw((db) => { db.exec("CREATE TABLE existing_data (value TEXT); INSERT INTO existing_data VALUES ('preserve')"); db.pragma(`user_version = ${version}`); });
     const close = vi.spyOn(Database.prototype, 'close');
     expect(open).toThrow(version ? /Unsupported database schema/ : /Unexpected objects/);
@@ -81,6 +81,6 @@ describe('library schema migration lifecycle', () => {
       expect(db.pragma('application_id', { simple: true })).toBe(4321);
       expect(db.prepare("SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").all()).toEqual([]);
     });
-    expect(open().db.pragma('user_version', { simple: true })).toBe(1);
+    expect(open().db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
   });
 });

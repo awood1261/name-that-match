@@ -1,19 +1,19 @@
 import type { CaptureMetadataV1 } from './capture.js';
 
-export const DIFFICULTIES = ['squash', 'competitive', 'deathmatch'] as const;
-export type Difficulty = typeof DIFFICULTIES[number];
+export const DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
+export type VisualDifficulty = typeof DIFFICULTIES[number];
+export type Difficulty = VisualDifficulty;
 export const DIFFICULTY_DETAILS = {
-  squash: { label: 'Squash Match', points: 1 },
-  competitive: { label: 'Competitive Match', points: 2 },
-  deathmatch: { label: 'Deathmatch', points: 3 },
+  easy: { label: 'Easy', definition: 'Clear visual clues make identification straightforward.' },
+  medium: { label: 'Medium', definition: 'Some recognizable clues require additional knowledge.' },
+  hard: { label: 'Hard', definition: 'Limited, misleading or ambiguous visual clues.' },
 } as const;
-
-export const OBSCURITIES = ['iconic', 'familiar', 'obscure'] as const;
+export const OBSCURITIES = ['low', 'medium', 'high'] as const;
 export type Obscurity = typeof OBSCURITIES[number];
 export const OBSCURITY_DETAILS = {
-  iconic: { label: 'Iconic', definition: 'A widely recognized match that a broad wrestling audience is likely to know.' },
-  familiar: { label: 'Familiar', definition: 'A recognizable match for fans familiar with its wrestlers, promotion, or era.' },
-  obscure: { label: 'Obscure', definition: 'A match primarily recognizable to dedicated fans with deeper wrestling knowledge.' },
+  low: { label: 'Low', definition: 'A widely recognizable or historically prominent match.' },
+  medium: { label: 'Medium', definition: 'Knowledgeable fans may recognize this match.' },
+  high: { label: 'High', definition: 'An obscure match requiring deeper wrestling knowledge.' },
 } as const;
 
 export const REVIEW_STATUSES = ['pending', 'approved', 'rejected'] as const;
@@ -47,7 +47,7 @@ export interface ScreenshotChanges {
   notes?: string | null;
 }
 
-/** Domain data only; filesystem references and future HTTP/eligibility projections are separate. */
+/** Domain data only; filesystem references and HTTP/eligibility projections are separate. */
 export interface Screenshot {
   id: string;
   matchId: string | null;

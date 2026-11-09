@@ -7,12 +7,9 @@ import {
 
 describe('library classifications and domain validation', () => {
   it('defines exactly the approved classifications and point meanings', () => {
-    expect(DIFFICULTIES).toEqual(['squash', 'competitive', 'deathmatch']);
-    expect(DIFFICULTY_DETAILS).toEqual({
-      squash: { label: 'Squash Match', points: 1 }, competitive: { label: 'Competitive Match', points: 2 },
-      deathmatch: { label: 'Deathmatch', points: 3 },
-    });
-    expect(OBSCURITIES).toEqual(['iconic', 'familiar', 'obscure']);
+    expect(DIFFICULTIES).toEqual(['easy', 'medium', 'hard']);
+    expect(Object.values(DIFFICULTY_DETAILS).map((entry) => entry.label)).toEqual(['Easy', 'Medium', 'Hard']);
+    expect(OBSCURITIES).toEqual(['low', 'medium', 'high']);
     expect(REVIEW_STATUSES).toEqual(['pending', 'approved', 'rejected']);
     for (const value of DIFFICULTIES) expect(isDifficulty(value)).toBe(true);
     for (const value of OBSCURITIES) {
@@ -20,7 +17,7 @@ describe('library classifications and domain validation', () => {
       expect(OBSCURITY_DETAILS[value].definition.length).toBeGreaterThan(30);
     }
     for (const value of REVIEW_STATUSES) expect(isReviewStatus(value)).toBe(true);
-    for (const value of [null, undefined, '', 'easy', 'unknown', 1, {}, []]) {
+    for (const value of [null, undefined, '', 'invalid', 'unknown', 1, {}, []]) {
       expect(isDifficulty(value)).toBe(false); expect(isObscurity(value)).toBe(false); expect(isReviewStatus(value)).toBe(false);
     }
   });
@@ -56,7 +53,7 @@ describe('library classifications and domain validation', () => {
     expect(() => parseScreenshotChanges({ notes: 'note\r\n' })).toThrow(DomainValidationError);
   });
   it('rejects unknown fields, invalid enums and implicit undefined rather than overwriting', () => {
-    for (const value of [null, [], 2, { event: undefined }, { obscure: 'iconic' }, { obscurity: 'legendary' }]) {
+    for (const value of [null, [], 2, { event: undefined }, { obscure: 'low' }, { obscurity: 'legendary' }, { obscurity: 'iconic' }, { obscurity: 'familiar' }, { obscurity: 'obscure' }]) {
       expect(() => parseMatchChanges(value)).toThrow(DomainValidationError);
     }
     for (const value of [{ difficulty: 1 }, { reviewStatus: 'approved' }, { provenance: {} }, { matchId: '../outside' }, { notes: undefined }]) {

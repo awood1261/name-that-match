@@ -27,8 +27,8 @@ Use the existing React, strict TypeScript, Vite, Node.js, SQLite, and Vitest sta
 ## Product rules
 
 - Standard answer window: 10 seconds.
-- Difficulty belongs to each screenshot: Squash Match = 1 point; Competitive Match = 2 points; Deathmatch = 3 points.
-- Match obscurity is a separate editorial classification and must not automatically change scoring.
+- Match obscurity (Low/Medium/High) and screenshot visual difficulty (Easy/Medium/Hard) are independent nullable inputs. The approved matrix in `shared/src/classification.ts` derives Squash Match = 1 point, Competitive Match = 2 points, or Deathmatch = 3 points; never store or manually edit derived tiers.
+- Gameplay eligibility additionally requires explicit approval, complete identifying match metadata, and a valid available image. The host judges verbal answers; event/year are not required for basic correctness. Future discretionary bonuses do not change the matrix.
 - A match may have multiple screenshots with different difficulties. A source video may contain multiple matches.
 - Unrated or unapproved screenshots are ineligible for gameplay. Prevent repeat matches within a session according to the future approved gameplay spec.
 - Do not invent game rules or treat visual references as functional approval.

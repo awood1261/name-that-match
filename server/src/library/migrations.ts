@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 
-export const LIBRARY_SCHEMA_VERSION = 1;
+export const LIBRARY_SCHEMA_VERSION = 2;
 
 export class LibraryMigrationError extends Error {
   constructor(message: string) {
@@ -104,21 +104,50 @@ CREATE TABLE import_items (
 CREATE INDEX import_items_batch_state ON import_items(batch_id, state);
 `;
 
-const migrations = [versionOne] as const;
+// Version one is immutable. Build the replacement tables from its original constraints.
+function upgradeClassifications(db: Database.Database): void {
+  const timestamp = new Date().toISOString();
+  const indexes = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name IN ('matches','screenshots') AND sql IS NOT NULL").all() as Array<{ sql: string }>;
+  for (const [table, column, pairs] of [
+    ['matches', 'obscurity', [['iconic', 'low'], ['familiar', 'medium'], ['obscure', 'high']]],
+    ['screenshots', 'difficulty', [['squash', 'easy'], ['competitive', 'medium'], ['deathmatch', 'hard']]],
+  ] as const) {
+    const schema = (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(table) as { sql: string }).sql;
+    let replacement = schema.replace(`CREATE TABLE ${table}`, `CREATE TABLE ${table}_next`);
+    for (const [oldValue, newValue] of pairs) replacement = replacement.replace(`'${oldValue}'`, `'${newValue}'`);
+    db.exec(replacement);
+    const columns = (db.pragma(`table_info(${table})`) as Array<{ name: string }>).map(({ name }) => name);
+    const expressions = columns.map((name) => name === column
+      ? `CASE ${column} ${pairs.map(([oldValue, newValue]) => `WHEN '${oldValue}' THEN '${newValue}'`).join(' ')} ELSE NULL END`
+      : name === 'revision' ? `revision + CASE WHEN ${column} IS NULL THEN 0 ELSE 1 END`
+      : name === 'updated_at' ? `CASE WHEN ${column} IS NULL THEN updated_at ELSE ? END` : name);
+    db.prepare(`INSERT INTO ${table}_next (${columns.join(',')}) SELECT ${expressions.join(',')} FROM ${table}`).run(timestamp);
+    db.exec(`DROP TABLE ${table}; ALTER TABLE ${table}_next RENAME TO ${table}`);
+  }
+  for (const index of indexes) db.exec(index.sql);
+}
 
 export function applyLibraryMigrations(db: Database.Database): void {
-  db.transaction(() => {
-    const version = db.pragma('user_version', { simple: true }) as number;
-    if (version > LIBRARY_SCHEMA_VERSION || version < 0) {
-      throw new LibraryMigrationError(`Unsupported database schema version ${version}; supported through ${LIBRARY_SCHEMA_VERSION}. Restore compatible data or use a compatible application.`);
-    }
-    if (version === 0) {
-      const existing = db.prepare("SELECT name FROM sqlite_master WHERE name NOT GLOB 'sqlite_*'").all();
-      if (existing.length) throw new LibraryMigrationError('Unexpected objects in version 0 database; migration refused without changing existing data.');
-    }
-    for (let next = version + 1; next <= LIBRARY_SCHEMA_VERSION; next += 1) {
-      db.exec(migrations[next - 1]);
-      db.pragma(`user_version = ${next}`);
-    }
-  }).immediate();
+  const version = db.pragma('user_version', { simple: true }) as number;
+  if (version > LIBRARY_SCHEMA_VERSION || version < 0) {
+    throw new LibraryMigrationError(`Unsupported database schema version ${version}; supported through ${LIBRARY_SCHEMA_VERSION}. Restore compatible data or use a compatible application.`);
+  }
+  if (version === LIBRARY_SCHEMA_VERSION) return;
+  // SQLite requires this outside the transaction for referenced-table rebuilds.
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      if (version === 0) {
+        const existing = db.prepare("SELECT name FROM sqlite_master WHERE name NOT GLOB 'sqlite_*'").all();
+        if (existing.length) throw new LibraryMigrationError('Unexpected objects in version 0 database; migration refused without changing existing data.');
+        db.exec(versionOne);
+      }
+      upgradeClassifications(db);
+      if ((db.pragma('foreign_key_check') as unknown[]).length) throw new LibraryMigrationError('Foreign key verification failed; migration rolled back.');
+      db.pragma('user_version = 2');
+    }).immediate();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  if (db.pragma('foreign_keys', { simple: true }) !== 1) throw new LibraryMigrationError('Cannot restore foreign key enforcement.');
 }

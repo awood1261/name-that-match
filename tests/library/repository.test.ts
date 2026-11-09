@@ -21,7 +21,7 @@ describe('library persistence and transactions', () => {
   // Only tests seed review states directly. Production approval requires later asset/review checks.
   function reviewed(matchId: string, reviewStatus: 'approved' | 'pending' | 'rejected' = 'approved') {
     const initial = shot();
-    repo.updateScreenshot(initial.id, 1, { matchId, difficulty: 'competitive' }, repo.getMatch(matchId).revision);
+    repo.updateScreenshot(initial.id, 1, { matchId, difficulty: 'medium' }, repo.getMatch(matchId).revision);
     session.db.prepare('UPDATE screenshots SET review_status=?, revision=revision+1 WHERE id=?').run(reviewStatus, initial.id);
     return repo.getScreenshot(initial.id);
   }
@@ -54,9 +54,9 @@ describe('library persistence and transactions', () => {
   });
 
   it('persists matches, partial dates, screenshot fields and immutable provenance across reopen', () => {
-    const match = repo.createMatch({ participantDescription: 'A & B vs C & D', promotion: 'P', event: 'E', matchDate: '2000-02-29', obscurity: 'familiar' });
+    const match = repo.createMatch({ participantDescription: 'A & B vs C & D', promotion: 'P', event: 'E', matchDate: '2000-02-29', obscurity: 'medium' });
     const original = shot();
-    const associated = repo.updateScreenshot(original.id, 1, { matchId: match.id, difficulty: 'deathmatch', notes: 'kept' }, 1);
+    const associated = repo.updateScreenshot(original.id, 1, { matchId: match.id, difficulty: 'hard', notes: 'kept' }, 1);
     session.db.close();
     session = resources.storage(initializeStorage({ dataDir: resources.root }));
     repo = createLibraryRepository(session.db);
@@ -68,8 +68,8 @@ describe('library persistence and transactions', () => {
   it('supports one video split across matches and one match containing multiple videos', () => {
     const a = identified(); const b = identified();
     const x = shot('x', 'videoSame01'); const y = shot('y', 'videoSame01'); const z = shot('z', 'videoOther1');
-    repo.updateScreenshot(x.id, 1, { matchId: a.id, difficulty: 'squash' }, 1);
-    repo.updateScreenshot(y.id, 1, { matchId: b.id, difficulty: 'deathmatch' }, 1);
+    repo.updateScreenshot(x.id, 1, { matchId: a.id, difficulty: 'easy' }, 1);
+    repo.updateScreenshot(y.id, 1, { matchId: b.id, difficulty: 'hard' }, 1);
     repo.updateScreenshot(z.id, 1, { matchId: a.id }, 1);
     expect(repo.getScreenshot(x.id).matchId).toBe(a.id);
     expect(repo.getScreenshot(y.id).matchId).toBe(b.id);
@@ -131,7 +131,7 @@ describe('library persistence and transactions', () => {
 
   it('invalidates when required metadata is cleared, but not for notes/obscurity or normalized no-ops', () => {
     const match = identified(); const approved = reviewed(match.id);
-    expect(repo.updateMatch(match.id, 1, { notes: 'editor', obscurity: 'obscure' }).invalidatedScreenshots).toEqual([]);
+    expect(repo.updateMatch(match.id, 1, { notes: 'editor', obscurity: 'high' }).invalidatedScreenshots).toEqual([]);
     expect(repo.getScreenshot(approved.id)).toEqual(approved);
     expect(repo.updateScreenshot(approved.id, approved.revision, { matchId: match.id, difficulty: approved.difficulty }, 2)).toEqual(approved);
     const note = repo.updateScreenshot(approved.id, approved.revision, { notes: ' screenshot note ' });
@@ -143,7 +143,7 @@ describe('library persistence and transactions', () => {
 
   it.each(['difficulty', 'unrate', 'reassign', 'unassign'] as const)('resets approval when a screenshot material edit is %s', (action) => {
     const match = identified(); const target = identified(); const approved = reviewed(match.id);
-    const changes = action === 'difficulty' ? { difficulty: 'deathmatch' }
+    const changes = action === 'difficulty' ? { difficulty: 'hard' }
       : action === 'unrate' ? { difficulty: null } : { matchId: action === 'reassign' ? target.id : null };
     const changed = repo.updateScreenshot(approved.id, approved.revision, changes, 1);
     expect(changed.reviewStatus).toBe('pending'); expect(changed.revision).toBe(approved.revision + 1);
