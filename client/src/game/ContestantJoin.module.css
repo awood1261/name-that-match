@@ -1,0 +1,7 @@
+.join { display: grid; gap: var(--space-3); min-width: 0; }
+.join p { overflow-wrap: anywhere; }
+.join label { display: grid; gap: var(--space-2); }
+.qr { display: block; width: min(100%, 360px); height: auto; aspect-ratio: 1; background: white; }
+.controls { display: grid; gap: var(--space-3); }
+.controls form { display: flex; gap: var(--space-3); align-items: end; flex-wrap: wrap; }
+.controls label { flex: 1 1 16rem; }

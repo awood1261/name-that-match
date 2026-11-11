@@ -80,7 +80,10 @@ Closing the dialog keeps durable server progress. Reopen **Recent imports** to r
 
 Open **Play** to configure contestants, explicitly select the active contestant and create a primary contestant-display link **before preparing**. Paste it into a separate tab. Prepare stays hidden until the primary has decoded/synchronized and the host selects **Reveal & start**. The server owns the ten-second clock, pause/resume and judgment; display reload/disconnect never resets it. Judgment leaves the contestant result concealed; select **Reveal Result** to present its committed outcome/points and frozen match identity. Reduced motion and refresh show a stable result. Host leases, revisions and receipts protect concurrent/retried requests. Tie-aware scoreboards show server totals and latest outcomes; contestant totals update on Reveal Result. Advance explicitly returns between rounds, keeping the same contestant and previous tier until you choose otherwise. Used matches remain excluded across contestants and tiers. Final-total presentation is available; End/New Game controls remain deferred. See [host operation, recovery and manual acceptance](docs/game-host.md).
 
+The contestant connection panel also provides a locally generated QR code for a configured LAN URL. On macOS it discovers the en0 address, replaces a localhost hostname while keeping the UI port, and preserves the full viewer link. Refresh/manual-origin controls do not change the game or register another viewer. See [QR/LAN setup and fallback instructions](docs/game-host.md#qr-code-and-lan-joining); deliberate listener/origin configuration is still required.
+
 ## Match management
+
 
 Image Library opens in **Matches**. Use **Unassigned screenshots** to select up to 256 captures and choose an existing target match. **Create match for selection** keeps those screenshots selected while you save a new match; **Use this match for selected screenshots**, **Back to screenshots**, and **Save assignment** finish the explicit association. Saving a match never assigns screenshots automatically.
 

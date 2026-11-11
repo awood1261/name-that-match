@@ -122,7 +122,7 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
   const storage = initializeStorage(options);
   const library = createLibraryHttp(storage, origins);
   let game: ReturnType<typeof createGameHttp>;
-  try { game = createGameHttp(storage, origins); }
+  try { game = createGameHttp(storage, origins, {}, { production: productionMode, host: resolvedHost }); }
   catch (error) { library.stop(); closeStorage(storage); throw error; }
   let storageReleased = false;
   const releaseStorage = () => {

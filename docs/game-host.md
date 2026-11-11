@@ -1,4 +1,4 @@
-# Game host — Task 5.3
+# Game host — Checkpoint 5.3a
 
 Open **Play** from the application navigation. This checkpoint supports setup, hidden preparation, a separate read-only contestant tab, the authoritative countdown, host judgment/pause controls and explicit **Reveal Result**. Scoreboard and final-total presentation are implemented. Explicit round advancement, contestant switching and next-tier selection are available. End/New Game UI remains a later Milestone 4 task. Automatic Studio launching/fullscreen and Road WebSockets remain later work. Use disposable test data for acceptance runs; this checkpoint can play successive rounds but does not yet provide End Game or New Game controls.
 
@@ -47,6 +47,35 @@ Completed sessions show final totals and the server's winner or tied winners, in
 
 For manual verification with the currently available UI, create a head-to-head setup and confirm zero totals/shared ranks. Start a round and judge it: host totals/latest outcome update immediately, while the contestant waits without disclosure. Select Reveal Result and confirm the same committed points and turn identity appear on the contestant scoreboard. Reload/reconnect and confirm totals stay unchanged. Advance explicitly to test additional rounds and tiers. Use a disposable data directory for alternative sessions; final-game UI acceptance follows the End/New Game controls.
 
+## QR code and LAN joining
+
+**Create contestant display link** registers the existing read-only viewer and automatically checks the laptop address. On macOS, the server runs `ipconfig getifaddr en0` once for this action. When the LAN origin is configured, the panel shows a copyable device URL and its matching offline QR code. Scan it with the other device's normal camera/browser on the same local Wi-Fi. The QR is generated locally, includes the full viewer join fragment and never contains host-control credentials. No camera permission in this application or external QR service is needed.
+
+For a host opened on localhost, discovery changes only the link's hostname and keeps the actual UI port. Vite development normally uses 5173; production normally uses 3001. The code does not change the server's listener or permitted origins for you. Configure them deliberately, keeping your host origin in the list too.
+
+For production on macOS, stop the running server, build, then use the current address:
+
+```bash
+npm run build
+NTM_LAN_IP="$(ipconfig getifaddr en0)"
+NAME_THAT_MATCH_HOST=0.0.0.0 NAME_THAT_MATCH_UI_ORIGINS="http://localhost:3001,http://127.0.0.1:3001,http://${NTM_LAN_IP}:3001" npm run prod
+```
+
+Verify that the address command returned a usable address before starting. For development, Vite already binds to all interfaces and proxies to the loopback Node server:
+
+```bash
+NTM_LAN_IP="$(ipconfig getifaddr en0)"
+NAME_THAT_MATCH_UI_ORIGINS="http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173,http://${NTM_LAN_IP}:5173" npm run dev
+```
+
+Adjust these exact origins to your actual configured ports. QR generation does not enable HTTPS/TLS. Successful detection/configuration does not prove firewall or Wi-Fi reachability. Both devices need to reach the laptop on the local network; external internet is unnecessary after installation/build.
+
+**Refresh LAN address** reruns detection and updates the URL/QR for the same viewer without changing the primary or game. If the network address changes, add its new exact origin to the startup configuration and restart when needed; server restart requires a fresh display link under the existing join rules. An old scanned address is not redirected automatically.
+
+For another interface, a non-macOS host, or missing en0, enter a complete configured IPv4 origin in **Manual LAN origin** and select **Use manual origin**. The field supports an explicitly chosen port. Unconfigured origins, localhost overrides, paths, query strings and credentials are rejected. Correct the displayed configuration issue rather than relaxing origin validation. A detection/configuration failure retains a link for a local browser tab, clearly labeled local-only, and suppresses the device QR. A QR rendering failure retains the configured device link for copying. Refresh clears outdated QR output before recomputing it.
+
+Primary registration/designation remains restricted as described above; address refresh does not create extra viewers. Scanning stays read-only and never prepares/reveals/scores or bypasses readiness. After a server restart, create a fresh viewer capability; on a resolved round, uncheck primary designation to create the secondary link used for saved-result viewing. Physical phone/tablet scanning and complete Road Mode acceptance are separate checks, not implied by desktop QR decoding.
+
 ## Advance and choose the next challenge
 
 After Reveal Result, select **Advance** when ready. It clears the prior clue/answer from the contestant display and returns to the between-round scoreboard. Saved scores, latest revealed outcomes and used-match history remain intact. Advance does not switch contestants, select another tier, prepare another screenshot or start a timer.
@@ -89,4 +118,4 @@ Use an already backed-up collection or a disposable configured data root. Start 
 - Use keyboard focus, native select/radio keys and Enter/Space on buttons. Check visible focus and readable controls at laptop and tablet widths, without horizontal overflow. This does not certify an actual tablet or Road Mode.
 - Revisit Image Library and confirm existing import, editing, classification, approval and filtering workflows still work.
 
-Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's task-5.3 verification record for current results and browser-check limits. Historical milestone-3 evidence is retained. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.
+Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's task-5.3a verification record for current QR/LAN results and browser-check limits. Historical task/milestone evidence is retained. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.

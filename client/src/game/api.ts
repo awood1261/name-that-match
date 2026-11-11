@@ -1,6 +1,7 @@
 import type { CommandEnvelope, CreateGame, Receipt } from '../../../shared/src/game/contracts';
 import type { ControllerCredential, GameApiFailure, HostCommandResponse, HostStatus } from '../../../shared/src/game/host';
 import type { DisplayCredential, DisplayObservation, DisplayReport } from '../../../shared/src/game/display';
+import type { DisplayOriginInput, DisplayOriginObservation } from '../../../shared/src/game/join';
 export class GameApiError extends Error {
   constructor(readonly detail: GameApiFailure, readonly status: number) { super(detail.message); }
 }
@@ -14,6 +15,7 @@ async function request<T>(path: string, signal: AbortSignal, credential?: Pick<C
   return result.data as T;
 }
 export const gameApi = {
+  displayOrigin: (credential: ControllerCredential, input: DisplayOriginInput, signal: AbortSignal) => request<DisplayOriginObservation>('/display-origin', signal, credential, input),
   claim: (signal: AbortSignal) => request<ControllerCredential>('/control-lease', signal, undefined, {}),
   renew: (credential: ControllerCredential, signal: AbortSignal) => request<{ serverEpoch: string }>('/control-lease/renew', signal, credential, {}),
   release: (credential: ControllerCredential, signal: AbortSignal) => request('/control-lease/release', signal, credential, {}),

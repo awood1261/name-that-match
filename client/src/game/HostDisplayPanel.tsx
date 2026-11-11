@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ControllerCredential, HostStatus } from '../../../shared/src/game/host';
 import { gameApi } from './api';
+import { ContestantJoin } from './ContestantJoin';
 import styles from './HostPage.module.css';
 
 export function HostDisplayPanel({ credential, status, disabled, refresh }: { credential: ControllerCredential; status: HostStatus; disabled: boolean; refresh: () => Promise<void> }) {
@@ -33,7 +34,7 @@ export function HostDisplayPanel({ credential, status, disabled, refresh }: { cr
     <label className={styles.connectionToggle}><input type="checkbox" checked={primary} disabled={disabled || busy} onChange={(e) => setPrimary(e.target.checked)} /> Use new link as the primary display</label>
     <button type="button" disabled={disabled || busy || !session || (primary && !canDesignate)} onClick={() => { void register(); }}>Create contestant display link</button>
     {!canDesignate && <p>Cancel preparation, or pause an exposed round, before changing the primary display.</p>}
-    {link && <label>Contestant display link<input type="text" readOnly value={link} onFocus={(e) => e.target.select()} /><span>Copy this link into a separate browser tab. It grants read-only access to this session.</span></label>}
+    {link && <ContestantJoin key={link} localLink={link} credential={credential} disabled={disabled || busy} />}
     {status.primaryDisplay.displays?.map((display, i) => <p key={display.displayId}>Display {i + 1} · {display.primary ? 'Primary' : 'Secondary'} · {display.connected ? 'Connected' : 'Disconnected'} · {display.ready ? 'Decoded and synchronized' : 'Not ready'} {!display.primary && <button disabled={disabled || busy || !canDesignate} onClick={() => { void designate(display.displayId); }}>Make display {i + 1} primary</button>}</p>)}
     {error && <p role="alert">{error}</p>}
   </section>;

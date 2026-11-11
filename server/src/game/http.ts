@@ -14,11 +14,13 @@ import { GameService, type GameServiceOptions } from './service.js';
 import { GameControl } from './control.js';
 import { GameLibrary } from './library.js';
 import { GameDisplays, parseDisplayReport } from './displays.js';
+import { observeDisplayOrigin, parseDisplayOriginInput, type DisplayOriginOptions } from './join.js';
 
-export function createGameHttp(storage: StorageSession, origins: Set<string>, runtime: Pick<GameServiceOptions, 'now' | 'schedule'> = {}) {
+export function createGameHttp(storage: StorageSession, origins: Set<string>, runtime: Pick<GameServiceOptions, 'now' | 'schedule'> = {}, joinOptions: DisplayOriginOptions = {}) {
   const repo = new GameRepository(storage.db); const library = new GameLibrary(storage); const serverEpoch = randomUUID();
   let stopped = false; let sequence = 0; let preparationError: string | null = null;
   const jobs = new Map<string, ReturnType<typeof defer>>();
+  const addressRequests = new Set<AbortController>();
   const displays = new GameDisplays((sessionId) => {
     const state = service.state(sessionId); const round = currentRound(state);
     if (round?.phase === 'guessing') service.connectionLost(state.id, round.id, state.stateVersion, 'primary-display');
@@ -96,6 +98,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
   const lifecycle = {
     stop() {
       if (stopped) return; stopped = true; clearInterval(heartbeat);
+      for (const controller of addressRequests) controller.abort(); addressRequests.clear();
       for (const job of jobs.values()) clearImmediate(job); jobs.clear();
       try { service.close(); } finally { library.release(); control.close(); displays.close(); }
     },
@@ -114,7 +117,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
         if (displayStatus || imageRoute) requestSession = id((displayStatus ?? imageRoute)![1]);
         if (session?.[2] === 'displays' && session[3]) throw new HttpError(404, 'NOT_FOUND', 'Game route not found.');
         const lease = /^\/api\/game\/control-lease(?:\/(renew|release))?$/.exec(route);
-        const methods = displayStatus ? ['POST'] : imageRoute ? ['GET'] : lease ? ['POST'] : route === '/api/game/current' ? ['GET'] : route === '/api/game/sessions' ? ['POST']
+        const methods = route === '/api/game/display-origin' ? ['POST'] : displayStatus ? ['POST'] : imageRoute ? ['GET'] : lease ? ['POST'] : route === '/api/game/current' ? ['GET'] : route === '/api/game/sessions' ? ['POST']
           : session ? session[2] === 'commands' ? session[3] ? ['GET'] : ['POST'] : session[2] === 'displays' ? ['POST'] : ['GET'] : [];
         if (!methods.length) throw new HttpError(404, 'NOT_FOUND', 'Game route not found.');
         if (!methods.includes(req.method ?? '')) throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed.', methods.join(', '));
@@ -124,6 +127,19 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           record(await body(req, 16 * 1024), []); json(res, 200, { data: control.claim() }); return;
         }
         const role = access(req, requestSession, !(displayStatus || imageRoute) && (!session || !!session[2])); authorizedHost = role === 'host';
+        if (route === '/api/game/display-origin') {
+          const input = parseDisplayOriginInput(await body(req, 1024));
+          if (input.uiOrigin !== origin) throw new HttpError(403, 'ORIGIN_REJECTED', 'The UI origin must match the requesting browser origin.');
+          if (addressRequests.size >= 1) throw new HttpError(409, 'ADDRESS_BUSY', 'Address discovery is already in progress. Try again shortly.');
+          const controller = new AbortController(); const abort = () => controller.abort();
+          addressRequests.add(controller); res.once('close', abort);
+          try {
+            const observation = await observeDisplayOrigin(input, origins, joinOptions, controller.signal);
+            if (controller.signal.aborted) res.destroy();
+            else { access(req); json(res, 200, { data: observation }); }
+          } finally { addressRequests.delete(controller); res.off('close', abort); }
+          return;
+        }
         displays.tick();
         if (displayStatus) {
           if (role !== 'display') throw new HttpError(403, 'DISPLAY_REQUIRED', 'Use a read-only display capability.');

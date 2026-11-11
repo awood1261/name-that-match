@@ -81,3 +81,31 @@ Both roles SHALL distinguish no session, empty pool, image loading/failure, stal
 #### Scenario: Image cannot decode
 - **WHEN** the designated display cannot load or decode the selected local image
 - **THEN** it reports not-ready, the host cannot start the attempt and no unexposed match is consumed
+
+### Requirement: GD-07 Offline QR and copyable contestant joining
+Under the owner-approved LAN join refinement, the host connection panel SHALL show a locally generated QR code beside the copyable contestant device URL once a viewer capability and configured usable LAN origin are available. Both representations SHALL contain exactly the same full URL, preserving scheme/port, session route and the display/token/epoch fragment. The QR SHALL grant only the existing read-only viewer access, SHALL not contain a host token/private answer, and SHALL not appear on the contestant filming stage. Generation SHALL require no external service, CDN, camera permission or internet connection. A maintained bundled encoder SHALL require explicit approval before any new dependency is installed.
+
+#### Scenario: Scan the complete contestant link
+- **WHEN** a host creates a display link from a loopback UI with successful configured LAN discovery
+- **THEN** the copy field and decodable QR contain the same LAN-address URL with the original UI scheme/port, session identity and complete viewer join fragment
+- **AND** scanning joins the existing read-only display without creating a game, starting a timer or bypassing primary readiness
+
+#### Scenario: Refresh the address without changing the viewer
+- **WHEN** the host explicitly refreshes discovery or applies a valid manual LAN origin to an existing join link
+- **THEN** the displayed URL and QR update together while session ID, viewer capability, epoch and primary designation remain unchanged
+- **AND** late/failed generation cannot leave an older QR beside a newer URL
+
+#### Scenario: Address or LAN configuration is unavailable
+- **WHEN** detection fails, the platform/interface is unsupported, or the detected/overridden origin does not pass the bind and exact-origin configuration checks
+- **THEN** the panel explains the problem and offers validated manual configuration and the existing local-tab link
+- **AND** it does not advertise a localhost or unconfigured origin QR as usable by another device
+
+#### Scenario: QR generation fails or cannot be used
+- **WHEN** a configured device URL exists but QR generation fails or the operator cannot scan it
+- **THEN** the matching copyable URL remains available with clear error feedback and keyboard-accessible controls
+- **AND** QR rendering uses high contrast, a quiet zone, responsive sizing and an accessible name without transmitting the capability to an external image service
+
+#### Scenario: Join capability lifetime and disclosure
+- **WHEN** a device opens the QR URL or a server restart invalidates its capability
+- **THEN** existing fragment-removal/tab-storage and fresh-link recovery behavior remains unchanged
+- **AND** generating, refreshing or copying the QR does not log or persist its full credential-bearing URL in game history or expose controller credentials

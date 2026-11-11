@@ -76,3 +76,38 @@ Game timers, read-only streams, controller leases and in-flight operations SHALL
 #### Scenario: Stop a server with connected displays
 - **WHEN** the server shuts down with active timers and WebSocket clients
 - **THEN** connections and owned resources close within documented bounds and the last committed session remains recoverable
+
+### Requirement: GN-09 Bounded LAN join address observation
+The server SHALL provide a host-capability-protected LAN origin observation for contestant link creation/explicit refresh, separate from game commands. On macOS automatic detection SHALL run `ipconfig getifaddr en0` with fixed arguments, no shell, bounded time/output and validated usable IPv4 output. It SHALL not run in startup requirements, snapshot polling, countdown, judgment or image processing. Unsupported platforms and command/interface failures SHALL produce actionable unavailable status rather than hangs, fabricated addresses or silent interface substitution. Tests SHALL inject detection rather than depend on the developer's network.
+
+The derived device origin SHALL replace only a loopback UI hostname, retaining the UI protocol/port; an already configured non-loopback IPv4 UI origin may be retained. An explicit manual exact HTTP(S) LAN origin SHALL support alternate interfaces/ports. All inputs SHALL be runtime validated and the effective device origin SHALL belong to the existing configured exact-origin allowlist. Discovery/override SHALL not silently change listener binding, environment configuration or origin permissions. Production SHALL distinguish loopback-only listeners from deliberate LAN binding; Vite development SHALL preserve its actual frontend port/proxy. Configuration success SHALL not be represented as proof of firewall/Wi-Fi reachability or Road certification.
+
+#### Scenario: Successful local address discovery
+- **WHEN** a host requests a device link from an allowed loopback UI origin and detection returns a usable en0 IPv4 address
+- **THEN** observation proposes that address with the same UI protocol/port and reports whether the server/frontend LAN configuration permits it
+- **AND** no session, viewer registration, timer, score, primary selection or current game phase changes
+
+#### Scenario: Detect on demand with bounded failure
+- **WHEN** detection is missing, nonzero, empty, malformed, timed out or cancelled, or en0/platform support is absent
+- **THEN** observation terminates within its documented bound and returns an actionable error/manual-origin path
+- **AND** normal localhost startup, gameplay, polling and shutdown remain available without repeated detector execution
+
+#### Scenario: Preserve configured origin permissions
+- **WHEN** discovery or manual override yields an origin outside NAME_THAT_MATCH_UI_ORIGINS, or the production listener is loopback-only
+- **THEN** the host receives explicit configuration instructions and no device-ready QR is advertised
+- **AND** unrelated/malformed origins remain rejected without wildcard CORS, automatic allowlist additions or trust in Host/Forwarded headers
+
+#### Scenario: Development and production use their own UI ports
+- **WHEN** otherwise valid joining is configured for the Vite frontend or Node-served production UI
+- **THEN** each device link retains its actual UI protocol/port, including configured non-default ports
+- **AND** development does not substitute the backend proxy port and production does not advertise the Vite port
+
+#### Scenario: Changed IP and manual interface selection
+- **WHEN** the host explicitly refreshes after an IP change or supplies a valid configured manual LAN origin for another interface
+- **THEN** the current link/QR can be recomposed without re-registering the viewer or changing game authority
+- **AND** invalid overrides are rejected, stale observations are ignored, and old scanned addresses are not promised to remain reachable
+
+#### Scenario: Observe address without leaking game authority
+- **WHEN** a viewer or unauthorized caller requests host-only address observation
+- **THEN** access is refused under existing role/epoch/origin/header rules
+- **AND** no controller token, private answer or complete capability-bearing join URL enters observation responses, logs or persistent game state
