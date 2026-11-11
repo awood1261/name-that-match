@@ -53,3 +53,7 @@ Application requests remained local. The final tie screenshot at 1366×768 was v
 5. Check solo zero-score completion, a head-to-head zero tie and disabled End on a prepared unresolved clue. Never delete a database or reset old scores to start another game.
 
 See `docs/game-host.md` for configuration, primary designation, restart and lost-response operation. Task 5.4 is complete: **30/46 total**, 16 remaining. Stop for review before navigation/recovery task 5.5 and the full milestone checkpoint 5.6. The active change remains incomplete and is not archived.
+
+## Subsequent owner acceptance
+
+The owner confirmed that ending and creating a new game work, then approved starting task 5.5. This records manual acceptance of 5.4 and implementation authorization for 5.5 only. The original evidence and remaining review/milestone gates above remain historical.

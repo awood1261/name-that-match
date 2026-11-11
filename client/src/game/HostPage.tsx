@@ -6,10 +6,13 @@ import { HostSetup } from './HostSetup';
 import { HostDisplayPanel } from './HostDisplayPanel';
 import { HostRoundControls } from './HostRoundControls';
 import { GameScoreboard } from './GameScoreboard';
+import { HostLeaveDialog } from './HostLeaveDialog';
+import type { NavigationGuard } from '../library/useMatchWorkspace';
 import styles from './HostPage.module.css';
 
-export function HostPage() {
+export function HostPage({ registerNavigationGuard }: { registerNavigationGuard?: (guard: NavigationGuard | null) => void }) {
   const host = useGameHost(); const [tier, setTier] = useState<GameTier>('squash'); const [setupDirty, setSetupDirty] = useState(false);
+  const [destination, setDestination] = useState<(() => void) | null>(null); const [leaving, setLeaving] = useState(false); const [leaveError, setLeaveError] = useState('');
   const snapshot = host.status?.snapshot; const session = snapshot?.session ?? null; const round = snapshot?.currentRound;
   const requestedTier = round?.requestedTier;
   // Retain the observed round's tier across Advance/Cancel, including after reload.
@@ -19,6 +22,24 @@ export function HostPage() {
   const unexposed = round?.phase === 'preparing' || round?.phase === 'ready';
   const roundOwner = session?.contestants.find((p) => p.id === round?.contestantId);
   const terminal = session?.status === 'completed' || session?.status === 'discarded';
+  const guessing = session?.status === 'active' && round?.phase === 'guessing';
+  const protectNavigation = (guessing && !host.released) || host.busy || host.pending;
+  useEffect(() => {
+    registerNavigationGuard?.((action) => { if (protectNavigation) { setLeaveError(''); setDestination(() => action); } else action(); });
+    return () => registerNavigationGuard?.(null);
+  });
+  useEffect(() => {
+    if (!protectNavigation) return;
+    const unload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', unload); return () => window.removeEventListener('beforeunload', unload);
+  }, [protectNavigation]);
+  async function leave() {
+    if (leaving || !destination) return; setLeaving(true); setLeaveError('');
+    try {
+      if (await host.prepareToLeave()) { const action = destination; setDestination(null); action(); }
+      else setLeaveError('Stay on Play to review the current state or check the pending command receipt, then try leaving again.');
+    } finally { setLeaving(false); }
+  }
   const stateLabel = !session ? 'No session' : session.status === 'completed' ? 'Game complete' : session.status === 'setup' ? 'Setup' : round?.phase === 'preparing' ? 'Preparing screenshot'
     : round?.phase === 'ready' ? 'Screenshot ready · hidden' : session.status === 'active' && !round ? 'Between rounds' : round?.phase.split('_').join(' ') ?? session.status;
   return <section className={styles.host} aria-labelledby="game-host-title">
@@ -28,6 +49,8 @@ export function HostPage() {
     <p className={styles.state} role="status">{host.loading ? 'Connecting to game server…' : host.busy ? 'Saving command…' : stateLabel}</p>
     {host.error && <p role="alert" className={styles.error}>{host.error}</p>}
     {host.notice && <p role="status" className={styles.success}>{host.notice}</p>}
+    {destination && <HostLeaveDialog busy={leaving} blocked={host.busy || host.pending || !host.connected || !host.credential} guessing={guessing}
+      error={leaveError || host.error || ''} onStay={() => setDestination(null)} onLeave={() => { void leave(); }} />}
     {host.pending && <div className={styles.card}>
       <p>A previous command needs review. New commands are blocked until its outcome is resolved.</p>
       <button type="button" disabled={host.busy || !host.credential} onClick={() => { void host.checkPending(); }}>Check command status</button>

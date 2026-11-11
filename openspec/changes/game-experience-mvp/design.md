@@ -374,3 +374,7 @@ The owner approved implementation with “proposal looks good you can implement�
 ### Task 5.4 authorization
 
 The owner accepted checkpoint 5.3a manual verification and approved the next task, confirmed End Game/New Game controls, by replying “i approve”. Implement task 5.4 only through the existing END_GAME command and fresh session-creation endpoint. New game copies names/starting selection as editable setup defaults with fresh IDs; it does not start automatically or reset the prior record. Earlier milestone-only authorization paragraphs remain historical. Do not begin 5.5/5.6, later milestones, dependency changes or archive on this authorization.
+
+### Task 5.5 authorization
+
+The owner accepted End/New Game manual verification and explicitly approved beginning task 5.5. Implement the existing D6/D10 host navigation and recovery rules only: shell guard with Stay/Pause-and-leave, confirmed server pause or safe-state observation before navigation, preserved library unsaved guards, explicit receipt/current-state review and no automatic resume/replay. Bound stalled game requests to the existing three-second observation convention so unknown delivery can reach manual reconciliation. No gameplay/schema/dependency/transport change, task 5.6 acceptance or archive is authorized.

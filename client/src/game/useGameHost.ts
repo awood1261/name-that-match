@@ -29,6 +29,7 @@ export function useGameHost() {
   const [status, setStatus] = useState<HostStatus | null>(null);
   const [credential, setCredential] = useState<ControllerCredential | null>(null);
   const [connected, setConnected] = useState(false); const transportLost = useRef(false);
+  const [released, setReleased] = useState(false);
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null); const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(() => saved(PENDING_KEY)); const [retryable, setRetryable] = useState(false); const [reviewedPending, setReviewedPending] = useState(false);
@@ -53,7 +54,7 @@ export function useGameHost() {
     }
   }, []);
   const connect = useCallback(async () => {
-    if (mutation.current) return; mutation.current = true; setLoading(true); setError(null);
+    if (mutation.current) return; mutation.current = true; setLoading(true); setError(null); setNotice(null);
     const life = lifetime.current; const signal = life.signal;
     try {
       let owner = saved<ControllerCredential>(CONTROL_KEY);
@@ -63,8 +64,14 @@ export function useGameHost() {
       }
       if (!owner) owner = await gameApi.claim(signal);
       if (!active.current || lifetime.current !== life) return;
-      currentCredential.current = owner; setCredential(owner); store(CONTROL_KEY, owner); latest.current = null;
-      accept(await observedStatus(owner, signal), owner);
+      currentCredential.current = owner; setCredential(owner); setReleased(false); store(CONTROL_KEY, owner); latest.current = null;
+      const restored = await observedStatus(owner, signal); accept(restored, owner);
+      if (restored.snapshot) {
+        const phase = restored.snapshot.currentRound?.phase;
+        setNotice(phase === 'interrupted' ? 'Recovered interrupted round. Its unknown remaining time cannot restart; explicitly void it.'
+          : phase === 'paused' ? 'Recovered paused round. Its saved remainder is preserved; reconnect the primary display and explicitly Resume.'
+          : 'Recovered saved game. Review its current state before continuing; no round or score was replayed.');
+      }
       if (saved(PENDING_KEY)) setError('A previous request has an uncertain outcome. Check command status before sending another command.');
     } catch (failure) { if (active.current && lifetime.current === life && !signal.aborted) setError(message(failure)); }
     finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setLoading(false); } }
@@ -95,30 +102,32 @@ export function useGameHost() {
     }, 1000);
     return () => { stopped = true; pollingLife.abort(); clearTimeout(timer); clearInterval(heartbeat); };
   }, [credential, accept, controlError]);
-  async function send(request: Pending) {
+  async function send(request: Pending): Promise<boolean> {
     const owner = currentCredential.current; const life = lifetime.current;
-    if (!owner || mutation.current) return;
+    if (!owner || mutation.current) return false;
     mutation.current = true; setBusy(true); setError(null); setNotice(null); setRetryable(false); setReviewedPending(false); savePending(request);
     try {
       const response = request.kind === 'create' ? await gameApi.create(owner, request.input, lifetime.current.signal) : await gameApi.command(owner, request.input, lifetime.current.signal);
-      if (!active.current || lifetime.current !== life || currentCredential.current !== owner) return;
+      if (!active.current || lifetime.current !== life || currentCredential.current !== owner) return false;
       accept(response.status, owner); savePending(null); setNotice(request.kind === 'create' ? 'Session created. Review the setup, then start when ready.' : 'Command saved.');
+      return true;
     } catch (failure) {
-      if (!active.current || lifetime.current !== life || life.signal.aborted) return;
+      if (!active.current || lifetime.current !== life || life.signal.aborted || currentCredential.current !== owner) return false;
       if (failure instanceof GameApiError && failure.status < 500) {
         if (![401, 403].includes(failure.status) && failure.detail.code !== 'SERVER_EPOCH_CHANGED') savePending(null);
         controlError(failure, owner);
         try { accept(await observedStatus(owner, lifetime.current.signal), owner); } catch { /* original error stays visible */ }
       } else setError('The request outcome is unknown. Check command status before retrying.');
     } finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setBusy(false); } }
+    return false;
   }
   function command(intent: HostIntent) {
-    if (pending || !latest.current?.snapshot || mutation.current) return;
+    if (pending || !latest.current?.snapshot || mutation.current) return Promise.resolve(false);
     const session = latest.current.snapshot.session; const { type, ...payload } = intent;
     const isSession = ['CONFIGURE_SETUP', 'START', 'DISCARD_SETUP', 'SELECT_CONTESTANT', 'PREPARE'].includes(type);
     const input = parseCommand({ protocolVersion: 1, commandId: clientId(), sessionId: session.id, expectedStateVersion: session.stateVersion, type, payload,
       ...(!isSession && session.currentRoundId ? { roundId: session.currentRoundId } : {}) });
-    void send({ kind: 'command', input });
+    return send({ kind: 'command', input });
   }
   function setup(names: string[], startingIndex: number) {
     if (pending || mutation.current) return;
@@ -139,16 +148,39 @@ export function useGameHost() {
     mutation.current = true; setBusy(true); setRetryable(false);
     try {
       const response = await gameApi.receipt(owner, pending.input.sessionId, pending.input.commandId, lifetime.current.signal);
-      accept(response.status, owner); savePending(null); setError(null); setNotice('The previous command was accepted. Current state restored.');
+      if (!active.current || lifetime.current !== life || currentCredential.current !== owner) return;
+      accept(response.status, owner);
+      const value = await observedStatus(owner, life.signal);
+      if (!active.current || lifetime.current !== life || currentCredential.current !== owner) return;
+      accept(value, owner); savePending(null); setError(null); setNotice('The previous command was accepted. Current state restored.');
     } catch (failure) {
+      if (!active.current || lifetime.current !== life || life.signal.aborted || currentCredential.current !== owner) return;
       if (failure instanceof GameApiError && failure.status === 404) {
         try {
-          const value = await observedStatus(owner, lifetime.current.signal); accept(value, owner);
+          const value = await observedStatus(owner, lifetime.current.signal);
+          if (!active.current || lifetime.current !== life || currentCredential.current !== owner) return;
+          accept(value, owner);
           const safe = pending.kind === 'create' ? !value.snapshot || ['completed', 'discarded'].includes(value.snapshot.session.status) : value.snapshot?.session.id === pending.input.sessionId && value.snapshot.session.stateVersion === pending.input.expectedStateVersion;
           setReviewedPending(true); setRetryable(safe); setError(safe ? 'No accepted receipt was found. Review current state, then deliberately retry the original request.' : 'No receipt found and state changed. Keep the current session; dismiss this request after review.');
         } catch (error) { controlError(error, owner); }
       } else controlError(failure, owner);
     } finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setBusy(false); } }
+  }
+  async function prepareToLeave(): Promise<boolean> {
+    const owner = currentCredential.current; const life = lifetime.current;
+    if (!owner || mutation.current || saved(PENDING_KEY)) return false;
+    mutation.current = true; setBusy(true);
+    try {
+      const value = await observedStatus(owner, life.signal);
+      if (!active.current || lifetime.current !== life || currentCredential.current !== owner) return false;
+      accept(value, owner);
+    } catch (failure) { controlError(failure, owner); return false; }
+    finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setBusy(false); } }
+    if (latest.current?.snapshot?.session.status === 'active' && latest.current.snapshot.currentRound?.phase === 'guessing') {
+      if (!await command({ type: 'PAUSE' })) return false;
+    }
+    return active.current && lifetime.current === life && currentCredential.current === owner && !saved(PENDING_KEY)
+      && latest.current?.snapshot?.currentRound?.phase !== 'guessing';
   }
   async function refresh() {
     const owner = currentCredential.current; const life = lifetime.current; if (!owner || mutation.current) return;
@@ -160,10 +192,10 @@ export function useGameHost() {
   async function release() {
     const owner = currentCredential.current; const life = lifetime.current; if (!owner || mutation.current || pending) return;
     mutation.current = true; setBusy(true);
-    try { await gameApi.release(owner, lifetime.current.signal); store(CONTROL_KEY, null); currentCredential.current = null; setCredential(null); setNotice('Host control released.'); }
+    try { await gameApi.release(owner, lifetime.current.signal); store(CONTROL_KEY, null); currentCredential.current = null; setCredential(null); setReleased(true); setNotice('Host control released.'); }
     catch (failure) { controlError(failure, owner); }
     finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setBusy(false); } }
   }
-  return { status, credential, connected, loading, busy, error, notice, pending: !!pending, retryable, setup, newGame, command, connect, refresh, release,
+  return { status, credential, connected, released, loading, busy, error, notice, pending: !!pending, retryable, setup, newGame, command, connect, refresh, release, prepareToLeave,
     checkPending, reviewedPending, retry: () => { if (pending && retryable) void send(pending); }, dismissPending: () => { if (!reviewedPending) return; savePending(null); setRetryable(false); setError(null); } };
 }

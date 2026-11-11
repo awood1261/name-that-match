@@ -1,4 +1,4 @@
-# Game host — Task 5.4
+# Game host — Task 5.5
 
 Open **Play** from the application navigation. This checkpoint supports setup, hidden preparation, a separate read-only contestant tab, the authoritative countdown, host judgment/pause controls and explicit **Reveal Result**. Scoreboard and final-total presentation are implemented. Explicit round advancement, contestant switching and next-tier selection are available. Confirmed End Game and New Game controls are available. Automatic Studio launching/fullscreen and Road WebSockets remain later work. Use disposable test data for acceptance runs; this checkpoint supports successive rounds, manual completion and fresh independent games.
 
@@ -100,6 +100,18 @@ Existing contestant pages keep showing the previous session's final result. Crea
 
 For manual acceptance, cancel each confirmation once and confirm no state change. End a scored game and compare host/device totals, reload/restart and restore its saved final, then create a new game and confirm fresh setup/zero scores with the library intact. Run a solo zero-score completion and a head-to-head zero-score tie. Verify End stays disabled on a prepared unresolved clue. Physical-device/full milestone acceptance remains separate from automated browser checks.
 
+## Leaving Play and recovered games
+
+During guessing, choosing another application section opens **Leave game host?**. **Stay** is focused by default; Stay or Escape closes the dialog without pausing, changing scores or navigating. **Pause and leave** first checks current server state and sends the existing PAUSE command if the round is still guessing. The destination opens only after a confirmed non-guessing state. If time expired meanwhile, the server retains expiry/awaiting judgment; no fresh time or automatic judgment is granted.
+
+A saving or uncertain command also protects navigation. A failed/lost PAUSE response keeps you on Play, with the destination blocked. Select Stay, reconnect if needed, and use **Check command status** to inspect the receipt/current state. Resolve or deliberately review/retry/dismiss through that panel; navigation never retries for you. A known paused/resolved game can be left without another pause; returning restores its committed state and does not Resume automatically. A successful explicit Release host control already invokes the server's pause/loss path and permits leaving after its acknowledgment.
+
+Browser reload/close uses the supported generic unsaved-work prompt during guessing or an in-flight/uncertain command. Browsers do not allow reliable custom Stay/Pause buttons or asynchronous pause acknowledgment during unload. Cancel that prompt and use in-app Pause and leave for confirmed navigation. If the browser actually closes or disconnects, the existing server liveness policy pauses at detection or settles expiry, consuming elapsed time rather than refunding it.
+
+Reopening Play reports a recovered saved game. A known paused round keeps only its saved remainder and requires fresh primary readiness plus explicit Resume. After an unknown running process crash it is Interrupted and must be explicitly voided; it cannot restart or Resume an invented window. Recovery never replays a judgment, automatically advances or changes ownership. Old process credentials are replaced by explicit host recovery; a stored uncertain request remains blocked until receipt review under the fresh credentials.
+
+Game HTTP observations/commands now have a three-second request bound. A write that times out remains uncertain, not rejected or automatically retried. Receipt review also reads the actual current session, so an old accepted receipt cannot replace a newer game's view. Late responses from an unmounted/replaced view cannot clear the next view's stored pending request. Image Library retains its existing Save/Discard/Stay and browser-unload protection independently of Play.
+
 ## Host control and request recovery
 
 - The current controller renews while Play is open. **Release host control** permits another tab/device to claim. Leaving Play stops renewals; control becomes claimable after 10 seconds without renewal. A host-liveness loss is detected after 3 seconds; it never awards points or advances a round. There is no force-takeover of an actively renewed lease.
@@ -130,4 +142,4 @@ Use an already backed-up collection or a disposable configured data root. Start 
 - Use keyboard focus, native select/radio keys and Enter/Space on buttons. Check visible focus and readable controls at laptop and tablet widths, without horizontal overflow. This does not certify an actual tablet or Road Mode.
 - Revisit Image Library and confirm existing import, editing, classification, approval and filtering workflows still work.
 
-Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's task-5.4 verification record for current lifecycle results and browser-check limits. Historical task/milestone evidence is retained. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.
+Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's task-5.5 verification record for current navigation/recovery results and browser-check limits. Historical task/milestone evidence is retained. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.

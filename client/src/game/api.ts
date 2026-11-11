@@ -6,13 +6,18 @@ export class GameApiError extends Error {
   constructor(readonly detail: GameApiFailure, readonly status: number) { super(detail.message); }
 }
 async function request<T>(path: string, signal: AbortSignal, credential?: Pick<ControllerCredential, 'token' | 'serverEpoch'>, payload?: unknown): Promise<T> {
-  const response = await fetch(`/api/game${path}`, { signal, method: payload === undefined ? 'GET' : 'POST', headers: {
-    ...(credential ? { Authorization: `Bearer ${credential.token}`, 'X-Name-That-Match-Epoch': credential.serverEpoch } : {}),
-    ...(payload === undefined ? {} : { 'Content-Type': 'application/json', 'X-Name-That-Match': 'game' }),
-  }, body: payload === undefined ? undefined : JSON.stringify(payload) });
-  const result = await response.json();
-  if (!response.ok) throw new GameApiError(result.error ?? { code: 'GAME_REQUEST_FAILED', message: 'Game request failed.' }, response.status);
-  return result.data as T;
+  const controller = new AbortController(); const abort = () => controller.abort();
+  signal.addEventListener('abort', abort, { once: true }); if (signal.aborted) abort();
+  const timeout = setTimeout(abort, 3000);
+  try {
+    const response = await fetch(`/api/game${path}`, { signal: controller.signal, method: payload === undefined ? 'GET' : 'POST', headers: {
+      ...(credential ? { Authorization: `Bearer ${credential.token}`, 'X-Name-That-Match-Epoch': credential.serverEpoch } : {}),
+      ...(payload === undefined ? {} : { 'Content-Type': 'application/json', 'X-Name-That-Match': 'game' }),
+    }, body: payload === undefined ? undefined : JSON.stringify(payload) });
+    const result = await response.json();
+    if (!response.ok) throw new GameApiError(result.error ?? { code: 'GAME_REQUEST_FAILED', message: 'Game request failed.' }, response.status);
+    return result.data as T;
+  } finally { clearTimeout(timeout); signal.removeEventListener('abort', abort); }
 }
 export const gameApi = {
   displayOrigin: (credential: ControllerCredential, input: DisplayOriginInput, signal: AbortSignal) => request<DisplayOriginObservation>('/display-origin', signal, credential, input),

@@ -18,8 +18,8 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('System');
-  const libraryGuard = useRef<NavigationGuard | null>(null);
-  const registerNavigationGuard = useCallback((guard: NavigationGuard | null) => { libraryGuard.current = guard; }, []);
+  const navigationGuard = useRef<NavigationGuard | null>(null);
+  const registerNavigationGuard = useCallback((guard: NavigationGuard | null) => { navigationGuard.current = guard; }, []);
 
   useEffect(() => {
     const fetchHealth = async () => {
@@ -59,7 +59,7 @@ function App() {
             <button key={item} type="button" className={styles.navButton}
               disabled={item === 'Game Settings'}
               aria-current={view === item ? 'page' : undefined} onClick={() => {
-                if (view === 'Image Library' && item !== view && libraryGuard.current) libraryGuard.current(() => setView(item));
+                if (item !== view && navigationGuard.current) navigationGuard.current(() => setView(item));
                 else setView(item);
               }}>
               {item}
@@ -73,7 +73,7 @@ function App() {
         </div>
       </header>
 
-      {view === 'Play' ? <HostPage /> : view === 'Image Library' ? <MatchLibraryPage registerNavigationGuard={registerNavigationGuard} /> : <section className={styles.panel} aria-live="polite">
+      {view === 'Play' ? <HostPage registerNavigationGuard={registerNavigationGuard} /> : view === 'Image Library' ? <MatchLibraryPage registerNavigationGuard={registerNavigationGuard} /> : <section className={styles.panel} aria-live="polite">
         <div className={styles.panelHeader}>
           <p className={styles.kicker}>Local server</p>
           <h2>System status</h2>

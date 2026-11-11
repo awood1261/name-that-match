@@ -2,12 +2,13 @@ import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HostPage } from '../../client/src/game/HostPage';
+import App from '../../client/src/App';
 import { gameApi, GameApiError } from '../../client/src/game/api';
 import { createState, currentRound, phase, transition } from '../../shared/src/game/engine';
 import { hostSnapshot } from '../../shared/src/game/projections';
 import type { CommandEnvelope, GameState, HostIntent } from '../../shared/src/game/contracts';
 import type { HostStatus } from '../../shared/src/game/host';
-import { context, NOW, setup, pureGame } from '../game/fixtures';
+import { context, NOW, setup, pureGame, envelope } from '../game/fixtures';
 import { randomUUID } from 'node:crypto';
 
 let state: GameState | null; let sequence: number;
@@ -303,5 +304,91 @@ describe('manual completion and independent new games', () => {
     vi.mocked(gameApi.create).mockRejectedValue(new GameApiError({ code: 'CONFLICT', message: 'New setup could not be created.' }, 409));
     render(<HostPage />); fireEvent.click(await screen.findByRole('button', { name: 'New game' })); await screen.findByText('New setup could not be created.');
     expect(screen.getByRole('region', { name: 'Final totals' })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'New game' })).toBeEnabled(); expect(state).toBe(completed);
+  });
+});
+
+describe('guarded host navigation and recovery', () => {
+  it('recovers an accepted lost judgment under fresh process credentials by receipt without rescoring', async () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); const input = envelope(game.state, { type: 'CORRECT' }); state = game.step({ type: 'CORRECT' });
+    sessionStorage.setItem('ntm.game.controller', JSON.stringify({ ...credential, token: 'c'.repeat(64), serverEpoch: randomUUID() }));
+    sessionStorage.setItem('ntm.game.pending', JSON.stringify({ kind: 'command', input }));
+    vi.mocked(gameApi.renew).mockRejectedValueOnce(new GameApiError({ code: 'CONTROL_REQUIRED', message: 'Old process credentials.' }, 401));
+    const receipt = vi.spyOn(gameApi, 'receipt').mockImplementation(async () => ({ receipt: { commandId: input.commandId, sessionId: input.sessionId, roundId: input.roundId!, acceptedVersion: state!.stateVersion }, status: status() }));
+    render(<HostPage />); await screen.findByText(/A previous request has an uncertain outcome/); expect(screen.getByRole('button', { name: 'Reveal Result' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText('The previous command was accepted. Current state restored.');
+    expect(receipt).toHaveBeenCalledWith(credential, input.sessionId, input.commandId, expect.any(AbortSignal)); expect(gameApi.command).not.toHaveBeenCalled(); expect(state!.awards).toHaveLength(1); expect(sessionStorage.getItem('ntm.game.pending')).toBeNull();
+  });
+  function live() {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.setTime(1000); state = game.state;
+    vi.mocked(gameApi.command).mockImplementation(async (_owner, input) => {
+      state = game.step({ ...input.payload, type: input.type } as HostIntent);
+      return { receipt: { commandId: input.commandId, sessionId: state.id, roundId: state.currentRoundId, acceptedVersion: state.stateVersion }, replayed: false, status: status() };
+    }); return game;
+  }
+  async function navigation() {
+    let guard: import('../../client/src/library/useMatchWorkspace').NavigationGuard | null = null;
+    const action = vi.fn(); const view = render(<HostPage registerNavigationGuard={(value) => { guard = value; }} />);
+    await screen.findByText('guessing'); act(() => guard!(action)); const dialog = await screen.findByRole('dialog', { name: 'Leave game host?' });
+    return { action, dialog, view };
+  }
+  it('integrates with shell navigation, pauses before leaving, and returns paused without automatic Resume', async () => {
+    live(); vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ status: 'ok', service: 'name-that-match-server', timestamp: NOW })));
+    render(<App />); fireEvent.click(screen.getByRole('button', { name: 'Play' })); await screen.findByText('guessing');
+    screen.getByRole('button', { name: 'System' }).focus(); fireEvent.click(screen.getByRole('button', { name: 'System' })); let dialog = await screen.findByRole('dialog'); fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    expect(screen.getByRole('heading', { name: 'Game host' })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'System' })).toHaveFocus(); expect(gameApi.command).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'System' })); dialog = await screen.findByRole('dialog'); fireEvent.click(within(dialog).getByRole('button', { name: 'Pause and leave' }));
+    await screen.findByRole('heading', { name: 'System status' }); expect(currentRound(state!)).toMatchObject({ phase: 'paused', remainingMs: 9000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Play' })); await screen.findByText(/Recovered paused round/); expect(gameApi.command).toHaveBeenCalledTimes(1);
+  });
+  it('allows navigation after an acknowledged explicit host release', async () => {
+    live(); let guard: import('../../client/src/library/useMatchWorkspace').NavigationGuard | null = null;
+    render(<HostPage registerNavigationGuard={(value) => { guard = value; }} />); fireEvent.click(await screen.findByRole('button', { name: 'Release host control' }));
+    await screen.findByText('Host control released.'); const action = vi.fn(); act(() => guard!(action)); expect(action).toHaveBeenCalledOnce();
+  });
+  it('defaults to Stay, supports Escape/focus trapping and browser unload protection without pausing', async () => {
+    live(); const { action, dialog } = await navigation(); const stay = within(dialog).getByRole('button', { name: 'Stay' }); const leave = within(dialog).getByRole('button', { name: 'Pause and leave' });
+    expect(stay).toHaveFocus(); fireEvent.keyDown(stay, { key: 'Tab', shiftKey: true }); expect(leave).toHaveFocus(); fireEvent.keyDown(leave, { key: 'Tab' }); expect(stay).toHaveFocus();
+    const unload = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(unload); expect(unload.defaultPrevented).toBe(true);
+    fireEvent.keyDown(dialog, { key: 'Escape' }); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(action).not.toHaveBeenCalled(); expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('waits for a server PAUSE acknowledgment and leaves with the actual preserved remainder', async () => {
+    live(); const previous = state!.currentRoundId; const { action, dialog } = await navigation();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Pause and leave' })); await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(gameApi.command).toHaveBeenCalledTimes(1); expect(vi.mocked(gameApi.command).mock.calls[0][1]).toMatchObject({ type: 'PAUSE', roundId: previous });
+    expect(currentRound(state!)).toMatchObject({ phase: 'paused', remainingMs: 9000 }); expect(state!.awards).toEqual([]);
+  });
+  it('blocks leaving on a lost pause response until explicit receipt review, then never replays PAUSE', async () => {
+    const game = live(); let receipt: ReturnType<typeof apply>;
+    vi.mocked(gameApi.command).mockImplementationOnce(async (_owner, input) => { state = game.step({ type: 'PAUSE' }); receipt = { receipt: { commandId: input.commandId, sessionId: state.id, roundId: state.currentRoundId, acceptedVersion: state.stateVersion }, replayed: false, status: status() }; throw new TypeError('Lost response'); });
+    vi.spyOn(gameApi, 'receipt').mockImplementation(async () => ({ ...receipt!, status: status() })); const { action, dialog } = await navigation();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Pause and leave' })); await within(dialog).findByRole('alert'); expect(action).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('button', { name: /leave/i })).toBeDisabled(); fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText('The previous command was accepted. Current state restored.'); expect(gameApi.command).toHaveBeenCalledTimes(1);
+  });
+  it('refreshes an already expired round before leaving without a new pause/judgment/award', async () => {
+    const game = live(); const { action, dialog } = await navigation(); game.setTime(10000); state = game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Pause and leave' })); await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(gameApi.command).not.toHaveBeenCalled(); expect(currentRound(state!)?.phase).toBe('awaiting_judgment'); expect(state!.awards).toEqual([]);
+  });
+  it('does not leave on a revision conflict or repeat a pause automatically', async () => {
+    live(); vi.mocked(gameApi.command).mockRejectedValueOnce(new GameApiError({ code: 'CONFLICT', message: 'Review changed state.' }, 409));
+    const { action, dialog } = await navigation(); fireEvent.click(within(dialog).getByRole('button', { name: 'Pause and leave' }));
+    await within(dialog).findByRole('alert'); expect(action).not.toHaveBeenCalled(); expect(gameApi.command).toHaveBeenCalledTimes(1);
+  });
+  it.each(['paused', 'interrupted'] as const)('restores %s explicitly without any automatic resume, void or timer reset', async (phase) => {
+    const game = live(); state = game.step(phase === 'paused' ? { type: 'PAUSE' } : { type: 'RECOVER_RUNNING' });
+    const guard = vi.fn(); render(<HostPage registerNavigationGuard={guard} />); await screen.findByText(phase === 'paused' ? /Recovered paused round/ : /Recovered interrupted round/);
+    expect(gameApi.command).not.toHaveBeenCalled(); expect(gameApi.create).not.toHaveBeenCalled(); const action = vi.fn(); act(() => guard.mock.calls.at(-1)![0](action)); expect(action).toHaveBeenCalledOnce();
+    const unload = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(unload); expect(unload.defaultPrevented).toBe(false);
+  });
+  it('ignores a late receipt completion after unmount, preserving the pending request for the next view', async () => {
+    live(); vi.mocked(gameApi.command).mockRejectedValueOnce(new TypeError('unknown'));
+    let finish!: (value: Awaited<ReturnType<typeof gameApi.receipt>>) => void; vi.spyOn(gameApi, 'receipt').mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const view = render(<HostPage />); await screen.findByText('guessing');
+    // Use the real command lane via a navigation pause to leave a pending envelope.
+    view.unmount(); const nav = await navigation(); fireEvent.click(within(nav.dialog).getByRole('button', { name: 'Pause and leave' })); await within(nav.dialog).findByRole('alert'); fireEvent.click(within(nav.dialog).getByRole('button', { name: 'Stay' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await waitFor(() => expect(finish).toBeTypeOf('function')); const pending = sessionStorage.getItem('ntm.game.pending');
+    nav.view.unmount(); await act(async () => { finish({ receipt: { commandId: 'irrelevant', sessionId: state!.id, roundId: null, acceptedVersion: 1 }, status: status() }); });
+    expect(sessionStorage.getItem('ntm.game.pending')).toBe(pending);
   });
 });
