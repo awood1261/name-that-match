@@ -56,3 +56,7 @@ Address detection is intentionally macOS/en0-specific, with explicit manual orig
 Follow `docs/game-host.md#qr-code-and-lan-joining` for exact production/development commands. Verify en0 returns an address, configure the appropriate UI origin/binding, and restart. In Play create a contestant link before preparing; its QR/device URL should appear. Scan on a device on the same local Wi-Fi and confirm the read-only waiting screen. Refresh the host address and confirm no extra display registration; check manual configured/unconfigured origins and local fallback. Prepare and confirm primary readiness, reveal/judge/reveal as usual. Restart needs a fresh viewer link. Do not delete operational data to simulate a new game.
 
 All four checkpoint tasks are complete: **29/46 total**, 17 remaining. Changes remain uncommitted for review. Stop before task 5.4; do not archive the incomplete game change.
+
+## Subsequent owner acceptance
+
+After confirming the connected contestant was designated primary, the owner reported that manual verification looked good. That records 5.3a acceptance. The owner then explicitly approved starting task 5.4 (End/New Game) only. The original implementation checkpoint and deferred hardware evidence remain historical; no later task or archive is implicitly approved.

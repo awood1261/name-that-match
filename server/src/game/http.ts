@@ -67,6 +67,8 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
     if (round?.phase === 'interrupted') allowedActions = ['VOID_INTERRUPTED'];
     if (round?.phase === 'adjudicated') allowedActions = ['REVEAL_ANSWER'];
     if (state?.status === 'active' && (round?.phase === 'answer_revealed' || (round?.phase === 'adjudicated' && round.outcome === 'void'))) allowedActions.push('ADVANCE');
+    if (state?.status === 'active' && (round?.phase === 'adjudicated' || round?.phase === 'answer_revealed')) allowedActions.push('END_GAME');
+    if (state?.status === 'completed' || state?.status === 'discarded') allowedActions = [];
     return { protocolVersion: 1, serverEpoch, sequence: ++sequence, snapshot: state ? hostSnapshot(state) : null, availability, allowedActions,
       candidateValid, primaryDisplay,
       timing: observation && 'remainingMs' in observation.snapshot ? { serverMonoMs: observation.serverMonoMs, remainingMs: observation.snapshot.remainingMs } : null,

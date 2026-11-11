@@ -108,7 +108,7 @@ export function useGameHost() {
       if (failure instanceof GameApiError && failure.status < 500) {
         if (![401, 403].includes(failure.status) && failure.detail.code !== 'SERVER_EPOCH_CHANGED') savePending(null);
         controlError(failure, owner);
-        try { accept(await gameApi.current(owner, lifetime.current.signal), owner); } catch { /* original error stays visible */ }
+        try { accept(await observedStatus(owner, lifetime.current.signal), owner); } catch { /* original error stays visible */ }
       } else setError('The request outcome is unknown. Check command status before retrying.');
     } finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setBusy(false); } }
   }
@@ -127,6 +127,13 @@ export function useGameHost() {
     if (latest.current?.snapshot) command({ type: 'CONFIGURE_SETUP', contestants, activeContestantId });
     else void send({ kind: 'create', input: { protocolVersion: 1, commandId: clientId(), sessionId: clientId(), contestants, activeContestantId } });
   }
+  function newGame() {
+    const previous = latest.current?.snapshot?.session;
+    if (pending || mutation.current || !connected || !previous || !['completed', 'discarded'].includes(previous.status)) return;
+    const contestants = previous.contestants.map((p) => ({ id: clientId(), name: p.name }));
+    const startingIndex = Math.max(0, previous.contestants.findIndex((p) => p.id === previous.activeContestantId));
+    void send({ kind: 'create', input: { protocolVersion: 1, commandId: clientId(), sessionId: clientId(), contestants, activeContestantId: contestants[startingIndex].id } });
+  }
   async function checkPending() {
     const owner = currentCredential.current; const life = lifetime.current; if (!owner || !pending || mutation.current) return;
     mutation.current = true; setBusy(true); setRetryable(false);
@@ -136,8 +143,8 @@ export function useGameHost() {
     } catch (failure) {
       if (failure instanceof GameApiError && failure.status === 404) {
         try {
-          const value = await gameApi.current(owner, lifetime.current.signal); accept(value, owner);
-          const safe = pending.kind === 'create' ? !value.snapshot : value.snapshot?.session.id === pending.input.sessionId && value.snapshot.session.stateVersion === pending.input.expectedStateVersion;
+          const value = await observedStatus(owner, lifetime.current.signal); accept(value, owner);
+          const safe = pending.kind === 'create' ? !value.snapshot || ['completed', 'discarded'].includes(value.snapshot.session.status) : value.snapshot?.session.id === pending.input.sessionId && value.snapshot.session.stateVersion === pending.input.expectedStateVersion;
           setReviewedPending(true); setRetryable(safe); setError(safe ? 'No accepted receipt was found. Review current state, then deliberately retry the original request.' : 'No receipt found and state changed. Keep the current session; dismiss this request after review.');
         } catch (error) { controlError(error, owner); }
       } else controlError(failure, owner);
@@ -157,6 +164,6 @@ export function useGameHost() {
     catch (failure) { controlError(failure, owner); }
     finally { if (lifetime.current === life) { mutation.current = false; if (active.current) setBusy(false); } }
   }
-  return { status, credential, connected, loading, busy, error, notice, pending: !!pending, retryable, setup, command, connect, refresh, release,
+  return { status, credential, connected, loading, busy, error, notice, pending: !!pending, retryable, setup, newGame, command, connect, refresh, release,
     checkPending, reviewedPending, retry: () => { if (pending && retryable) void send(pending); }, dismissPending: () => { if (!reviewedPending) return; savePending(null); setRetryable(false); setError(null); } };
 }

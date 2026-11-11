@@ -65,7 +65,7 @@ Checkpoint evidence: `task-5.3a-verification.md`. All four 5.3a tasks are comple
 
 ### Remaining Milestone 4 tasks
 
-- [ ] 5.4 Add confirmed manual End game and New game with fresh UUID/use history while preserving completed sessions/library; verify unresolved-round refusal, zero-score ties, no in-place reset and persistence after restart (GS-07/08; D7).
+- [x] 5.4 Add confirmed manual End game and New game with fresh UUID/use history while preserving completed sessions/library; verify unresolved-round refusal, zero-score ties, no in-place reset and persistence after restart (GS-07/08; D7). Evidence: `task-5.4-verification.md`.
 - [ ] 5.5 Add live-host navigation protection and recovered/lost-response reconciliation; verify Stay/Pause-and-leave, unchanged library unsaved protection, explicit receipt review, running-restart interruption and durable-paused recovery (GS-08, GR-08, GN-07; D6/D10).
 - [ ] 5.6 Complete the milestone checkpoint and a disposable multi-round/tie/restart manual game including existing import regressions; request Milestone 4 review. Acceptance reference: GS-05–08, GR-07/08; D11.
 

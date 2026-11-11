@@ -1,6 +1,6 @@
-# Game host — Checkpoint 5.3a
+# Game host — Task 5.4
 
-Open **Play** from the application navigation. This checkpoint supports setup, hidden preparation, a separate read-only contestant tab, the authoritative countdown, host judgment/pause controls and explicit **Reveal Result**. Scoreboard and final-total presentation are implemented. Explicit round advancement, contestant switching and next-tier selection are available. End/New Game UI remains a later Milestone 4 task. Automatic Studio launching/fullscreen and Road WebSockets remain later work. Use disposable test data for acceptance runs; this checkpoint can play successive rounds but does not yet provide End Game or New Game controls.
+Open **Play** from the application navigation. This checkpoint supports setup, hidden preparation, a separate read-only contestant tab, the authoritative countdown, host judgment/pause controls and explicit **Reveal Result**. Scoreboard and final-total presentation are implemented. Explicit round advancement, contestant switching and next-tier selection are available. Confirmed End Game and New Game controls are available. Automatic Studio launching/fullscreen and Road WebSockets remain later work. Use disposable test data for acceptance runs; this checkpoint supports successive rounds, manual completion and fresh independent games.
 
 ## Setup and preparation
 
@@ -43,9 +43,9 @@ The host scoreboard uses the complete server score ledger, updates immediately a
 
 Rows are sorted by descending score; tied scores retain roster order and share a rank. Each contestant has their latest visible outcome, committed award and actual global turn number. Turns count exposed attempts, including zero-point outcomes, rather than cancelled hidden preparations. There is no three-round quota or automatic contestant rotation.
 
-Completed sessions show final totals and the server's winner or tied winners, including zero-score ties and solo games. The host retains the last observed completed session across polling/reload; an actual current session takes priority. The final renderer is implemented, but this checkpoint does not yet expose End game or New game buttons. These lifecycle controls remain task 5.4; do not delete operational data to simulate them.
+Completed sessions show final totals and the server's winner or tied winners, including zero-score ties and solo games. The host retains the last observed completed session across polling/reload; an actual current session takes priority. Select End game from between rounds or a resolved round, confirm, and review the final totals. New game creates a separate editable setup; it never resets or deletes a saved game or the library.
 
-For manual verification with the currently available UI, create a head-to-head setup and confirm zero totals/shared ranks. Start a round and judge it: host totals/latest outcome update immediately, while the contestant waits without disclosure. Select Reveal Result and confirm the same committed points and turn identity appear on the contestant scoreboard. Reload/reconnect and confirm totals stay unchanged. Advance explicitly to test additional rounds and tiers. Use a disposable data directory for alternative sessions; final-game UI acceptance follows the End/New Game controls.
+For manual verification with the currently available UI, create a head-to-head setup and confirm zero totals/shared ranks. Start a round and judge it: host totals/latest outcome update immediately, while the contestant waits without disclosure. Select Reveal Result and confirm the same committed points and turn identity appear on the contestant scoreboard. Reload/reconnect and confirm totals stay unchanged. Advance explicitly to test additional rounds and tiers. Use End game/New game for an independent session; use a disposable data directory for acceptance runs.
 
 ## QR code and LAN joining
 
@@ -88,6 +88,18 @@ An explicitly voided/skipped round also offers Advance before Reveal Result, as 
 
 Manual checks: play two successive rounds without switching, then Advance and explicitly switch contestants for a third. Confirm scores remain with each round's owner, turn numbers advance only on exposure, and the old result/image disappear on Advance. Change tiers before Prepare, check exhausted-tier feedback and no repeats, and reload between rounds to verify selection/totals persist. Use Tab and Enter to reach/activate Advance and the native contestant/tier controls. Lost responses still require **Check command status**; do not issue a second command to guess whether Advance succeeded.
 
+## End a game and start another
+
+Select **End game** between rounds or after saving a judgment, then confirm. Cancel dismisses the confirmation without a command. End is disabled during preparing, Ready, guessing, pause, awaiting judgment or interruption, with instructions to cancel hidden preparation or resolve/void an exposed attempt first. It does not automatically void a clue or change a judgment.
+
+Completion publishes all committed totals and the winner or all tied leaders. This includes a saved correct award even if you have not selected Reveal Result yet; the confirmation area explains this. A started head-to-head game can end tied at zero; solo identifies its sole winner, including at zero. Final games have no scoring/Advance/preparation/contestant-switch controls. Reload Play (reopen Play if the shell lands on System) to restore the observed final; after a server restart, reclaim host control first.
+
+Select **New game**, then confirm, to create a new setup with fresh session/contestant/command IDs, zero scores, no attempts and empty used-match/image history. Contestant names and the last active selection are copied as editable setup defaults. Review names/count/starting contestant, save changes if needed, then explicitly select Start game. Confirmation cancel creates nothing; a lost response uses the existing Check command status/receipt flow before another request. Starting the next game never starts automatically or rewrites the completed result.
+
+Existing contestant pages keep showing the previous session's final result. Create a fresh primary display link/QR for the new session and open it on the contestant device before preparing. Do not re-scan the old session's link expecting it to switch games. Process-local viewer capabilities still expire on server restart; for viewing an old resolved result after restart, uncheck primary designation when creating its fresh secondary link as described above. The existing process-wide four-viewer-capability limit is unchanged; this checkpoint adds no display-history management.
+
+For manual acceptance, cancel each confirmation once and confirm no state change. End a scored game and compare host/device totals, reload/restart and restore its saved final, then create a new game and confirm fresh setup/zero scores with the library intact. Run a solo zero-score completion and a head-to-head zero-score tie. Verify End stays disabled on a prepared unresolved clue. Physical-device/full milestone acceptance remains separate from automated browser checks.
+
 ## Host control and request recovery
 
 - The current controller renews while Play is open. **Release host control** permits another tab/device to claim. Leaving Play stops renewals; control becomes claimable after 10 seconds without renewal. A host-liveness loss is detected after 3 seconds; it never awards points or advances a round. There is no force-takeover of an actively renewed lease.
@@ -96,7 +108,7 @@ Manual checks: play two successive rounds without switching, then Advance and ex
 - A lost response shows an uncertain-request panel and blocks new commands. Use **Check command status**. An accepted receipt restores the current state. If no receipt exists, the client checks current state before offering **Retry original request**, preserving the same command/session/round IDs and original revision. If state changed, deliberately dismiss only after that review; do not manufacture a second command to guess whether the first succeeded.
 - Sessions, attempts, owner IDs and receipts live in SQLite; controller/viewer capabilities are process-local and never stored in game history. This is trusted-LAN coordination, not account authentication or an anti-cheat sandbox. Existing library administration remains reachable under its existing policy.
 
-The native HTTP adapter exposes the existing M1 command lane plus private/public snapshots and receipt lookup. Display status accepts only connection/readiness/clock observations, and the opaque current-round image route requires a role capability. Host commands cannot override readiness. There is no End/New Game UI yet; preserve the current session and use Advance for another round rather than deleting data to reset it. Use a separate disposable data root for independent acceptance runs.
+The native HTTP adapter exposes the existing M1 command lane plus private/public snapshots and receipt lookup. Display status accepts only connection/readiness/clock observations, and the opaque current-round image route requires a role capability. Host commands cannot override readiness. End game commits final results; New game uses the existing session-creation endpoint with a fresh identity. Preserve saved data rather than deleting a database to reset play. Use a separate disposable data root for independent acceptance runs.
 
 ## Manual acceptance
 
@@ -118,4 +130,4 @@ Use an already backed-up collection or a disposable configured data root. Start 
 - Use keyboard focus, native select/radio keys and Enter/Space on buttons. Check visible focus and readable controls at laptop and tablet widths, without horizontal overflow. This does not certify an actual tablet or Road Mode.
 - Revisit Image Library and confirm existing import, editing, classification, approval and filtering workflows still work.
 
-Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's task-5.3a verification record for current QR/LAN results and browser-check limits. Historical task/milestone evidence is retained. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.
+Automated verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `openspec validate game-experience-mvp --type change --strict`, `openspec validate --all --strict`, and `git diff --check`. See the change's task-5.4 verification record for current lifecycle results and browser-check limits. Historical task/milestone evidence is retained. Physical Android/TV, viewing-distance, external-internet-disconnection and full-game acceptance remain separate checks.

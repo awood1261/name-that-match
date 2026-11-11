@@ -370,3 +370,7 @@ Following the implemented task 5.3 checkpoint, the owner requested automatic `ip
 ### QR/LAN implementation and package authorization
 
 The owner approved implementation with “proposal looks good you can implement”, limited to checkpoint 5.3a. The owner then explicitly approved `qrcode` 1.5.4 for runtime offline encoding and `@types/qrcode` 1.5.6 plus `jsqr` 1.4.0 as development-only typing/independent decode dependencies. That approval satisfies the D9a package gate for these exact packages only; the earlier planning-only and no-install wording records its prior approval stage. End/New Game (5.4), later milestones, WebSocket dependencies and archive remain outside this authorization.
+
+### Task 5.4 authorization
+
+The owner accepted checkpoint 5.3a manual verification and approved the next task, confirmed End Game/New Game controls, by replying “i approve”. Implement task 5.4 only through the existing END_GAME command and fresh session-creation endpoint. New game copies names/starting selection as editable setup defaults with fresh IDs; it does not start automatically or reset the prior record. Earlier milestone-only authorization paragraphs remain historical. Do not begin 5.5/5.6, later milestones, dependency changes or archive on this authorization.

@@ -62,6 +62,47 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     return result;
   }
   async function reveal() { await prepare(); await connect(); await report(); await current(); expect((await command('REVEAL_AND_START')).status).toBe(200); }
+  it.each([false, true])('ends resolved rounds with reveal=%s and preserves final scores across new setup and restart', async (revealed) => {
+    await reveal(); const oldSessionId = state.snapshot!.session.id; const oldViewer = viewer;
+    const libraryBefore = storage.db.prepare('SELECT id,revision,review_status,image_path FROM screenshots').all();
+    await command('CORRECT'); if (revealed) await command('REVEAL_ANSWER');
+    expect(state.allowedActions).toContain('END_GAME'); const saved = await command('END_GAME'); expect(saved.status).toBe(200);
+    expect((await command('END_GAME', {}, saved.envelope)).data.replayed).toBe(true);
+    const finished = state.snapshot!; expect(finished.session.status).toBe('completed'); expect(state.allowedActions).toEqual([]);
+    await report(); expect(observation.snapshot).toMatchObject({ phase: 'completed', scores: [{ total: 1 }, { total: 0 }], winnerIds: [finished.session.contestants[0].id] });
+    expect((await command('CORRECT')).status).toBe(409); expect((await command('ADVANCE')).status).toBe(409);
+    expect((await request('/current')).data.snapshot).toBeNull();
+    const input = setup(1); const created = await request('/sessions', input); expect(created.status).toBe(201); state = created.data.status;
+    expect(state.snapshot!.session.id).not.toBe(oldSessionId); expect(state.snapshot!.currentRound).toBeNull(); expect(state.snapshot!.scores[0].total).toBe(0); expect(state.availability.distinctMatches).toBe(1);
+    expect((await request(`/sessions/${oldSessionId}`, undefined, oldViewer)).data.snapshot).toMatchObject({ phase: 'completed', scores: [{ total: 1 }, { total: 0 }] });
+    expect((await request('/sessions', input)).data.replayed).toBe(true); expect(storage.db.prepare('SELECT COUNT(*) n FROM game_sessions').get()).toEqual({ n: 2 });
+    // Replaying a prior End receipt cannot complete or clear the new session.
+    expect((await request(`/sessions/${oldSessionId}/commands`, saved.envelope)).data.replayed).toBe(true);
+    await current(); expect(state.snapshot!.session.id).toBe(input.sessionId); expect(state.snapshot!.session.status).toBe('setup');
+    expect((await command('START')).status).toBe(200); expect((await command('PREPARE', { roundId: randomUUID(), tier: 'squash' })).status).toBe(202);
+    for (let n = 0; n < 30 && state.snapshot!.currentRound?.phase !== 'ready'; n++) { await new Promise((r) => setTimeout(r, 5)); await current(); }
+    expect(state.snapshot!.currentRound?.phase).toBe('ready'); expect(state.snapshot!.currentRound).toMatchObject({ context: { screenshotId: libraryBefore[0] && (libraryBefore[0] as { id: string }).id } });
+    await command('CANCEL_UNEXPOSED'); game.stop(); game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now });
+    owner = (await request('/control-lease', {})).data; await current(); expect(state.snapshot!.session.id).toBe(input.sessionId); expect(state.snapshot!.scores[0].total).toBe(0);
+    expect((await request(`/sessions/${oldSessionId}`)).data.snapshot).toEqual(finished); expect((await request(`/sessions/${oldSessionId}/commands/${saved.envelope.commandId}`)).data.receipt).toEqual(saved.data.receipt);
+    expect(storage.db.prepare('SELECT id,revision,review_status,image_path FROM screenshots').all()).toEqual(libraryBefore);
+    expect(storage.db.prepare('SELECT COUNT(*) n FROM game_score_events').get()).toEqual({ n: 1 });
+  });
+  it('publishes all zero-score tied winners and refuses ending unresolved work or viewer lifecycle mutations', async () => {
+    const original = state.snapshot!; expect((await command('END_GAME')).status).toBe(409);
+    await prepare(); expect(state.allowedActions).not.toContain('END_GAME'); expect((await command('END_GAME')).status).toBe(409);
+    await connect(); await report(); await current(); await command('REVEAL_AND_START');
+    expect((await command('END_GAME')).status).toBe(409);
+    await command('PAUSE'); expect((await command('END_GAME')).status).toBe(409);
+    await report(); await current(); await command('RESUME'); now = 10000; await report();
+    owner = (await request('/control-lease', {})).data; await current(); expect((await command('END_GAME')).status).toBe(409);
+    await command('CONFIRM_TIMEOUT');
+    expect((await request(sessionPath() + '/commands', { type: 'END_GAME' }, viewer)).status).toBe(403);
+    expect((await request('/sessions', setup(), viewer)).status).not.toBe(201);
+    const ended = await command('END_GAME'); expect(ended.status).toBe(200); await report();
+    expect(observation.snapshot).toMatchObject({ phase: 'completed', winnerIds: original.session.contestants.map((p) => p.id), scores: [{ total: 0 }, { total: 0 }] });
+    expect(state.allowedActions).toEqual([]);
+  });
   it('runs explicit consecutive turns, tier changes and switching with durable match exclusion and replay-safe Advance', async () => {
     const [a, b] = state.snapshot!.session.contestants.map((p) => p.id);
     await reveal(); const first = state.snapshot!.currentRound!;

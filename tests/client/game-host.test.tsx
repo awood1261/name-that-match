@@ -16,7 +16,7 @@ function status(): HostStatus {
   const p = state ? phase(state) : null; const round = state && currentRound(state);
   return { protocolVersion: 1, serverEpoch: credential.serverEpoch, sequence: ++sequence, snapshot: state ? hostSnapshot(state) : null,
     availability: { tiers: { squash: { screenshots: 2, matches: 1 }, competitive: { screenshots: 0, matches: 0 }, deathmatch: { screenshots: 0, matches: 0 } }, distinctMatches: 1, asOf: NOW },
-    allowedActions: p === 'setup' ? ['CONFIGURE_SETUP', 'START', 'DISCARD_SETUP'] : p === 'between_rounds' ? ['SELECT_CONTESTANT', 'PREPARE'] : p === 'ready' || p === 'preparing' ? ['CANCEL_UNEXPOSED'] : p === 'answer_revealed' ? ['ADVANCE'] : p === 'adjudicated' ? ['REVEAL_ANSWER', ...(round?.phase === 'adjudicated' && round.outcome === 'void' ? ['ADVANCE' as const] : [])] : [],
+    allowedActions: p === 'setup' ? ['CONFIGURE_SETUP', 'START', 'DISCARD_SETUP'] : p === 'between_rounds' ? ['SELECT_CONTESTANT', 'PREPARE', 'END_GAME'] : p === 'ready' || p === 'preparing' ? ['CANCEL_UNEXPOSED'] : p === 'answer_revealed' ? ['ADVANCE', 'END_GAME'] : p === 'adjudicated' ? ['REVEAL_ANSWER', 'END_GAME', ...(round?.phase === 'adjudicated' && round.outcome === 'void' ? ['ADVANCE' as const] : [])] : [],
     candidateValid: true, primaryDisplay: { ready: false, message: 'A connected contestant display is required.' }, preparationError: null };
 }
 const env = () => ({ nowMonoMs: 0, nowIso: NOW, clock: null, primaryReady: false, candidateCurrent: true, hasEligibleMatches: true, awardId: randomUUID() });
@@ -168,7 +168,7 @@ describe('host setup and preparation UI', () => {
     await waitFor(() => expect(gameApi.session).toHaveBeenCalledTimes(2));
     expect(screen.getByRole('region', { name: 'Final totals' })).toHaveTextContent('1 point');
     view.unmount(); render(<HostPage />); await screen.findByRole('region', { name: 'Final totals' });
-    expect(gameApi.create).not.toHaveBeenCalled(); expect(gameApi.command).not.toHaveBeenCalled(); expect(screen.queryByRole('button', { name: 'New game' })).not.toBeInTheDocument();
+    expect(gameApi.create).not.toHaveBeenCalled(); expect(gameApi.command).not.toHaveBeenCalled(); expect(screen.getByRole('button', { name: 'New game' })).toBeEnabled();
   });
   it('discards a missing or invalid completed-session observation', async () => {
     const session = vi.spyOn(gameApi, 'session').mockRejectedValue(new GameApiError({ code: 'NOT_FOUND', message: 'Session not found.' }, 404));
@@ -231,5 +231,77 @@ describe('explicit round progression', () => {
     await screen.findByText(/The request outcome is unknown/); expect(screen.getByLabelText('Switch contestant')).toBeDisabled(); expect(screen.getByRole('button', { name: 'Prepare screenshot' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText('The previous command was accepted. Current state restored.');
     expect(screen.getByLabelText('Switch contestant')).toBeEnabled(); expect(gameApi.command).toHaveBeenCalledTimes(1); expect(state!.awards).toHaveLength(1);
+  });
+});
+
+describe('manual completion and independent new games', () => {
+  function finished(count = 2) {
+    const game = pureGame(); if (count === 1) game.step({ type: 'CONFIGURE_SETUP', contestants: [game.state.contestants[0]], activeContestantId: game.state.contestants[0].id });
+    game.step({ type: 'START' }); game.step({ type: 'END_GAME' }); state = game.state;
+  }
+  it('requires confirmation to end, then shows zero-score tied winners and hides live controls', async () => {
+    const game = pureGame(); game.step({ type: 'START' }); state = game.state;
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false); render(<HostPage />);
+    const end = await screen.findByRole('button', { name: 'End game' }); end.focus(); expect(end).toHaveFocus(); fireEvent.click(end);
+    expect(gameApi.command).not.toHaveBeenCalled(); expect(state!.status).toBe('active'); confirm.mockReturnValue(true); fireEvent.click(end); fireEvent.click(end);
+    await screen.findByRole('region', { name: 'Final totals' }); expect(gameApi.command).toHaveBeenCalledTimes(1);
+    expect(state!.status).toBe('completed'); expect(screen.getByRole('region', { name: 'Final totals' })).toHaveTextContent('Tie: Contestant 1 & Contestant 2');
+    for (const label of ['End game', 'Prepare screenshot', 'Advance', 'Reveal Result']) expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Switch contestant')).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'New game' })).toBeEnabled();
+  });
+  it('prevents End game during an unresolved attempt and explains cancellation', async () => {
+    const game = pureGame(); game.ready(); state = game.state;
+    const confirm = vi.spyOn(window, 'confirm'); render(<HostPage />); const end = await screen.findByRole('button', { name: 'End game' });
+    expect(end).toBeDisabled(); fireEvent.click(end); expect(confirm).not.toHaveBeenCalled(); expect(gameApi.command).not.toHaveBeenCalled(); expect(screen.getByText('Cancel preparation before ending the game.')).toBeInTheDocument();
+  });
+  it.each([false, true])('allows ending a saved judgment with result reveal=%s without scoring again', async (revealed) => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.step({ type: 'CORRECT' }); if (revealed) game.step({ type: 'REVEAL_ANSWER' }); state = game.state;
+    const awards = structuredClone(state.awards); vi.spyOn(window, 'confirm').mockReturnValue(true); render(<HostPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'End game' })); await screen.findByRole('region', { name: 'Final totals' });
+    expect(state!.awards).toEqual(awards); expect(screen.getByRole('region', { name: 'Final totals' })).toHaveTextContent('Winner: Contestant 1');
+  });
+  it.each([1, 2])('creates a fresh %i-contestant setup only after New game confirmation, with editable names and no automatic start', async (count) => {
+    finished(count); const previous = structuredClone(state!); const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<HostPage />); const start = await screen.findByRole('button', { name: 'New game' }); start.focus(); expect(start).toHaveFocus(); fireEvent.click(start);
+    expect(gameApi.create).not.toHaveBeenCalled(); expect(state!.id).toBe(previous.id); confirm.mockReturnValue(true); fireEvent.click(start); fireEvent.click(start);
+    await screen.findByRole('button', { name: 'Start game' }); expect(gameApi.create).toHaveBeenCalledTimes(1); expect(gameApi.command).not.toHaveBeenCalled();
+    expect(state!.id).not.toBe(previous.id); expect(state!.status).toBe('setup'); expect(state!.rounds).toEqual([]); expect(state!.awards).toEqual([]); expect(state!.nextTurnOrdinal).toBe(1);
+    expect(state!.contestants.map((p) => p.name)).toEqual(previous.contestants.map((p) => p.name)); expect(state!.contestants.every((p) => !previous.contestants.some((q) => q.id === p.id))).toBe(true);
+    expect(screen.getByLabelText('Contestant 1 name')).toHaveValue(previous.contestants[0].name); expect(previous.status).toBe('completed');
+  });
+  it('blocks duplicate lifecycle commands and resolves a lost End game acknowledgment by receipt', async () => {
+    const game = pureGame(); game.step({ type: 'START' }); state = game.state; let receipt: ReturnType<typeof apply>;
+    vi.spyOn(window, 'confirm').mockReturnValue(true); vi.mocked(gameApi.command).mockImplementationOnce(async (_owner, input) => { receipt = apply(input); throw new TypeError('Lost response'); });
+    vi.spyOn(gameApi, 'receipt').mockImplementation(async () => ({ ...receipt!, status: status() })); render(<HostPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'End game' })); await screen.findByText(/The request outcome is unknown/);
+    const next = await screen.findByRole('button', { name: 'New game' }); expect(next).toBeDisabled(); fireEvent.click(next); expect(gameApi.create).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText('The previous command was accepted. Current state restored.');
+    expect(next).toBeEnabled(); expect(gameApi.command).toHaveBeenCalledTimes(1);
+  });
+  it('reconciles an accepted New game creation after a lost response without creating a second setup', async () => {
+    finished(); vi.spyOn(window, 'confirm').mockReturnValue(true); let input: Parameters<typeof gameApi.create>[1];
+    vi.mocked(gameApi.create).mockImplementationOnce(async (_owner, value) => { input = value; state = createState(value, NOW); throw new TypeError('Lost response'); });
+    vi.spyOn(gameApi, 'receipt').mockImplementation(async () => ({ receipt: { commandId: input!.commandId, sessionId: input!.sessionId, roundId: null, acceptedVersion: 1 }, status: status() }));
+    render(<HostPage />); fireEvent.click(await screen.findByRole('button', { name: 'New game' })); await screen.findByText(/The request outcome is unknown/);
+    fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText('The previous command was accepted. Current state restored.');
+    expect(gameApi.create).toHaveBeenCalledOnce(); expect(state!.id).toBe(input!.sessionId); expect(state!.status).toBe('setup'); expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('keeps completed totals on rejected creation and offers a deliberate retry after missing receipt review', async () => {
+    finished(); const completed = state!; vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(gameApi.current).mockImplementation(async () => ({ ...status(), snapshot: null })); vi.spyOn(gameApi, 'session').mockImplementation(async () => status());
+    sessionStorage.setItem('ntm.game.observedSession', JSON.stringify(completed.id));
+    vi.mocked(gameApi.create).mockRejectedValueOnce(new TypeError('Delivery unknown'));
+    vi.spyOn(gameApi, 'receipt').mockRejectedValue(new GameApiError({ code: 'NOT_FOUND', message: 'No receipt.' }, 404));
+    render(<HostPage />); fireEvent.click(await screen.findByRole('button', { name: 'New game' })); await screen.findByText(/The request outcome is unknown/);
+    fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText(/No accepted receipt was found/);
+    expect(screen.getByRole('region', { name: 'Final totals' })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Retry original request' })).toBeEnabled(); expect(state).toBe(completed);
+  });
+  it('keeps the observed completed session when a New game request is explicitly rejected', async () => {
+    finished(); const completed = state!; vi.spyOn(window, 'confirm').mockReturnValue(true);
+    sessionStorage.setItem('ntm.game.observedSession', JSON.stringify(completed.id));
+    vi.mocked(gameApi.current).mockImplementation(async () => ({ ...status(), snapshot: null })); vi.spyOn(gameApi, 'session').mockImplementation(async () => status());
+    vi.mocked(gameApi.create).mockRejectedValue(new GameApiError({ code: 'CONFLICT', message: 'New setup could not be created.' }, 409));
+    render(<HostPage />); fireEvent.click(await screen.findByRole('button', { name: 'New game' })); await screen.findByText('New setup could not be created.');
+    expect(screen.getByRole('region', { name: 'Final totals' })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'New game' })).toBeEnabled(); expect(state).toBe(completed);
   });
 });

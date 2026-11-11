@@ -11,6 +11,21 @@ function fixture(options: Parameters<typeof serviceFixture>[0] = {}) { const f =
 afterEach(async () => { vi.restoreAllMocks(); for (const f of fixtures.splice(0)) await f.cleanup(); });
 
 describe('transactional game service', () => {
+  it('reopens independent completed/new games with separate scores and reusable match history, preserving library rows', () => {
+    const f = fixture(); f.ready(); const candidate = currentRound(f.state)!;
+    if (!('context' in candidate) || !candidate.context) throw new Error('No candidate');
+    f.command({ type: 'REVEAL_AND_START' }); f.command({ type: 'CORRECT' }); f.command({ type: 'END_GAME' }); const old = f.state;
+    const library = f.storage.db.prepare('SELECT id,revision,match_id,image_path FROM screenshots').all();
+    const created = f.service.create(setup(1)); let next = f.service.execute(envelope(created.state, { type: 'START' })).state;
+    f.reopen(); expect(f.state).toEqual(old); expect(f.service.repository.current()?.id).toBe(next.id);
+    next = f.service.state(next.id); expect(next.rounds).toEqual([]); expect(next.awards).toEqual([]);
+    next = f.service.execute(envelope(next, { type: 'PREPARE', roundId: randomUUID(), tier: 'squash' })).state;
+    expect(f.service.completePreparation(next.id, next.currentRoundId!, next.stateVersion, candidate.context)).toBe(true);
+    for (const type of ['REVEAL_AND_START', 'CORRECT', 'END_GAME'] as const) next = f.service.execute(envelope(f.service.state(next.id), { type })).state;
+    f.reopen(); expect(f.state).toEqual(old); expect(f.service.state(next.id)).toEqual(next); expect(scoreboard(next)[0].total).toBe(1);
+    expect(f.service.repository.current()).toBeNull(); expect(f.storage.db.prepare('SELECT id,revision,match_id,image_path FROM screenshots').all()).toEqual(library);
+    expect(f.storage.db.prepare('SELECT count(*) n FROM game_sessions').get()).toEqual({ n: 2 }); expect(f.storage.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 2 });
+  });
   it('creates/setup-edits idempotently and blocks a second unfinished game or authority', () => {
     const f = fixture(); const other = setup();
     expect(() => f.service.create(other)).toThrow(/nonterminal/);
