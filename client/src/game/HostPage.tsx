@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GAME_TIERS, GAME_TIER_DETAILS, type GameTier } from '../../../shared/src/classification';
 import { clientId } from '../ids';
 import { useGameHost } from './useGameHost';
@@ -11,6 +11,9 @@ import styles from './HostPage.module.css';
 export function HostPage() {
   const host = useGameHost(); const [tier, setTier] = useState<GameTier>('squash'); const [setupDirty, setSetupDirty] = useState(false);
   const snapshot = host.status?.snapshot; const session = snapshot?.session ?? null; const round = snapshot?.currentRound;
+  const requestedTier = round?.requestedTier;
+  // Retain the observed round's tier across Advance/Cancel, including after reload.
+  useEffect(() => { if (requestedTier) setTier(requestedTier); }, [requestedTier]);
   const can = (action: string) => !!host.credential && host.connected && !host.busy && !host.pending && !!host.status?.allowedActions.some((a) => a === action);
   const active = session?.contestants.find((p) => p.id === session.activeContestantId);
   const unexposed = round?.phase === 'preparing' || round?.phase === 'ready';

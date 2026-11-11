@@ -13,10 +13,10 @@ import { randomUUID } from 'node:crypto';
 let state: GameState | null; let sequence: number;
 const credential = { token: 'a'.repeat(64), serverEpoch: randomUUID(), generation: 1 };
 function status(): HostStatus {
-  const p = state ? phase(state) : null;
+  const p = state ? phase(state) : null; const round = state && currentRound(state);
   return { protocolVersion: 1, serverEpoch: credential.serverEpoch, sequence: ++sequence, snapshot: state ? hostSnapshot(state) : null,
     availability: { tiers: { squash: { screenshots: 2, matches: 1 }, competitive: { screenshots: 0, matches: 0 }, deathmatch: { screenshots: 0, matches: 0 } }, distinctMatches: 1, asOf: NOW },
-    allowedActions: p === 'setup' ? ['CONFIGURE_SETUP', 'START', 'DISCARD_SETUP'] : p === 'between_rounds' ? ['SELECT_CONTESTANT', 'PREPARE'] : p === 'ready' || p === 'preparing' ? ['CANCEL_UNEXPOSED'] : [],
+    allowedActions: p === 'setup' ? ['CONFIGURE_SETUP', 'START', 'DISCARD_SETUP'] : p === 'between_rounds' ? ['SELECT_CONTESTANT', 'PREPARE'] : p === 'ready' || p === 'preparing' ? ['CANCEL_UNEXPOSED'] : p === 'answer_revealed' ? ['ADVANCE'] : p === 'adjudicated' ? ['REVEAL_ANSWER', ...(round?.phase === 'adjudicated' && round.outcome === 'void' ? ['ADVANCE' as const] : [])] : [],
     candidateValid: true, primaryDisplay: { ready: false, message: 'A connected contestant display is required.' }, preparationError: null };
 }
 const env = () => ({ nowMonoMs: 0, nowIso: NOW, clock: null, primaryReady: false, candidateCurrent: true, hasEligibleMatches: true, awardId: randomUUID() });
@@ -24,7 +24,10 @@ function apply(command: CommandEnvelope) {
   const intent = { ...command.payload, type: command.type } as HostIntent;
   state = transition(state!, intent, env());
   const response = { receipt: { commandId: command.commandId, sessionId: state.id, roundId: state.currentRoundId, acceptedVersion: state.stateVersion }, replayed: false, status: status() };
-  if (command.type === 'PREPARE') state = transition(state, { type: 'PREPARE_SUCCEEDED', context: context() }, env());
+  if (command.type === 'PREPARE') {
+    const candidate = context(); candidate.image.sha256 = randomUUID().replace(/-/g, '') + '0'.repeat(32);
+    state = transition(state, { type: 'PREPARE_SUCCEEDED', context: candidate }, env());
+  }
   return response;
 }
 beforeEach(() => {
@@ -174,5 +177,59 @@ describe('host setup and preparation UI', () => {
     expect(sessionStorage.getItem('ntm.game.observedSession')).toBeNull(); view.unmount();
     sessionStorage.setItem('ntm.game.observedSession', JSON.stringify('invalid'));
     render(<HostPage />); await screen.findByRole('button', { name: 'Create session' }); expect(session).toHaveBeenCalledOnce(); expect(gameApi.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('explicit round progression', () => {
+  function resolved(outcome: 'correct' | 'incorrect' | 'timeout' | 'void' = 'correct', revealed = true, deathmatch = false) {
+    const game = pureGame(); const candidate = context();
+    if (deathmatch) { candidate.obscurity = 'high'; candidate.difficulty = 'hard'; }
+    game.step({ type: 'START' }); game.step({ type: 'PREPARE', roundId: randomUUID(), tier: deathmatch ? 'deathmatch' : 'squash' });
+    game.step({ type: 'PREPARE_SUCCEEDED', context: candidate }); game.step({ type: 'REVEAL_AND_START' });
+    if (outcome === 'timeout') { game.setTime(10000); game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration }); game.step({ type: 'CONFIRM_TIMEOUT' }); }
+    else game.step(outcome === 'void' ? { type: 'VOID_EXPOSED', reason: 'skip' } : { type: outcome === 'correct' ? 'CORRECT' : 'INCORRECT' });
+    if (revealed) game.step({ type: 'REVEAL_ANSWER' }); state = game.state;
+  }
+  it('advances only explicitly, retains selection/scores, and switches only future preparations', async () => {
+    resolved(); const [a, b] = state!.contestants.map((p) => p.id); const original = structuredClone(state!.rounds[0]);
+    render(<HostPage />); const advance = await screen.findByRole('button', { name: 'Advance' });
+    expect(screen.getByLabelText('Switch contestant')).toBeDisabled(); expect(gameApi.command).not.toHaveBeenCalled();
+    advance.focus(); expect(advance).toHaveFocus(); fireEvent.click(advance); fireEvent.click(advance);
+    await screen.findByText('Between rounds');
+    expect(gameApi.command).toHaveBeenCalledTimes(1); expect(vi.mocked(gameApi.command).mock.calls[0][1]).toMatchObject({ type: 'ADVANCE', roundId: original.id });
+    expect(state!.activeContestantId).toBe(a); expect(state!.awards).toHaveLength(1); expect(state!.rounds[0]).toEqual(original);
+    expect(screen.getByLabelText('Switch contestant')).toBeEnabled(); expect(screen.queryByRole('button', { name: 'Advance' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare screenshot' })); await screen.findByText('Screenshot ready · hidden', {}, { timeout: 2000 });
+    expect(currentRound(state!)?.contestantId).toBe(a); expect(state!.nextTurnOrdinal).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel preparation' })); await screen.findByText('Between rounds');
+    const control = screen.getByLabelText('Switch contestant'); control.focus(); expect(control).toHaveFocus();
+    fireEvent.change(control, { target: { value: b } }); await waitFor(() => expect(state!.activeContestantId).toBe(b));
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare screenshot' })); await screen.findByText('Screenshot ready · hidden', {}, { timeout: 2000 });
+    expect(currentRound(state!)?.contestantId).toBe(b); expect(screen.getByLabelText('Switch contestant')).toBeDisabled();
+    expect(state!.rounds[0]).toEqual(original); expect(state!.nextTurnOrdinal).toBe(2); expect(state!.awards[0].contestantId).toBe(a);
+  });
+  it.each(['correct', 'incorrect', 'timeout', 'void'] as const)('requires Reveal Result before Advance except an explicit %s void', async (outcome) => {
+    resolved(outcome, false); render(<HostPage />); await screen.findByRole('button', { name: 'Reveal Result' });
+    if (outcome === 'void') expect(screen.getByRole('button', { name: 'Advance' })).toBeEnabled();
+    else expect(screen.queryByRole('button', { name: 'Advance' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Switch contestant')).toBeDisabled(); expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('retains the restored previous tier, explains exhaustion and requires an explicit different tier', async () => {
+    resolved('correct', true, true); render(<HostPage />); await screen.findByRole('button', { name: 'Advance' });
+    fireEvent.click(screen.getByRole('button', { name: 'Advance' })); await screen.findByText('Between rounds');
+    expect(screen.getByRole('radio', { name: /Deathmatch/ })).toBeChecked(); expect(screen.getByRole('button', { name: 'Prepare screenshot' })).toBeDisabled();
+    expect(screen.getByText(/No eligible unseen screenshots in this tier/)).toBeInTheDocument(); expect(gameApi.command).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('radio', { name: /Squash Match/ })); fireEvent.click(screen.getByRole('button', { name: 'Prepare screenshot' }));
+    await screen.findByText('Screenshot ready · hidden', {}, { timeout: 2000 });
+    expect(currentRound(state!)?.requestedTier).toBe('squash'); expect(vi.mocked(gameApi.command).mock.calls[1][1]).toMatchObject({ type: 'PREPARE', payload: { tier: 'squash' } });
+  });
+  it('blocks further progression on a lost Advance acknowledgment and reconciles its receipt', async () => {
+    resolved(); let receipt: ReturnType<typeof apply>;
+    vi.mocked(gameApi.command).mockImplementationOnce(async (_owner, input) => { receipt = apply(input); throw new TypeError('Response lost'); });
+    vi.spyOn(gameApi, 'receipt').mockImplementation(async () => ({ ...receipt!, status: status() }));
+    render(<HostPage />); fireEvent.click(await screen.findByRole('button', { name: 'Advance' }));
+    await screen.findByText(/The request outcome is unknown/); expect(screen.getByLabelText('Switch contestant')).toBeDisabled(); expect(screen.getByRole('button', { name: 'Prepare screenshot' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText('The previous command was accepted. Current state restored.');
+    expect(screen.getByLabelText('Switch contestant')).toBeEnabled(); expect(gameApi.command).toHaveBeenCalledTimes(1); expect(state!.awards).toHaveLength(1);
   });
 });

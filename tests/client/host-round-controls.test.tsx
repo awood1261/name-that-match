@@ -42,6 +42,9 @@ describe('host live round intents', () => {
     const command = vi.fn(); const view = render(<HostRoundControls status={status('adjudicated')} can={() => false} command={command} />);
     expect(screen.getByRole('button', { name: 'Reveal Result' })).toBeDisabled(); fireEvent.click(screen.getByRole('button', { name: 'Reveal Result' })); expect(command).not.toHaveBeenCalled();
     view.rerender(<HostRoundControls status={status('answer_revealed')} can={() => true} command={command} />);
-    expect(screen.queryByRole('button', { name: 'Reveal Result' })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Advance' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reveal Result' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Advance' })); expect(command).toHaveBeenCalledWith({ type: 'ADVANCE' });
+    command.mockClear(); view.rerender(<HostRoundControls status={status('answer_revealed')} can={() => false} command={command} />);
+    expect(screen.getByRole('button', { name: 'Advance' })).toBeDisabled(); fireEvent.click(screen.getByRole('button', { name: 'Advance' })); expect(command).not.toHaveBeenCalled();
   });
 });

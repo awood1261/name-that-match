@@ -39,3 +39,7 @@ Multi-turn/final states are verified in automated domain, persistence and compon
 Using a disposable data root, create a head-to-head setup and check initial shared zero ranks. Start, connect a primary viewer, prepare and reveal a screenshot, then judge: the private host board updates while the contestant waits. Reveal Result and compare totals, latest outcome and turn ownership. Reload/reconnect the viewer and check that scores do not change. Repeat alternative outcomes/tiers in disposable sessions as needed. See `docs/game-host.md` for full operation and origin configuration.
 
 Task 5.2 is complete; progress is **24/42**, with 18 later tasks open. Stop before 5.3 for review. The foundation, hardening and Match Library changes are already archived. The sole active game change remains incomplete, so nothing is eligible to archive and no capability synchronization/archive was performed. Changes are left uncommitted for review.
+
+## Subsequent owner acceptance
+
+The owner confirmed task 5.2 manual verification and authorized the next task. This records scoreboard acceptance and task 5.3 authorization; it does not complete later tasks or authorize archiving the incomplete game change. The original checkpoint evidence above is retained.

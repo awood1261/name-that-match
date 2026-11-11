@@ -64,6 +64,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
     if (round?.phase === 'awaiting_judgment') allowedActions = ['CORRECT_BEFORE_BUZZER', 'CONFIRM_TIMEOUT', 'VOID_EXPOSED'];
     if (round?.phase === 'interrupted') allowedActions = ['VOID_INTERRUPTED'];
     if (round?.phase === 'adjudicated') allowedActions = ['REVEAL_ANSWER'];
+    if (state?.status === 'active' && (round?.phase === 'answer_revealed' || (round?.phase === 'adjudicated' && round.outcome === 'void'))) allowedActions.push('ADVANCE');
     return { protocolVersion: 1, serverEpoch, sequence: ++sequence, snapshot: state ? hostSnapshot(state) : null, availability, allowedActions,
       candidateValid, primaryDisplay,
       timing: observation && 'remainingMs' in observation.snapshot ? { serverMonoMs: observation.serverMonoMs, remainingMs: observation.snapshot.remainingMs } : null,
@@ -193,7 +194,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
         }
         const result = service.execute(command);
         if (command.type === 'PREPARE' && selected && !result.replayed) { preparationError = null; processPreparation(result.state, selected); }
-        if (!result.replayed && (command.type === 'CANCEL_UNEXPOSED' || command.type === 'END_GAME' || command.type === 'DISCARD_SETUP')) { library.release(); preparationError = null; }
+        if (!result.replayed && (command.type === 'ADVANCE' || command.type === 'CANCEL_UNEXPOSED' || command.type === 'END_GAME' || command.type === 'DISCARD_SETUP')) { library.release(); preparationError = null; }
         json(res, command.type === 'PREPARE' && !result.replayed ? 202 : 200, { data: { receipt: result.receipt, replayed: result.replayed, status: status(result.state) } });
       } catch (error) {
         if (!req.complete) { res.setHeader('Connection', 'close'); req.resume(); }

@@ -8,6 +8,8 @@ import { initializeStorage, type StorageSession } from '../../server/src/storage
 import { createTestResources, listen } from '../helpers/resources';
 import { eligibleCapture } from './host-fixtures';
 import { setup } from './fixtures';
+import { customPng } from '../imports/fixtures';
+import type { GameTier } from '../../shared/src/classification';
 import type { ControllerCredential, HostStatus } from '../../shared/src/game/host';
 import type { DisplayCredential, DisplayObservation } from '../../shared/src/game/display';
 
@@ -60,6 +62,62 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     return result;
   }
   async function reveal() { await prepare(); await connect(); await report(); await current(); expect((await command('REVEAL_AND_START')).status).toBe(200); }
+  it('runs explicit consecutive turns, tier changes and switching with durable match exclusion and replay-safe Advance', async () => {
+    const [a, b] = state.snapshot!.session.contestants.map((p) => p.id);
+    await reveal(); const first = state.snapshot!.currentRound!;
+    if (!('context' in first) || !first.context) throw new Error('Missing candidate');
+    eligibleCapture(storage, { matchId: first.context.matchId, difficulty: 'hard', bytes: customPng() });
+    eligibleCapture(storage, { bytes: customPng({ raw: Buffer.from([0, 12, 0, 0, 255, 0, 0, 255, 255]) }) });
+    eligibleCapture(storage, { obscurity: 'medium', bytes: customPng({ raw: Buffer.from([0, 24, 0, 0, 255, 0, 0, 255, 255]) }) });
+    eligibleCapture(storage, { obscurity: 'high', difficulty: 'hard', bytes: customPng({ raw: Buffer.from([0, 36, 0, 0, 255, 0, 0, 255, 255]) }) });
+    let previousAdvance: unknown; const matched = new Set<string>();
+    for (const [index, tier] of (['squash', 'squash', 'competitive', 'deathmatch'] as GameTier[]).entries()) {
+      if (index > 0) {
+        if (index === 2) expect((await command('SELECT_CONTESTANT', { contestantId: b })).status).toBe(200);
+        expect((await command('PREPARE', { roundId: randomUUID(), tier })).status).toBe(202);
+        for (let n = 0; n < 30 && state.snapshot!.currentRound?.phase !== 'ready'; n++) { await new Promise((r) => setTimeout(r, 5)); await current(); }
+        expect(state.snapshot!.currentRound?.phase).toBe('ready');
+        const roundId = state.snapshot!.session.currentRoundId;
+        expect((await command('ADVANCE', {}, previousAdvance)).data.replayed).toBe(true);
+        expect(state.snapshot!.session.currentRoundId).toBe(roundId); expect(state.candidateValid).toBe(true);
+        await report(); await current(); expect((await command('REVEAL_AND_START')).status).toBe(200);
+      }
+      const round = state.snapshot!.currentRound!;
+      if (!('context' in round) || !round.context) throw new Error('Missing candidate');
+      expect(matched.has(round.context.matchId)).toBe(false); matched.add(round.context.matchId);
+      expect(round).toMatchObject({ contestantId: index < 2 ? a : b, turnOrdinal: index + 1 });
+      expect((await command('SELECT_CONTESTANT', { contestantId: index < 2 ? b : a })).status).toBe(409);
+      expect((await command('ADVANCE')).status).toBe(409);
+      await command('CORRECT'); expect(state.allowedActions).not.toContain('ADVANCE');
+      expect((await command('ADVANCE')).status).toBe(409);
+      await command('REVEAL_ANSWER'); expect(state.allowedActions).toContain('ADVANCE');
+      const imagePath = sessionPath() + `/rounds/${round.id}/image`;
+      expect((await request(sessionPath() + '/commands', { type: 'ADVANCE' }, viewer)).status).toBe(403);
+      const saved = await command('ADVANCE'); previousAdvance = saved.envelope; expect(saved.status).toBe(200);
+      expect(state.snapshot!.session.activeContestantId).toBe(index < 2 ? a : b);
+      expect(state.snapshot!.currentRound).toBeNull(); expect(state.allowedActions).toContain('SELECT_CONTESTANT');
+      await report(); expect(observation.snapshot).toMatchObject({ phase: 'between_rounds', turnsExposed: index + 1 });
+      expect(observation.snapshot).not.toHaveProperty('answer'); expect(observation.snapshot).not.toHaveProperty('imageKey');
+      expect((await request(imagePath, undefined, viewer)).status).toBe(404);
+      expect((await command('ADVANCE')).status).toBe(409);
+      if (index === 0) expect(state.availability.tiers).toMatchObject({ squash: { screenshots: 1 }, competitive: { screenshots: 1 }, deathmatch: { screenshots: 1 } });
+    }
+    expect(state.availability.distinctMatches).toBe(0); expect(state.snapshot!.scores.map((s) => [s.contestantId, s.total])).toEqual([[b, 5], [a, 2]]);
+    expect((await command('PREPARE', { roundId: randomUUID(), tier: 'deathmatch' })).status).toBe(422);
+    game.stop(); game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now });
+    owner = (await request('/control-lease', {})).data; await current();
+    expect(state.snapshot!.session.activeContestantId).toBe(b); expect(state.snapshot!.session.nextTurnOrdinal).toBe(5); expect(state.availability.distinctMatches).toBe(0);
+    expect((await command('ADVANCE', {}, previousAdvance)).data.replayed).toBe(true);
+    expect(storage.db.prepare('SELECT contestant_id FROM game_rounds ORDER BY ordinal').all()).toEqual([a, a, b, b].map((contestant_id) => ({ contestant_id })));
+    expect(storage.db.prepare('SELECT COUNT(*) n FROM game_score_events').get()).toEqual({ n: 4 });
+  });
+  it('offers explicit Advance after void without requiring answer reveal, retaining zero and used history', async () => {
+    await reveal(); await command('VOID_EXPOSED', { reason: 'skip' }); expect(state.allowedActions).toContain('ADVANCE');
+    const ownerId = state.snapshot!.session.activeContestantId; await command('ADVANCE'); await report();
+    expect(observation.snapshot).toMatchObject({ phase: 'between_rounds', turnsExposed: 1, activeContestantId: ownerId });
+    expect(observation.snapshot.scores.every((s) => s.total === 0 && !s.lastOutcome)).toBe(true); expect(state.availability.distinctMatches).toBe(0);
+    expect(storage.db.prepare('SELECT phase,outcome FROM game_rounds').get()).toEqual({ phase: 'adjudicated', outcome: 'void' });
+  });
   it('keeps Ready covered in the public projection and requires actual decoded primary readiness', async () => {
     await prepare(); await connect();
     expect(observation.snapshot.phase).toBe('ready'); expect(observation.asset?.imageKey).toBe(state.snapshot!.session.currentRoundId);
