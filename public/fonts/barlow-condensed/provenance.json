@@ -1,0 +1,41 @@
+{
+  "family": "Barlow Condensed",
+  "retrieved": "2026-11-12",
+  "manifest": "https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,800;1,900&display=swap&subset=latin",
+  "license": "OFL.txt",
+  "subset": "latin",
+  "files": [
+    {
+      "file": "barlow-condensed-latin-800-italic.woff2",
+      "weight": 800,
+      "style": "italic",
+      "source": "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxyL3I-JCGChYJ8VI-L6OO_au7B6xTrf3fmu4kG.woff2",
+      "bytes": 23780,
+      "sha256": "59b48100622b2dea5b10bbf9e98d02eecf20ea8ae000821877f2d470ec16ee55"
+    },
+    {
+      "file": "barlow-condensed-latin-900-italic.woff2",
+      "weight": 900,
+      "style": "italic",
+      "source": "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxyL3I-JCGChYJ8VI-L6OO_au7B6xTrW3bmu4kG.woff2",
+      "bytes": 23212,
+      "sha256": "b58672f4b405724353d140e19cfead74fefc9004271e846d4884cd9b76f36dbf"
+    },
+    {
+      "file": "barlow-condensed-latin-700-normal.woff2",
+      "weight": 700,
+      "style": "normal",
+      "source": "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B46r2z3bWuQ.woff2",
+      "bytes": 22444,
+      "sha256": "3787a5a419171630e6890cfa47c4da067474d005cd0ff8dc11ec090fdc3ee2b8"
+    },
+    {
+      "file": "barlow-condensed-latin-900-normal.woff2",
+      "weight": 900,
+      "style": "normal",
+      "source": "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B45L0z3bWuQ.woff2",
+      "bytes": 21968,
+      "sha256": "aa01966de3f608a765a172237a3ffc6161fe4c7e3870b1a904dc6437e54c4e24"
+    }
+  ]
+}

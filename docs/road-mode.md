@@ -1,6 +1,6 @@
 # Road Mode and real-time operation
 
-Studio and Road use the same host controls, contestant display, Node game authority and SQLite session. Host commands and receipt review use HTTP; one shared WebSocket adapter carries observations, readiness, clocks and liveness. The contestant URL/QR still opens an ordinary read-only web page. That page derives its socket URL from its own origin. There is no separate Road game engine or scoring system.
+Studio and Road use the same host controls, contestant display, Node game authority and SQLite session. Host commands and receipt review use HTTP; one shared WebSocket adapter carries observations, readiness, clocks and liveness. The contestant URL/QR still opens an ordinary read-only web page. Its [visual screens](contestant-visuals.md) use the same authoritative public phases and existing clock, with locally bundled typography/illustrations. That page derives its socket URL from its own origin. There is no separate Road game engine or scoring system.
 
 ## Prepare and start
 

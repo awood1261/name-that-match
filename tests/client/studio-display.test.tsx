@@ -49,4 +49,19 @@ describe('Studio presentation controls', () => {
     expect(preview.promotion).toHaveLength(64); expect(preview.stipulation).toHaveLength(80); expect(preview.matchDate).toBeNull(); expect(answer).toEqual(original);
     expect(stageAnswer({ ...answer, participantDescription: 'Alpha vs Beta', promotion: 'AEW', event: 'All In', stipulation: null }).participantDescription).toBe('Alpha vs Beta');
   });
+  it('selects landscape/compact geometry from available space and restores unchanged legacy geometry', () => {
+    let resize!: () => void; const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect = disconnect; });
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1920);
+    const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(1080);
+    const view = render(<ContestantStage guides visual><p>Visual scene</p></ContestantStage>);
+    const stage = document.querySelector('[data-contestant-stage]') as HTMLElement;
+    expect(stage).toHaveAttribute('data-layout', 'landscape'); expect(stage).toHaveAttribute('data-visual-scene');
+    expect(Number(stage.style.getPropertyValue('--stage-scale'))).toBe(1);
+    width.mockReturnValue(375); height.mockReturnValue(600); act(() => resize());
+    expect(stage).toHaveAttribute('data-layout', 'compact'); expect(Number(stage.style.getPropertyValue('--stage-scale'))).toBeCloseTo(375 / 1080);
+    view.rerender(<ContestantStage guides={false}><p>Existing result</p></ContestantStage>);
+    expect(stage).toHaveAttribute('data-layout', 'legacy'); expect(stage).not.toHaveAttribute('data-visual-scene');
+    expect(stage).toHaveAttribute('data-guides', 'false'); view.unmount(); expect(disconnect).toHaveBeenCalledTimes(2);
+  });
 });

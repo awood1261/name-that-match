@@ -36,8 +36,43 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); history.replaceState(null, '', '/'); });
 
 describe('isolated contestant stage and image lifecycle', () => {
+  it('keeps choice until preparation, preserves the intro through Ready and reveals without waiting for cosmetic completion', async () => {
+    phase = { ...base, phase: 'between_rounds' };
+    render(<ContestantDisplay sessionId={sessionId} />);
+    await screen.findByRole('heading', { name: 'CHOOSE YOUR MATCH' });
+    expect(screen.queryByRole('region', { name: 'Scoreboard' })).not.toBeInTheDocument();
+    // Host tier input is not a public mutation; another waiting snapshot does not advance the viewer.
+    phase = { ...base, phase: 'between_rounds', stateVersion: 3 };
+    await waitFor(() => expect(displayApi.status).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('heading', { name: 'CHOOSE YOUR MATCH' })).toBeInTheDocument();
+    phase = { ...round, stateVersion: 4, phase: 'preparing' };
+    await screen.findByRole('heading', { name: 'SELECTING MATCH...' });
+    await waitFor(() => expect(document.querySelector('[data-intro]')).toHaveAttribute('data-intro', 'true'));
+    phase = { ...round, stateVersion: 5, phase: 'ready', imageKey: roundId };
+    await waitFor(() => expect(createUrl).toHaveBeenCalled());
+    expect(document.querySelector('[data-intro]')).toHaveAttribute('data-intro', 'true');
+    expect(screen.queryByAltText('Current wrestling match clue')).not.toBeInTheDocument();
+    phase = { ...round, stateVersion: 6, phase: 'guessing', imageKey: roundId, remainingMs: 2300 };
+    await screen.findByAltText('Current wrestling match clue'); expect(screen.getByRole('timer')).toHaveTextContent('00:03');
+    expect(screen.queryByRole('heading', { name: 'SELECTING MATCH...' })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-visual-scene]')).toBeInTheDocument();
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('restores selection settled after refresh or loss, and returns to choice on cancellation/failure', async () => {
+    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'SELECTING MATCH...' });
+    expect(document.querySelector('[data-intro]')).toHaveAttribute('data-intro', 'false');
+    vi.mocked(displayApi.status).mockRejectedValueOnce(new TypeError('connection lost'));
+    await screen.findByRole('heading', { name: 'Display unavailable' });
+    expect(screen.queryByRole('heading', { name: 'SELECTING MATCH...' })).not.toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'SELECTING MATCH...' });
+    expect(document.querySelector('[data-intro]')).toHaveAttribute('data-intro', 'false');
+    phase = { ...base, stateVersion: 4, phase: 'between_rounds' };
+    await screen.findByRole('heading', { name: 'CHOOSE YOUR MATCH' });
+    expect(screen.queryByAltText('Current wrestling match clue')).not.toBeInTheDocument();
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
   it('decodes a prepared clue while keeping it out of the DOM and strips join secrets from the URL', async () => {
-    const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'Ready · waiting for reveal' });
+    const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'SELECTING MATCH...' });
     await waitFor(() => expect(createUrl).toHaveBeenCalledOnce());
     expect(screen.queryByAltText('Current wrestling match clue')).not.toBeInTheDocument();
     expect(location.hash).toBe(''); expect(document.body.innerHTML).not.toContain(credential.token);
@@ -116,7 +151,7 @@ describe('isolated contestant stage and image lifecycle', () => {
     await act(async () => { finish(observation()); }); expect(displayApi.image).not.toHaveBeenCalled();
   });
   it('accepts a fresh join fragment in the same tab after server restart', async () => {
-    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'Ready · waiting for reveal' });
+    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'SELECTING MATCH...' });
     const next = { ...credential, token: 'b'.repeat(64), serverEpoch: randomUUID(), displayId: randomUUID() };
     vi.mocked(displayApi.status).mockImplementation(async () => ({ ...observation(), serverEpoch: next.serverEpoch }));
     await act(async () => {
@@ -147,10 +182,10 @@ describe('countdown presentation', () => {
 });
 
 describe('contestant scoreboard visibility and recovery', () => {
-  it('shows between-turn totals, keeps current judgment concealed, then publishes revealed totals', async () => {
+  it('shows choice between turns, keeps current judgment concealed, then publishes revealed totals', async () => {
     const zero = [{ contestantId, name: 'Contestant One', total: 0 }];
     phase = { ...base, phase: 'between_rounds', scores: zero };
-    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('region', { name: 'Scoreboard' }); expect(screen.getByText('Exposed turns: 0')).toBeInTheDocument();
+    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'CHOOSE YOUR MATCH' }); expect(screen.queryByRole('region', { name: 'Scoreboard' })).not.toBeInTheDocument();
     phase = { ...round, stateVersion: 3, phase: 'adjudicated', scores: zero, turnsExposed: 1 };
     await screen.findByRole('heading', { name: 'Waiting for the host' }); expect(screen.queryByRole('region', { name: 'Scoreboard' })).not.toBeInTheDocument(); expect(document.body.textContent).not.toContain('Correct');
     phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer, turnsExposed: 1,

@@ -1,0 +1,12 @@
+.scene { width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 20px 84px 40px; color: var(--game-scene-white); background: var(--game-scene-black); text-align: center; }
+.logo { display: block; width: 960px; height: 156px; object-fit: contain; margin: 0 auto; }
+.title { display: flex; align-items: center; justify-content: center; gap: 36px; margin: 0; font: italic var(--font-contestant-heading-weight) var(--game-scene-heading-size)/1 var(--font-contestant-heading); }
+.title::before, .title::after { content: ''; flex: 1 1 100px; max-width: 210px; height: 10px; background: var(--game-scene-purple); transform: skew(-25deg); }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:global([data-layout='compact']) .scene { padding: 28px 40px; }
+:global([data-layout='compact']) .logo { width: 860px; height: 140px; }
+:global([data-layout='compact']) .title { font-size: 84px; gap: 20px; }
+@media (prefers-reduced-motion: no-preference) {
+  .entrance { animation: sceneEntrance 180ms ease-out both; }
+}
+@keyframes sceneEntrance { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

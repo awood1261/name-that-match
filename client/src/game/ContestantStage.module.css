@@ -1,3 +1,5 @@
-.viewport { min-width: 0; min-height: 0; position: relative; margin: var(--space-2); }
+.viewport { min-width: 0; min-height: 0; position: relative; margin: var(--space-2); overflow: hidden; }
 .stage { position: absolute; left: 50%; top: 50%; width: var(--game-stage-width); height: var(--game-stage-height); transform: translate(-50%, -50%) scale(var(--stage-scale)); transform-origin: center; background: var(--color-panel); }
-.stage[data-guides='true']::after { content: ''; position: absolute; inset: 0; pointer-events: none; border: var(--game-stage-outline) dashed var(--color-primary); z-index: 1; }
+.stage[data-layout='landscape'] { --game-stage-width: 1920px; --game-stage-height: 1080px; background: var(--game-scene-black); }
+.stage[data-layout='compact'] { --game-stage-width: 1080px; --game-stage-height: 1440px; background: var(--game-scene-black); }
+.stage[data-guides='true']::after { content: ''; position: absolute; width: 1080px; height: 960px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; border: var(--game-stage-outline) dashed var(--color-primary); z-index: 1; }

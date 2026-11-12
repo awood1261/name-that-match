@@ -87,6 +87,8 @@ Open **Play** to configure contestants, explicitly select the active contestant 
 
 Leaving Play during guessing offers Stay or a confirmed Pause and leave. Recovered rounds never Resume automatically, and uncertain requests require explicit receipt review before further commands. Browser reload/close uses the supported generic warning and server liveness recovery.
 
+The contestant presents **Choose Your Match → Selecting Match → screenshot/countdown**, with local Barlow Condensed typography and individual SVG card illustrations. Selection animation never starts or delays Reveal. See [visual behavior, fonts, framing guides and manual checks](docs/contestant-visuals.md). Existing result/final screens remain unchanged.
+
 The contestant connection panel also provides a locally generated QR code for a configured LAN URL. On macOS it discovers the en0 address, replaces a localhost hostname while keeping the UI port, and preserves the full viewer link. Refresh/manual-origin controls do not change the game or register another viewer. See [QR/LAN setup and fallback instructions](docs/game-host.md#qr-code-and-lan-joining); deliberate listener/origin configuration is still required.
 
 ## Match management

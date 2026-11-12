@@ -6,6 +6,10 @@ import { DisplayControls } from './DisplayControls';
 import { readDisplayJoin, useContestantDisplay } from './useContestantDisplay';
 import { ResultPresentation } from './ResultPresentation';
 import { GameScoreboard } from './GameScoreboard';
+import { ChooseMatch } from './ChooseMatch';
+import { SelectingMatch } from './SelectingMatch';
+import { ScreenshotRound } from './ScreenshotRound';
+import '../styles/contestant-fonts.css';
 import styles from './ContestantDisplay.module.css';
 
 export function ContestantDisplay({ sessionId }: { sessionId: string }) {
@@ -19,9 +23,15 @@ export function ContestantDisplay({ sessionId }: { sessionId: string }) {
   const phase = snapshot?.phase;
   const previous = useRef<{ roundId: string | null; phase: string | undefined }>({ roundId: null, phase: undefined });
   const [animateResult, setAnimateResult] = useState(false);
+  const [selectionIntro, setSelectionIntro] = useState(false);
   const roundId = snapshot && 'roundId' in snapshot ? snapshot.roundId : null;
   useEffect(() => {
     const entrance = !display.stale && phase === 'answer_revealed' && previous.current.roundId === roundId && previous.current.phase !== undefined && previous.current.phase !== 'answer_revealed';
+    const selecting = phase === 'preparing' || phase === 'ready';
+    if (display.stale || !selecting) setSelectionIntro(false);
+    else if (previous.current.roundId !== roundId || !['preparing', 'ready'].includes(previous.current.phase ?? '')) {
+      setSelectionIntro(previous.current.phase === 'setup' || previous.current.phase === 'between_rounds');
+    }
     previous.current = { roundId, phase: display.stale ? undefined : phase };
     setAnimateResult(entrance);
     if (!entrance) return;
@@ -33,9 +43,12 @@ export function ContestantDisplay({ sessionId }: { sessionId: string }) {
   const labels = { setup: 'Waiting for the host', between_rounds: 'Choose your challenge', discarded: 'Setup closed', completed: 'Game complete', preparing: 'Preparing your challenge', ready: 'Ready · waiting for reveal', guessing: 'Name that match!', paused: 'Paused', awaiting_judgment: 'Time up', interrupted: 'Round interrupted', adjudicated: 'Waiting for the host', answer_revealed: 'Result revealed' };
   const label = !credential ? 'Display link required' : display.stale ? display.error ? 'Display unavailable' : 'Connecting display' : (phase ? labels[phase] : 'Waiting for session');
   const visible = !display.stale && phase === 'guessing' && !!display.imageUrl;
+  const visual = !display.stale && !display.error && credential && snapshot ? snapshot.phase === 'setup' || snapshot.phase === 'between_rounds' ? <ChooseMatch />
+    : snapshot.phase === 'preparing' || snapshot.phase === 'ready' ? <SelectingMatch key={snapshot.roundId} intro={selectionIntro} />
+    : snapshot.phase === 'guessing' && display.imageUrl && snapshot.turnOrdinal !== null ? <ScreenshotRound imageUrl={display.imageUrl} turnOrdinal={snapshot.turnOrdinal} tier={snapshot.requestedTier} remaining={display.remaining} onImageError={display.retry} /> : null : null;
   return <main className={styles.display}>
     <DisplayControls guides={guides} onGuides={setGuides} />
-    <ContestantStage guides={guides}><div className={styles.composition} data-phase={display.stale ? 'connecting' : phase}>
+    <ContestantStage guides={guides} visual={!!visual}>{visual ?? <div className={styles.composition} data-phase={display.stale ? 'connecting' : phase}>
       <img className={styles.logo} src="/images/name-that-match-horizontal-logo.png" alt="Name That Match" />
       <header className={styles.heading} hidden={!contestant && !tier}>{snapshot && 'turnOrdinal' in snapshot && snapshot.turnOrdinal !== null && <p>Turn {snapshot.turnOrdinal}</p>}{contestant && <p>{contestant}</p>}{tier && <p className={styles.tier}>{tier}</p>}</header>
       <h1 className={styles.status} aria-live="polite">{label}</h1>
@@ -48,6 +61,6 @@ export function ContestantDisplay({ sessionId }: { sessionId: string }) {
       {!display.stale && snapshot?.phase === 'answer_revealed' && <GameScoreboard scores={snapshot.scores} activeContestantId={snapshot.activeContestantId} turnsExposed={snapshot.turnsExposed}
         stage currentTurn={snapshot.turnOrdinal !== null ? { turnOrdinal: snapshot.turnOrdinal, contestantId: snapshot.contestantId } : null} compact />}
       {display.error && credential && <button className={styles.retry} onClick={display.retry}>Retry display connection</button>}
-    </div></ContestantStage>
+    </div>}</ContestantStage>
   </main>;
 }
