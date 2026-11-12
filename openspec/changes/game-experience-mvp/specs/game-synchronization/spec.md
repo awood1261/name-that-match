@@ -16,7 +16,7 @@ Each connection SHALL receive a complete role-appropriate snapshot before render
 
 #### Scenario: Reload during a round
 - **WHEN** the display reloads or reconnects
-- **THEN** it resumes the current authoritative phase and remaining time, never a new ten-second window or new score
+- **THEN** it resumes the current authoritative phase and remaining time, never a new full-duration window or new score
 
 ### Requirement: GN-03 Display readiness and clock estimation
 The designated primary display SHALL confirm its selected round image has decoded and its clock observation is sufficiently current before reveal/resume. Viewers SHALL interpolate countdowns from server timing observations and local monotonic elapsed time, not award points, extend deadlines or expire the server round. Server restart SHALL invalidate old clock epochs and readiness acknowledgments.

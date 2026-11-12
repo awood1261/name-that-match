@@ -92,3 +92,16 @@ Checkpoint evidence: `task-5.3a-verification.md`. All four 5.3a tasks are comple
 - [x] 7.6 Integrate owned socket/timer/lease lifecycle with startup/shutdown and storage fault handling; verify failed listen, open/slow clients, primary/host loss, queued writes, DB failure, bounded termination and clean reopen with no resource leak/hang (GN-04/08; D7/D9). Evidence: `milestone-6-verification.md`; physical checks are separately recorded as deferred.
 - [x] 7.7 Run packet delay/drop, high RTT/stale clock, primary/secondary/host disconnect, controller recovery, lost adjudication response and restart scenarios; automated two-display tests must preserve deadline/score/use history and role isolation across reconnect (GN-02–08; D11). Evidence: `milestone-6-verification.md`; physical checks are separately recorded as deferred.
 - [x] 7.8 Complete the final milestone checkpoint and full Studio/Road/offline manual checklist, recording real devices and deferred checks separately; report all executed results, remaining release limitations and Git status, then stop for review. Do not mark deferred Photo Library tasks complete or archive without an explicit request. Acceptance reference: GN-01–08, GD-03–06; D11. Evidence: `milestone-6-verification.md`; physical checks are separately recorded as deferred.
+
+## 8. Owner-approved refinement — thirty-second guessing window
+
+The owner directly requested 30 seconds on 2026-11-12. These six focused tasks extend the 46-task MVP checklist to 52; previous milestones and verification records remain historical. This is not authorization to archive or complete the visual change's remaining physical acceptance.
+
+- [x] 8.1 Record the approved 30s rule, preservation of legacy remainders/history, schema-4 design and unchanged non-game timeout behavior; strictly validate the updated change before implementation. Evidence: direct owner request recorded in proposal/design/GR-09; strict change and whole-project validation passed before implementation.
+- [x] 8.2 Add the transactional schema-3-to-4 timing-constraint migration through the existing runner; verify old rows/indexes/triggers/FKs, repeated/fresh initialization, >10s new timing support, newer-version rejection and injected failure rollback.
+- [x] 8.3 Change the single standard window to 30,000ms and reuse it in live timing validation; verify new Reveal uses 30s while Resume preserves its actual remainder and host leases/heartbeats/resource limits are unchanged.
+- [x] 8.4 Update focused timing/storage/API/component tests for 29,999/30,000ms, old pauses, no reset after reconnect/restart, 00:30 rendering, invalid >30s and once-only scoring; run focused tests and the full regression suite.
+- [x] 8.5 Update current setup/upgrade/operation and durable project instructions to 30s/schema4, retaining WAL-safe backup guidance and legacy-pause behavior; verify current references without rewriting archived or past verification evidence.
+- [x] 8.6 Run npm test/typecheck/lint/build, strict MVP/visual/whole-project OpenSpec validation, production browser smoke and Git tracking audit; record actual results and manual verification steps, then stop without archive/commit/push.
+
+Tasks 8.2–8.6 evidence: `thirty-second-verification.md`.

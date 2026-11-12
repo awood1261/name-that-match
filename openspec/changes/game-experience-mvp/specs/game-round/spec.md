@@ -1,6 +1,6 @@
 ## Purpose
 
-Control the filmed round lifecycle with a server-owned ten-second window, explicit host adjudication, safe interruptions and reliable command outcomes shared by both production modes.
+Control the filmed round lifecycle with a server-owned thirty-second window, explicit host adjudication, safe interruptions and reliable command outcomes shared by both production modes.
 
 ## ADDED Requirements
 
@@ -15,12 +15,12 @@ The game SHALL expose explicit between-round, preparing, ready, guessing, paused
 - **WHEN** a client tries to reveal before ready, judge an unexposed round, advance an unresolved round or mutate a completed session
 - **THEN** the command fails without hidden state, score or repeat-history changes
 
-### Requirement: GR-02 Atomic reveal and ten-second timer
-Reveal and start SHALL be one host operation after the selected image is validated and decoded by the designated display. It SHALL commit exposure and an authoritative ten-second deadline together. Server elapsed time SHALL determine expiration independently of delayed timer callbacks or client clock changes. Cosmetic shuffle effects SHALL finish before this window and SHALL not expose unused real screenshots.
+### Requirement: GR-02 Atomic reveal and thirty-second timer
+Reveal and start SHALL be one host operation after the selected image is validated and decoded by the designated display. It SHALL commit exposure and an authoritative thirty-second deadline together. Server elapsed time SHALL determine expiration independently of delayed timer callbacks or client clock changes. Cosmetic shuffle effects SHALL finish before this window and SHALL not expose unused real screenshots.
 
 #### Scenario: Ready reveal
 - **WHEN** the host reveals a ready round with the current display acknowledgment
-- **THEN** the preloaded image becomes visible, the match becomes used and one ten-second deadline starts
+- **THEN** the preloaded image becomes visible, the match becomes used and one thirty-second deadline starts
 
 #### Scenario: Delayed callback or client drift
 - **WHEN** the host command arrives at or after the deadline even if a server timeout callback has not executed
@@ -34,7 +34,7 @@ A correct in-window judgment SHALL stop the timer and resolve the round for its 
 - **THEN** the attempt ends for zero points even if time remains
 
 #### Scenario: Deadline reached
-- **WHEN** the authoritative ten-second window expires
+- **WHEN** the authoritative thirty-second window expires
 - **THEN** further guesses are closed and the host must explicitly confirm no credit or use the approved pre-buzzer judgment action
 
 ### Requirement: GR-04 Explicit pre-buzzer judgment after expiration
@@ -49,7 +49,7 @@ While awaiting judgment, the host SHALL be able to explicitly attest that the co
 - **THEN** the round resolves with zero points and cannot later receive another judgment
 
 ### Requirement: GR-05 Approved pause and resume controls
-Under approved P3, the MVP SHALL permit host pause while guessing, preserving the server-calculated remainder and covering the screenshot on contestant displays. Resume SHALL require a connected, synchronized, decoded primary display and an explicit host action. It SHALL use the saved remainder rather than grant another ten seconds. A pause arriving after expiry SHALL not restore guessing time.
+Under approved P3, the MVP SHALL permit host pause while guessing, preserving the server-calculated remainder and covering the screenshot on contestant displays. Resume SHALL require a connected, synchronized, decoded primary display and an explicit host action. It SHALL use the saved remainder rather than grant another thirty seconds. A pause arriving after expiry SHALL not restore guessing time.
 
 #### Scenario: Pause and resume
 - **WHEN** the host pauses with four seconds remaining and later resumes after readiness is restored
@@ -109,3 +109,19 @@ Host commands SHALL identify their intended session, applicable round, expected 
 #### Scenario: Old acknowledgment arrives
 - **WHEN** a response to a previously accepted command arrives after a newer snapshot
 - **THEN** the UI does not roll back to the receipt's historical revision or duplicate its score
+
+### Requirement: GR-09 Thirty-second duration upgrade preserves existing records
+Newly revealed rounds SHALL use a standard 30,000ms server-owned guessing window. Saved paused remainders and completed history SHALL remain unchanged by upgrade; future new rounds in an existing session SHALL use the new duration. The storage upgrade SHALL preserve records, indexes, triggers and foreign-key enforcement transactionally and SHALL reject durations above 30,000ms. Failure SHALL roll back data, schema and version without exposing partial success. Existing classification/scoring, controller lease, liveness and command semantics SHALL remain unchanged.
+
+#### Scenario: Thirty-second boundary
+- **WHEN** a new round is revealed
+- **THEN** host and contestant observe 30 seconds initially, ordinary correct judgment is eligible at 29,999ms and expiration wins at 30,000ms
+- **AND** cosmetic clocks do not extend that deadline
+
+#### Scenario: Legacy saved pause
+- **WHEN** a version-3 game with a saved five-second pause is upgraded and resumed explicitly after readiness
+- **THEN** its remainder is still five seconds rather than thirty and earlier awards/receipts/library records remain unchanged
+
+#### Scenario: Failed timing migration
+- **WHEN** migration fails after replacement-table or drop/rename work
+- **THEN** the old schema version, rows, indexes, triggers and foreign-key enforcement remain recoverable without data loss

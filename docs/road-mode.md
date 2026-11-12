@@ -4,7 +4,7 @@ Studio and Road use the same host controls, contestant display, Node game author
 
 ## Prepare and start
 
-Use Node 20/npm 10 and install the locked dependencies while installation access is available. Before upgrading operational data, stop every writer and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore). Schema remains 3; this transport milestone adds no migration.
+Use Node 20/npm 10 and install the locked dependencies while installation access is available. Before upgrading operational data, stop every writer and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore). Current schema is 4: the 30-second guessing refinement widens game-round timing checks; existing pauses/history are preserved.
 
 ```bash
 npm ci
@@ -51,7 +51,7 @@ When the primary or host connection is lost during guessing, the server pauses a
 
 An uncertain HTTP judgment remains pending even when the socket reports a newer state. Use **Check command status**, review the accepted receipt/current snapshot and retry only deliberately when offered. The existing command identity/revision guards prevent duplicate awards. A socket reconnect never resends that judgment.
 
-For a normal command-line stop, SIGINT/Ctrl-C or SIGTERM uses the bounded `server.close()` path and persists a known pause when storage permits. Wait for exit before reopening the same root. A process kill/power loss during an unknown running window recovers Interrupted/void-only; it cannot supply a new ten seconds. A known committed pause and completed results retain their stored state. Server restarts invalidate capabilities/clock epochs: reclaim host control, request a fresh primary link and review recovery. Storage faults latch mutations and report unavailable rather than publish invented success.
+For a normal command-line stop, SIGINT/Ctrl-C or SIGTERM uses the bounded `server.close()` path and persists a known pause when storage permits. Wait for exit before reopening the same root. A process kill/power loss during an unknown running window recovers Interrupted/void-only; it cannot supply a new thirty seconds. A known committed pause and completed results retain their stored state. Server restarts invalidate capabilities/clock epochs: reclaim host control, request a fresh primary link and review recovery. Storage faults latch mutations and report unavailable rather than publish invented success.
 
 This is trusted-LAN coordination, not account authentication or anti-cheat security. Existing library administration APIs remain available to trusted LAN readers. No cloud service, external font/CDN, TLS provisioning, camera permission or optional WebSocket native addon/compression was added. SQLite WAL/NORMAL power-loss limitations and whole-root backup requirements remain unchanged.
 

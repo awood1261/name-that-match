@@ -110,3 +110,24 @@ CREATE TRIGGER game_receipt_no_update BEFORE UPDATE ON game_command_receipts BEG
 CREATE TRIGGER game_receipt_no_delete BEFORE DELETE ON game_command_receipts BEGIN SELECT RAISE(ABORT,'Retain receipts'); END;
 `);
 }
+
+/** Schema 4: rebuild only timing CHECKs, inside the runner's FK-off transaction. */
+export function extendGuessingWindow(db: Database.Database): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='game_rounds'").get() as { sql: string } | undefined;
+  if (!row) throw new Error('Missing game rounds schema for timing upgrade');
+  let bounds = 0;
+  const schema = row.sql.replace(/^CREATE TABLE (?:"game_rounds"|game_rounds)/i, 'CREATE TABLE game_rounds_next')
+    .replace(/\b(window_ms|remaining_ms)\s*<=\s*10000\b/g, (_match, column: string) => { bounds++; return `${column} <= 30000`; });
+  if (bounds !== 2 || !schema.startsWith('CREATE TABLE game_rounds_next')) throw new Error('Unexpected game rounds timing schema; upgrade refused');
+  const objects = db.prepare(`SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL AND
+    ((type='index' AND tbl_name='game_rounds') OR
+    (type='trigger' AND (tbl_name='game_rounds' OR instr(lower(sql),'game_rounds')>0))) ORDER BY type,name`).all() as Array<{ type: string; name: string; sql: string }>;
+  const quote = (name: string) => `"${name.replace(/"/g, '""')}"`;
+  const columns = (db.pragma('table_info(game_rounds)') as Array<{ name: string }>).map(({ name }) => quote(name)).join(',');
+  db.exec(schema);
+  db.exec(`INSERT INTO game_rounds_next (${columns}) SELECT ${columns} FROM game_rounds`);
+  // Dependent triggers must not refer to a temporarily absent table during rename.
+  for (const object of objects) if (object.type === 'trigger') db.exec(`DROP TRIGGER ${quote(object.name)}`);
+  db.exec('DROP TABLE game_rounds; ALTER TABLE game_rounds_next RENAME TO game_rounds');
+  for (const object of objects) db.exec(object.sql);
+}

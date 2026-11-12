@@ -200,7 +200,7 @@ describe('explicit round progression', () => {
     if (deathmatch) { candidate.obscurity = 'high'; candidate.difficulty = 'hard'; }
     game.step({ type: 'START' }); game.step({ type: 'PREPARE', roundId: randomUUID(), tier: deathmatch ? 'deathmatch' : 'squash' });
     game.step({ type: 'PREPARE_SUCCEEDED', context: candidate }); game.step({ type: 'REVEAL_AND_START' });
-    if (outcome === 'timeout') { game.setTime(10000); game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration }); game.step({ type: 'CONFIRM_TIMEOUT' }); }
+    if (outcome === 'timeout') { game.setTime(30000); game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration }); game.step({ type: 'CONFIRM_TIMEOUT' }); }
     else game.step(outcome === 'void' ? { type: 'VOID_EXPOSED', reason: 'skip' } : { type: outcome === 'correct' ? 'CORRECT' : 'INCORRECT' });
     if (revealed) game.step({ type: 'REVEAL_ANSWER' }); state = game.state;
   }
@@ -350,7 +350,7 @@ describe('guarded host navigation and recovery', () => {
     screen.getByRole('button', { name: 'System' }).focus(); fireEvent.click(screen.getByRole('button', { name: 'System' })); let dialog = await screen.findByRole('dialog'); fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
     expect(screen.getByRole('heading', { name: 'Game host' })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'System' })).toHaveFocus(); expect(gameApi.command).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'System' })); dialog = await screen.findByRole('dialog'); fireEvent.click(within(dialog).getByRole('button', { name: 'Pause and leave' }));
-    await screen.findByRole('heading', { name: 'System status' }); expect(currentRound(state!)).toMatchObject({ phase: 'paused', remainingMs: 9000 });
+    await screen.findByRole('heading', { name: 'System status' }); expect(currentRound(state!)).toMatchObject({ phase: 'paused', remainingMs: 29000 });
     fireEvent.click(screen.getByRole('button', { name: 'Play' })); await screen.findByText(/Recovered paused round/); expect(gameApi.command).toHaveBeenCalledTimes(1);
   });
   it('allows navigation after an acknowledged explicit host release', async () => {
@@ -368,7 +368,7 @@ describe('guarded host navigation and recovery', () => {
     live(); const previous = state!.currentRoundId; const { action, dialog } = await navigation();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Pause and leave' })); await waitFor(() => expect(action).toHaveBeenCalledOnce());
     expect(gameApi.command).toHaveBeenCalledTimes(1); expect(vi.mocked(gameApi.command).mock.calls[0][1]).toMatchObject({ type: 'PAUSE', roundId: previous });
-    expect(currentRound(state!)).toMatchObject({ phase: 'paused', remainingMs: 9000 }); expect(state!.awards).toEqual([]);
+    expect(currentRound(state!)).toMatchObject({ phase: 'paused', remainingMs: 29000 }); expect(state!.awards).toEqual([]);
   });
   it('blocks leaving on a lost pause response until explicit receipt review, then never replays PAUSE', async () => {
     const game = live(); let receipt: ReturnType<typeof apply>;
@@ -379,7 +379,7 @@ describe('guarded host navigation and recovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText('The previous command was accepted. Current state restored.'); expect(gameApi.command).toHaveBeenCalledTimes(1);
   });
   it('refreshes an already expired round before leaving without a new pause/judgment/award', async () => {
-    const game = live(); const { action, dialog } = await navigation(); game.setTime(10000); state = game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration });
+    const game = live(); const { action, dialog } = await navigation(); game.setTime(30000); state = game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Pause and leave' })); await waitFor(() => expect(action).toHaveBeenCalledOnce());
     expect(gameApi.command).not.toHaveBeenCalled(); expect(currentRound(state!)?.phase).toBe('awaiting_judgment'); expect(state!.awards).toEqual([]);
   });

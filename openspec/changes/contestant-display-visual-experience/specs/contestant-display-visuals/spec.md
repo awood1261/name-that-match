@@ -61,7 +61,7 @@ The display SHALL format the existing synchronized remaining time as MM:SS using
 - **WHEN** authoritative guessing arrives during a decorative intro
 - **THEN** the actual clue and current countdown replace it immediately
 - **WHEN** a saved paused round resumes
-- **THEN** only its preserved authoritative remainder is displayed, not a new ten seconds
+- **THEN** only its preserved authoritative remainder is displayed, not a new full guessing window
 
 #### Scenario: Refresh and expiry
 - **WHEN** the viewer reloads into guessing with 2.3 seconds remaining

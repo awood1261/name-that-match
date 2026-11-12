@@ -130,9 +130,9 @@ describe('real local WebSocket game adapter', () => {
     const secondary = await connect({ ...hello(), ...extra }); await prepare(); await primary.ready(); await command('REVEAL_AND_START');
     secondary.ws.terminate(); await sleep(30); expect((await current()).snapshot!.currentRound?.phase).toBe('guessing');
     now = 2000; primary.ws.terminate(); await until(() => { const r = storage.db.prepare('SELECT phase FROM game_rounds').get() as { phase: string }; return r.phase === 'paused' ? true : undefined; });
-    const recovered = await connect(); expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 8000 });
+    const recovered = await connect(); expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 28000 });
     expect((await command('RESUME')).status).toBe(422); await recovered.ready(); expect((await command('RESUME')).status).toBe(200);
-    expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'guessing', windowMs: 8000 });
+    expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'guessing', windowMs: 28000 });
   });
   it('replaces a connection without letting its old close clear the new readiness generation', async () => {
     const first = await connect(); const second = await connect(); await until(() => first.ws.readyState === WebSocket.CLOSED ? true : undefined);
@@ -142,7 +142,7 @@ describe('real local WebSocket game adapter', () => {
   it('pauses on host loss and reconnects as observations only, without replaying judgment or Resume', async () => {
     const host = await connect(hello('host')); const primary = await connect(); await prepare(); await primary.ready(); await command('REVEAL_AND_START'); now = 1200;
     host.ws.terminate(); await sleep(30); const next = await connect(hello('host'));
-    expect(next.snapshot.role === 'host' && next.snapshot.state.snapshot?.currentRound).toMatchObject({ phase: 'paused', remainingMs: 8800 });
+    expect(next.snapshot.role === 'host' && next.snapshot.state.snapshot?.currentRound).toMatchObject({ phase: 'paused', remainingMs: 28800 });
     expect(storage.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 0 });
   });
   it('refuses stale round/image proof and another display identity without bypassing the primary gate', async () => {
@@ -164,13 +164,13 @@ describe('real local WebSocket game adapter', () => {
   });
   it('covers high RTT and stale readiness, preserving elapsed time rather than restarting', async () => {
     const primary = await connect(); await prepare(); await primary.ready(); await command('REVEAL_AND_START'); now = 1500;
-    await primary.ready(501); expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 8500 });
+    await primary.ready(501); expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 28500 });
     expect((await command('RESUME')).status).toBe(422); await primary.ready(); expect((await command('RESUME')).status).toBe(200);
   });
   it('preserves expiry precedence when loss is detected after the deadline', async () => {
     const primary = await connect(); await prepare(); await primary.ready(); await command('REVEAL_AND_START');
-    for (let step = 1; step <= 9; step++) { now = step * 1000; await request('/control-lease/renew', {}); await primary.ready(); }
-    now = 10_000; primary.ws.terminate();
+    for (let step = 1; step <= 10; step++) { now = step * 2900; await request('/control-lease/renew', {}); await primary.ready(); }
+    now = 30_000; primary.ws.terminate();
     await sleep(30); expect((await current()).snapshot!.currentRound?.phase).toBe('awaiting_judgment'); expect((await command('CORRECT')).status).toBe(409);
   });
   it('bounds a missing HELLO', async () => {

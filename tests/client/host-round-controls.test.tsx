@@ -10,7 +10,7 @@ function status(phase: Round['phase']): HostStatus {
   const game = pureGame(); game.ready();
   if (phase !== 'ready') game.step({ type: 'REVEAL_AND_START' });
   if (phase === 'paused') game.step({ type: 'PAUSE' });
-  if (phase === 'awaiting_judgment') { game.setTime(10000); game.step({ type: 'EXPIRE', timerGeneration: game.state.rounds[0].timerGeneration }); }
+  if (phase === 'awaiting_judgment') { game.setTime(30000); game.step({ type: 'EXPIRE', timerGeneration: game.state.rounds[0].timerGeneration }); }
   if (phase === 'interrupted') game.step({ type: 'RECOVER_RUNNING' });
   if (phase === 'adjudicated' || phase === 'answer_revealed') game.step({ type: 'CORRECT' });
   if (phase === 'answer_revealed') game.step({ type: 'REVEAL_ANSWER' });

@@ -15,7 +15,7 @@ Open `http://localhost:3001`. This serves the built UI, logo, favicon and screen
 
 Use the same configured `NAME_THAT_MATCH_DATA_DIR` on every start. It defaults to `./data`, resolved from the server's working directory. Run one server per data root. Changing the root or working directory can open a different collection. Custom ports and LAN devices need the exact bind/origin configuration in [game host joining guidance](game-host.md); Open contestant display uses the local host-window origin while the QR/copy field preserves the separately configured device origin.
 
-Before upgrading existing data, stop all writers/watchers and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore), including screenshot files and any sidecars. Current schema remains 3; Studio adds no migration. Restore to a separate root, verify integrity/assets and use compatible code for rollback. Do not copy only a live database, delete sidecars or reset operational data to troubleshoot presentation.
+Before upgrading existing data, stop all writers/watchers and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore), including screenshot files and any sidecars. Current schema is 4; the timer refinement widens game-round timing checks while preserving old pauses/history. Restore to a separate root, verify integrity/assets and use compatible code for rollback. Do not copy only a live database, delete sidecars or reset operational data to troubleshoot presentation.
 
 ## Set up the external display
 
@@ -35,7 +35,7 @@ Solo/two-player scoreboards, results and answers retain the legacy logical stage
 
 ## Recovery and finishing
 
-- Closing/reloading the primary uses the existing loss policy: the server pauses at detection with actual remaining time, or expires if already due. Reopen the existing link, wait for fresh decoding/synchronization and explicitly **Resume**. Rejoining never grants a fresh ten seconds or resumes automatically. Avoid opening the same primary link in competing windows; a new connection replaces the earlier generation.
+- Closing/reloading the primary uses the existing loss policy: the server pauses at detection with actual remaining time, or expires if already due. Reopen the existing link, wait for fresh decoding/synchronization and explicitly **Resume**. Rejoining never grants a fresh thirty seconds or resumes automatically. Avoid opening the same primary link in competing windows; a new connection replaces the earlier generation.
 - During guessing, navigate from Play with **Pause and leave** for acknowledged pause; **Stay** leaves play running. Returning stays paused. Resolve uncertain requests through **Check command status** rather than blindly repeating a judgment.
 - A process restart expires credentials. Reclaim host control, create a fresh primary link for an unresolved game and inspect the recovered state. A known paused remainder is recoverable; unknown running crash time becomes Interrupted/void-only. Completed scores remain saved. See [host recovery](game-host.md).
 - **End game** requires a resolved/between-round state. **New game** creates a separate setup; Start is explicit and old viewers remain on the old game's result. Create a fresh display registration for the new game. The existing process-wide four-registration limit still applies; Open, address refresh and QR generation do not allocate registrations.

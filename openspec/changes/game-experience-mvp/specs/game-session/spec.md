@@ -152,4 +152,4 @@ Session setup, transitions, used history, outcomes, awards and accepted command 
 #### Scenario: Restart during a running window
 - **WHEN** the server restarts with Guessing as the last committed phase and without a trustworthy persisted paused remainder
 - **THEN** the exposed round becomes interrupted, the display covers the image, and the host must deliberately void it under the proposed recovery policy
-- **AND** the match stays used and no automatic ten-second restart or point award occurs
+- **AND** the match stays used and no automatic full-duration restart or point award occurs

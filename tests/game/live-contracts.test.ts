@@ -26,10 +26,17 @@ describe('live runtime message contracts', () => {
     const check = () => expect(parseLiveServer(frame()).type).toBe('snapshot');
     check(); game.step({ type: 'START' }); check(); game.step({ type: 'PREPARE', roundId: randomUUID(), tier: 'squash' }); check();
     game.step({ type: 'PREPARE_SUCCEEDED', context: context() }); check(); game.step({ type: 'REVEAL_AND_START' }); check(); game.step({ type: 'PAUSE' }); check();
-    game.step({ type: 'RESUME' }); game.setTime(10_000); game.step({ type: 'EXPIRE', timerGeneration: game.clock!.timerGeneration }); check(); game.step({ type: 'CORRECT_BEFORE_BUZZER' }); check();
+    game.step({ type: 'RESUME' }); game.setTime(30_000); game.step({ type: 'EXPIRE', timerGeneration: game.clock!.timerGeneration }); check(); game.step({ type: 'CORRECT_BEFORE_BUZZER' }); check();
     for (const field of ['answer', 'outcome', 'award', 'context', 'originalFilename']) {
       const value = frame(); if (value.role !== 'display') throw new Error('fixture'); Object.assign(value.state.snapshot, { [field]: 'private' }); expect(() => parseLiveServer(value)).toThrow();
     }
     game.step({ type: 'REVEAL_ANSWER' }); check(); game.step({ type: 'ADVANCE' }); check(); game.step({ type: 'END_GAME' }); check();
+  });
+  it('accepts thirty-second public timing and rejects a duration above the standard bound', () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' });
+    const snapshot = displaySnapshot(game.state, game.clock, 0);
+    const frame = { ...tag, type: 'snapshot', role: 'display', sequence: 1, sessionId: snapshot.sessionId, stateVersion: snapshot.stateVersion, serverMonoMs: 0, state: { snapshot, asset: null } };
+    expect(snapshot).toMatchObject({ phase: 'guessing', remainingMs: 30000 }); expect(() => parseLiveServer(frame)).not.toThrow();
+    expect(() => parseLiveServer({ ...frame, state: { snapshot: { ...snapshot, remainingMs: 30001 }, asset: null } })).toThrow();
   });
 });

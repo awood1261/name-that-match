@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initializeStorage } from '../../server/src/storage';
 import { applyLibraryMigrations, LIBRARY_SCHEMA_VERSION } from '../../server/src/library/migrations';
 import { GameRepository } from '../../server/src/game/repository';
+import { GameService } from '../../server/src/game/service';
+import { addGameSchema } from '../../server/src/game/migrations';
 import { createLibraryRepository } from '../../server/src/library/repository';
 import { createTestResources } from '../helpers/resources';
 import { screenshotInput } from '../library/fixtures';
@@ -16,7 +18,7 @@ const fixtures: ReturnType<typeof serviceFixture>[] = [];
 function fixture() { const f = serviceFixture(); fixtures.push(f); return f; }
 afterEach(async () => { vi.restoreAllMocks(); for (const f of fixtures.splice(0)) await f.cleanup(); });
 
-describe('global schema 3 game migration', () => {
+describe('global schema 4 game migration', () => {
   let resources: ReturnType<typeof createTestResources>;
   let rawConnections: Database.Database[];
   beforeEach(() => { resources = createTestResources(); rawConnections = []; });
@@ -30,10 +32,54 @@ describe('global schema 3 game migration', () => {
     if (version === 2) for (const [old, next] of [['iconic', 'low'], ['familiar', 'medium'], ['obscure', 'high'], ['squash', 'easy'], ['competitive', 'medium'], ['deathmatch', 'hard']]) schema = schema.split(`'${old}'`).join(`'${next}'`);
     db.exec(schema); db.pragma(`user_version=${version}`); db.pragma('foreign_keys=ON'); return db;
   }
+  function legacyPausedGame() {
+    const source = fixture(); source.ready(); source.command({ type: 'REVEAL_AND_START' }); source.command({ type: 'CORRECT' });
+    source.command({ type: 'REVEAL_ANSWER' }); source.command({ type: 'ADVANCE' }); source.ready(source.candidate('b'.repeat(64)));
+    source.command({ type: 'REVEAL_AND_START' }); source.setTime(25000); source.command({ type: 'PAUSE' }); const sessionId = source.state.id; source.service.close();
+    const db = legacy(2); addGameSchema(db); db.pragma('foreign_keys=OFF');
+    const tables = ['matches', 'screenshots', 'import_batches', 'import_items', 'game_sessions', 'game_contestants', 'game_rounds', 'game_score_events', 'game_command_receipts'];
+    // Populate the historical schema independently; all old round timings fit its 10s bound.
+    db.transaction(() => {
+      for (const table of tables) {
+        for (const row of source.storage.db.prepare(`SELECT * FROM ${table}`).all() as Array<Record<string, unknown>>) {
+          const columns = Object.keys(row); db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(c => `@${c}`).join(',')})`).run(row);
+        }
+      }
+    })(); db.pragma('user_version=3'); db.pragma('foreign_keys=ON');
+    const rows = () => tables.map(table => db.prepare(`SELECT * FROM ${table} ORDER BY ${table === 'game_command_receipts' ? 'command_id' : 'id'}`).all());
+    const objects = () => db.prepare("SELECT name,sql FROM sqlite_master WHERE type IN ('index','trigger') AND name LIKE 'game_%' ORDER BY name").all();
+    return { db, rows, objects, sessionId };
+  }
+  it('upgrades a populated v3 game without changing old pause, scores, receipts, library, indexes or triggers', () => {
+    const f = legacyPausedGame(); const rows = f.rows(); const objects = f.objects();
+    expect(f.db.prepare("SELECT sql FROM sqlite_master WHERE name='game_rounds'").get()).toMatchObject({ sql: expect.stringContaining('window_ms <= 10000') });
+    applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(4);
+    expect(f.rows()).toEqual(rows); expect(f.objects()).toEqual(objects); expect(f.db.pragma('foreign_key_check')).toEqual([]);
+    expect(f.db.pragma('foreign_keys', { simple: true })).toBe(1);
+    let now = 0; const service = new GameService(new GameRepository(f.db), { now: () => now, primaryReady: () => true, candidateCurrent: () => true });
+    try {
+      const paused = service.state(f.sessionId); expect(paused.rounds.at(-1)).toMatchObject({ phase: 'paused', remainingMs: 5000 });
+      const running = service.execute(envelope(paused, { type: 'RESUME' })).state;
+      expect(running.rounds.at(-1)).toMatchObject({ phase: 'guessing', windowMs: 5000 });
+      expect(() => f.db.prepare('UPDATE game_rounds SET window_ms=30001 WHERE id=?').run(running.currentRoundId)).toThrow(/CHECK/);
+      now = 5000; expect(service.state(f.sessionId).rounds.at(-1)?.phase).toBe('awaiting_judgment');
+      expect(f.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 1 });
+    } finally { service.close(); }
+    const stable = f.rows(); applyLibraryMigrations(f.db); expect(f.rows()).toEqual(stable);
+  });
+  it('rolls back v3 timing rebuild after destructive DDL and can retry with all records and enforcement intact', () => {
+    const f = legacyPausedGame(); const rows = f.rows(); const objects = f.objects(); const exec = f.db.exec.bind(f.db);
+    vi.spyOn(f.db, 'exec').mockImplementation(sql => { const result = exec(sql); if (sql.startsWith('DROP TABLE game_rounds;')) throw new Error('injected timing rebuild failure'); return result; });
+    expect(() => applyLibraryMigrations(f.db)).toThrow(/injected timing/);
+    expect(f.db.pragma('user_version', { simple: true })).toBe(3); expect(f.rows()).toEqual(rows); expect(f.objects()).toEqual(objects);
+    expect(f.db.pragma('foreign_keys', { simple: true })).toBe(1); expect(f.db.pragma('foreign_key_check')).toEqual([]);
+    expect(f.db.prepare("SELECT name FROM sqlite_master WHERE name='game_rounds_next'").get()).toBeUndefined();
+    vi.restoreAllMocks(); applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(4); expect(f.rows()).toEqual(rows);
+  });
   it('creates exactly five STRICT game tables, stable indexes, pragmas and an empty session on fresh/repeated startup', () => {
     const first = open(); const tables = first.db.prepare("SELECT name,strict FROM pragma_table_list WHERE name LIKE 'game_%' ORDER BY name").all();
     expect(tables).toEqual(gameTables.map((name) => ({ name, strict: 1 })));
-    expect(first.db.pragma('user_version', { simple: true })).toBe(3);
+    expect(first.db.pragma('user_version', { simple: true })).toBe(4);
     expect(first.db.pragma('foreign_keys', { simple: true })).toBe(1); expect(first.db.pragma('journal_mode', { simple: true })).toBe('wal');
     expect(first.db.pragma('synchronous', { simple: true })).toBe(1); expect(new GameRepository(first.db).current()).toBeNull();
     const schema = first.db.prepare("SELECT name,sql FROM sqlite_master WHERE name LIKE 'game_%' ORDER BY name").all(); first.db.close();
@@ -56,9 +102,9 @@ describe('global schema 3 game migration', () => {
     expect(fs.statSync(upgraded.dbPath).ino).toBe(inode); expect(fs.readFileSync(path.join(resources.root, 'screenshots', 'kept.txt'), 'utf8')).toBe('unchanged');
     expect(upgraded.db.pragma('foreign_key_check')).toEqual([]);
   });
-  it('retains the existing supported schema-1 mapping on the way to 3', () => {
+  it('retains the existing supported schema-1 mapping on the way to 4', () => {
     const db = legacy(1); db.exec("INSERT INTO matches(id,obscurity,created_at,updated_at) VALUES('legacy','iconic','old','old')"); db.close();
-    const storage = open(); expect(storage.db.pragma('user_version', { simple: true })).toBe(3);
+    const storage = open(); expect(storage.db.pragma('user_version', { simple: true })).toBe(4);
     expect(storage.db.prepare("SELECT obscurity,revision FROM matches WHERE id='legacy'").get()).toEqual({ obscurity: 'low', revision: 2 });
   });
   it('rejects unsupported newer versions without mutation', () => {
@@ -73,7 +119,7 @@ describe('global schema 3 game migration', () => {
     expect(() => applyLibraryMigrations(db)).toThrow(/injected/); expect(db.pragma('user_version', { simple: true })).toBe(2);
     expect(db.prepare("SELECT obscurity,revision FROM matches WHERE id='kept'").get()).toEqual({ obscurity: 'high', revision: 1 });
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'game_%'").all()).toEqual([]); expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
-    vi.restoreAllMocks(); applyLibraryMigrations(db); expect(db.pragma('user_version', { simple: true })).toBe(3); db.close();
+    vi.restoreAllMocks(); applyLibraryMigrations(db); expect(db.pragma('user_version', { simple: true })).toBe(4); db.close();
   });
 });
 

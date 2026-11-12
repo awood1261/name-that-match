@@ -3,7 +3,7 @@ import type { Obscurity, PartialDate, VisualDifficulty } from '../library.js';
 
 export const GAME_PROTOCOL_VERSION = 1;
 export const GAME_RULES_VERSION = 1;
-export const GUESSING_WINDOW_MS = 10_000;
+export const GUESSING_WINDOW_MS = 30_000;
 export const MAX_GAME_TURNS = 1000;
 export const MAX_GAME_COMMANDS = 10_000;
 export interface Contestant { id: string; name: string }

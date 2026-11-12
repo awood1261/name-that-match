@@ -1,6 +1,6 @@
 # Contestant visual screens
 
-The three updated screens follow `design-comps/screen-updates`, with the existing public server state, local assets, HTTP image preload and shared WebSocket observation adapter. Game rules, readiness, ten-second deadlines, scoring, receipts and match-repeat prevention are unchanged. Setup/host operation remains in [game host](game-host.md), [Studio](studio-mode.md) and [Road](road-mode.md).
+The three updated screens follow `design-comps/screen-updates`, with the existing public server state, local assets, HTTP image preload and shared WebSocket observation adapter. Game rules, readiness, thirty-second deadlines, scoring, receipts and match-repeat prevention are unchanged. Setup/host operation remains in [game host](game-host.md), [Studio](studio-mode.md) and [Road](road-mode.md).
 
 ## Sequence and controls
 

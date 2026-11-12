@@ -7,10 +7,10 @@ import { Countdown } from '../../client/src/game/Countdown';
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 it.each(GAME_TIERS)('renders actual round/tier and the contained clue without identity for %s', (tier) => {
   const onImageError = vi.fn();
-  render(<ScreenshotRound imageUrl="blob:opaque" turnOrdinal={3} tier={tier} remaining={{ ms: 10000, at: performance.now() }} onImageError={onImageError} />);
+  render(<ScreenshotRound imageUrl="blob:opaque" turnOrdinal={3} tier={tier} remaining={{ ms: 30000, at: performance.now() }} onImageError={onImageError} />);
   expect(screen.getByText('ROUND 03')).toBeInTheDocument();
   expect(screen.getByText(GAME_TIER_DETAILS[tier].label)).toBeInTheDocument();
-  expect(screen.getByRole('timer')).toHaveTextContent('00:10');
+  expect(screen.getByRole('timer')).toHaveTextContent('00:30');
   expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'off');
   const image = screen.getByAltText('Current wrestling match clue'); expect(image).toHaveAttribute('src', 'blob:opaque');
   fireEvent.error(image); expect(onImageError).toHaveBeenCalledOnce();

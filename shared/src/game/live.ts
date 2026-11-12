@@ -1,4 +1,5 @@
 import type { DisplaySnapshot } from './contracts.js';
+import { GUESSING_WINDOW_MS } from './contracts.js';
 import type { DisplayObservation } from './display.js';
 import type { HostStatus } from './host.js';
 import { id, parseContestants, parseRoundContext, positive, record, requireGame } from './validation.js';
@@ -119,7 +120,7 @@ function validateHostRound(input: unknown) {
   requireGame(PHASES.includes(r.phase as string), 'validation', 'Invalid round'); id(r.id); id(r.contestantId); positive(r.ordinal);
   requireGame(['squash', 'competitive', 'deathmatch'].includes(r.requestedTier as string) && typeof r.createdAt === 'string' && Number.isSafeInteger(r.timerGeneration), 'validation', 'Invalid round fields'); nonnegative(r.timerGeneration);
   if (r.phase !== 'preparing' && !(r.phase === 'cancelled' && r.context === null)) parseRoundContext(r.context);
-  if (r.phase === 'guessing' || r.phase === 'paused') { const ms = nonnegative(r.phase === 'guessing' ? r.windowMs : r.remainingMs); requireGame(ms <= 10_000, 'validation', 'Invalid round time'); }
+  if (r.phase === 'guessing' || r.phase === 'paused') { const ms = nonnegative(r.phase === 'guessing' ? r.windowMs : r.remainingMs); requireGame(ms <= GUESSING_WINDOW_MS, 'validation', 'Invalid round time'); }
   if (r.phase === 'adjudicated' || r.phase === 'answer_revealed') { validateOutcome(r); requireGame(typeof r.lateEntry === 'boolean' && typeof r.judgedAt === 'string', 'validation', 'Invalid judgment'); }
   if (r.turnOrdinal !== undefined) positive(r.turnOrdinal);
 }
@@ -154,7 +155,7 @@ function validateDisplaySnapshot(input: unknown) {
   } else {
     const timed = ['guessing', 'paused', 'awaiting_judgment', 'interrupted'].includes(v.phase as string); const image = ['ready', 'guessing'].includes(v.phase as string);
     record(input, [...round, ...(timed ? ['remainingMs'] : []), ...(image ? ['imageKey'] : [])]);
-    if (timed) { const remaining = nonnegative(v.remainingMs); requireGame(remaining <= 10_000, 'validation', 'Invalid remaining time'); }
+    if (timed) { const remaining = nonnegative(v.remainingMs); requireGame(remaining <= GUESSING_WINDOW_MS, 'validation', 'Invalid remaining time'); }
     if (image) requireGame(id(v.imageKey) === v.roundId, 'validation', 'Invalid image identity');
   }
 }
