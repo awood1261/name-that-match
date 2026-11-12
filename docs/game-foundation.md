@@ -1,6 +1,6 @@
 # Game Experience Milestone 1
 
-This document records the Milestone 1 checkpoint: domain engine, clock/service boundary and SQLite persistence. Milestones 2–3 now add host HTTP/setup/preparation, the read-only contestant tab, countdown and live judgments; see [current host operation](game-host.md). Full-game progression, Studio launching and WebSockets remain deferred.
+This document records the Milestone 1 checkpoint: domain engine, clock/service boundary and SQLite persistence. Later milestones add host HTTP/setup/preparation, the read-only contestant display, live judgments, full-game progression and Studio presentation; see [current host operation](game-host.md) and [Studio setup](studio-mode.md). WebSocket synchronization remains deferred. Historical Milestone 1 evidence below is unchanged.
 
 ## Storage and upgrade
 

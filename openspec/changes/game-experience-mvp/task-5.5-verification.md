@@ -53,3 +53,7 @@ These are disposable desktop/browser/process checks. Physical TV/tablet, externa
 5. For restart/crash scenarios use disposable data: a known pause restores its remainder; unknown running crash restores Interrupted and requires Void. Rejoining never resumes or scores automatically. Browser reload/close has only the standard warning; cancel and use in-app navigation when you need confirmed pause.
 
 Task 5.5 is complete: **31/46 total**, 15 remaining. Stop for owner review before task 5.6; do not archive or automatically start the milestone checkpoint.
+
+## Subsequent owner acceptance and checkpoint
+
+The owner subsequently confirmed manual verification of Stay, Pause-and-leave and return-to-paused, and authorized task 5.6. The integrated Milestone 4 results and remaining physical-device deferrals are recorded in `milestone-4-verification.md`. The earlier task-specific evidence above is retained as history; Studio implementation still requires separate approval.

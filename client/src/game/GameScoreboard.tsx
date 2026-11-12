@@ -4,17 +4,17 @@ import styles from './GameScoreboard.module.css';
 
 const outcomes = { correct: 'Correct', incorrect: 'Incorrect', timeout: 'Timeout', void: 'Void / Skip' };
 
-export function GameScoreboard({ scores, activeContestantId, turnsExposed, currentTurn, winnerIds, compact = false, privateView = false }: {
+export function GameScoreboard({ scores, activeContestantId, turnsExposed, currentTurn, winnerIds, compact = false, privateView = false, stage = false }: {
   scores: ScoreRow[]; activeContestantId: string; turnsExposed: number;
   currentTurn?: { turnOrdinal: number; contestantId: string } | null;
-  winnerIds?: string[]; compact?: boolean; privateView?: boolean;
+  winnerIds?: string[]; compact?: boolean; privateView?: boolean; stage?: boolean;
 }) {
   const titleId = useId(); const final = winnerIds !== undefined;
   const winners = scores.filter((row) => winnerIds?.includes(row.contestantId)).map((row) => row.name);
   const owner = scores.find((row) => row.contestantId === currentTurn?.contestantId);
-  return <section className={styles.scoreboard} data-compact={compact} aria-labelledby={titleId}>
+  return <section className={styles.scoreboard} data-compact={compact} data-stage={stage} aria-labelledby={titleId}>
     <header className={styles.heading}><h3 id={titleId}>{final ? 'Final totals' : 'Scoreboard'}</h3>
-      <p>{currentTurn && !final ? `Turn ${currentTurn.turnOrdinal} · ${owner?.name ?? ''}` : `Exposed turns: ${turnsExposed}`}</p>
+      <p>{currentTurn && !final ? stage && compact ? `Turn ${currentTurn.turnOrdinal}` : `Turn ${currentTurn.turnOrdinal} · ${owner?.name ?? ''}` : `Exposed turns: ${turnsExposed}`}</p>
     </header>
     {final && <p className={styles.winner} role="status">{winners.length > 1 ? 'Tie' : 'Winner'}: {winners.join(' & ')}</p>}
     <ol className={styles.rows}>

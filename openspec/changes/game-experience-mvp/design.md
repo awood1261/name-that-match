@@ -378,3 +378,7 @@ The owner accepted checkpoint 5.3a manual verification and approved the next tas
 ### Task 5.5 authorization
 
 The owner accepted End/New Game manual verification and explicitly approved beginning task 5.5. Implement the existing D6/D10 host navigation and recovery rules only: shell guard with Stay/Pause-and-leave, confirmed server pause or safe-state observation before navigation, preserved library unsaved guards, explicit receipt/current-state review and no automatic resume/replay. Bound stalled game requests to the existing three-second observation convention so unknown delivery can reach manual reconciliation. No gameplay/schema/dependency/transport change, task 5.6 acceptance or archive is authorized.
+
+### Milestone 5 authorization
+
+Following the completed Milestone 4 checkpoint and Studio architecture review, the owner approved proceeding with Milestone 5. Implement tasks 6.1–6.6 using the reviewed `docs/studio-mode-plan.md`: explicit isolated launch, viewer-controlled fullscreen, uniformly scaled safe stage, scoped CSS Modules, accessibility, built-application/load verification and operation guidance. Existing game rules, HTTP polling and primary readiness/recovery stay unchanged. Physical hardware/offline checks must be recorded as performed or explicitly deferred. No Milestone 6 implementation, new dependencies or archive is authorized by this approval.

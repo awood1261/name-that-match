@@ -10,6 +10,7 @@ export function ContestantJoin({ localLink, credential, disabled }: { localLink:
   const [observation, setObservation] = useState<DisplayOriginObservation | null>(null);
   const [manualOrigin, setManualOrigin] = useState(''); const [busy, setBusy] = useState(false);
   const [error, setError] = useState(''); const [qr, setQr] = useState<{ url: string; image: string } | null>(null);
+  const [launchNotice, setLaunchNotice] = useState('');
   const request = useRef<AbortController | null>(null); const generation = useRef(0);
   const link = observation?.ready ? withDisplayOrigin(localLink, observation.origin) : localLink;
   const observe = useCallback(async (refresh: boolean, manual?: string) => {
@@ -33,6 +34,13 @@ export function ContestantJoin({ localLink, credential, disabled }: { localLink:
     return () => { current = false; };
   }, [link, observation]);
   return <section className={styles.join} aria-label="Contestant joining">
+    <button type="button" disabled={disabled} onClick={() => {
+      try {
+        window.open(localLink, '_blank', 'noopener,noreferrer');
+        setLaunchNotice('Open requested. If no window appeared, allow popups or copy the link below into a separate tab. Move the viewer to your display and choose Enter fullscreen there. Connection status determines readiness.');
+      } catch { setLaunchNotice('The browser could not open the display. Copy the link below into a separate tab.'); }
+    }}>Open contestant display</button>
+    {launchNotice && <p role="status">{launchNotice}</p>}
     <label>Contestant display link<input readOnly value={link} onFocus={(event) => event.target.select()} /></label>
     <p role="status">{busy ? 'Checking LAN address…' : observation?.message ?? 'Local-tab link. LAN access has not been verified.'}</p>
     <p>{observation?.ready ? 'Scan with the other device on the same local Wi-Fi, or copy this read-only link.' : 'Local tab only: this fallback is not advertised for another device.'}</p>

@@ -67,4 +67,14 @@ describe('offline contestant join controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh LAN address' })); await waitFor(() => expect(gameApi.displayOrigin).toHaveBeenCalledTimes(2));
     expect(register).toHaveBeenCalledOnce(); expect(designate).not.toHaveBeenCalled(); expect(command).not.toHaveBeenCalled();
   });
+  it('opens the existing local viewer only on a gesture, with opener isolation and a null-handle fallback', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const register = vi.spyOn(gameApi, 'registerDisplay'); const command = vi.spyOn(gameApi, 'command');
+    render(<ContestantJoin localLink={localLink} credential={credential} disabled={false} />);
+    await screen.findByRole('img'); expect(open).not.toHaveBeenCalled();
+    const button = screen.getByRole('button', { name: 'Open contestant display' }); button.focus(); expect(button).toHaveFocus(); fireEvent.click(button);
+    expect(open).toHaveBeenCalledWith(localLink, '_blank', 'noopener,noreferrer'); await screen.findByText(/If no window appeared/);
+    expect(register).not.toHaveBeenCalled(); expect(command).not.toHaveBeenCalled(); expect(screen.getByLabelText('Contestant display link')).toHaveValue(qr.withDisplayOrigin(localLink, origin));
+    open.mockImplementation(() => { throw new Error('blocked'); }); fireEvent.click(button); await screen.findByText(/browser could not open the display/);
+  });
 });

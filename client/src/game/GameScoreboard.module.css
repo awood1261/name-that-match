@@ -18,3 +18,26 @@
 .scoreboard[data-compact='true'] .row:only-child { grid-column: 1 / -1; }
 .scoreboard[data-compact='true'] .row { padding: var(--space-2); gap: var(--space-1) var(--space-2); }
 @media (max-width: 500px) { .scoreboard { padding: var(--space-3); } .scoreboard[data-compact='true'] .rows { grid-template-columns: 1fr; } }
+
+/* Logical stage coordinates; outer viewport breakpoints must not scale these twice. */
+.scoreboard[data-stage='true'] { padding: 24px; }
+.scoreboard[data-stage='true'] .heading h3 { font-size: 32px; }
+.scoreboard[data-stage='true'] .heading p { min-width: 0; overflow-wrap: anywhere; }
+.scoreboard[data-stage='true'] .heading p,
+.scoreboard[data-stage='true'] .latest,
+.scoreboard[data-stage='true'] .caption,
+.scoreboard[data-stage='true'] .rank,
+.scoreboard[data-stage='true'] .active,
+.scoreboard[data-stage='true'] .total span { font-size: 22px; line-height: 1.2; }
+.scoreboard[data-stage='true'] .name { font-size: 32px; line-height: 1.2; }
+.scoreboard[data-stage='true'] .total { font-size: 56px; }
+.scoreboard[data-stage='true'] .winner { font-size: 44px; line-height: 1.15; }
+.scoreboard[data-stage='true'][data-compact='true'] { flex: 0 0 auto; padding: 12px; }
+.scoreboard[data-stage='true'][data-compact='true'] .heading h3 { font-size: 24px; }
+.scoreboard[data-stage='true'][data-compact='true'] .rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.scoreboard[data-stage='true'][data-compact='true'] .name { font-size: 20px; }
+.scoreboard[data-stage='true'][data-compact='true'] .total { font-size: 36px; }
+.scoreboard[data-stage='true'][data-compact='true'] .caption { display: none; }
+.scoreboard[data-stage='true'][data-compact='true'] .rank,
+.scoreboard[data-stage='true'][data-compact='true'] .active,
+.scoreboard[data-stage='true'][data-compact='true'] .latest { font-size: 18px; }

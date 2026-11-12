@@ -1,6 +1,6 @@
-# Game host — Task 5.5
+# Game host
 
-Open **Play** from the application navigation. This checkpoint supports setup, hidden preparation, a separate read-only contestant tab, the authoritative countdown, host judgment/pause controls and explicit **Reveal Result**. Scoreboard and final-total presentation are implemented. Explicit round advancement, contestant switching and next-tier selection are available. Confirmed End Game and New Game controls are available. Automatic Studio launching/fullscreen and Road WebSockets remain later work. Use disposable test data for acceptance runs; this checkpoint supports successive rounds, manual completion and fresh independent games.
+Open **Play** from the application navigation. Setup, hidden preparation, a separate read-only contestant display, authoritative countdown, judgment/pause controls, **Reveal Result**, scoreboard, progression and confirmed End/New Game are available. Studio adds explicit **Open contestant display**, optional viewer fullscreen and a uniformly scaled reel-safe stage; see [Studio operation and manual acceptance](studio-mode.md). Opening is always operator-driven. Road WebSockets remain later work. Use disposable test data for acceptance runs.
 
 ## Setup and preparation
 

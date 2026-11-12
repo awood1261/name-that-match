@@ -40,3 +40,10 @@
   --transition-medium: 220ms ease;
   --content-width: min(1100px, calc(100% - 2rem));
 }
+
+/* Logical filming coordinates, scoped to the contestant stage and its previews. */
+[data-contestant-stage] {
+  --game-stage-width: 1080px;
+  --game-stage-height: 960px;
+  --game-stage-outline: 2px;
+}

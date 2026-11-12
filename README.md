@@ -1,6 +1,6 @@
 # Name That Match
 
-Name That Match is a local-first wrestling trivia application built with React, Vite, and a local Node server. The current application supports capture import, match management and screenshot assignment alongside the foundation's system status, portable storage, and design tokens.
+Name That Match is a local-first wrestling trivia application built with React, Vite, and a local Node server. It supports capture import, match management, screenshot classification/review and host-controlled games with a separate Studio contestant display, alongside portable storage and system status.
 
 ## Overview
 
@@ -9,6 +9,8 @@ Name That Match is a local-first wrestling trivia application built with React, 
 - SQLite-backed match, screenshot and durable import metadata with migrations
 - Configurable local data directory for SQLite and screenshot assets
 - Offline-safe startup with no cloud dependency
+- Authoritative game sessions, ten-second attempts, host judgments and durable scores
+- Explicit Studio display launch, optional fullscreen and a scaled reel-safe stage
 
 ## Requirements
 
@@ -77,6 +79,8 @@ Open **Image Library → Import captures**. Choose a folder or multiple PNG/JSON
 Closing the dialog keeps durable server progress. Reopen **Recent imports** to resume; interrupted uploads can re-select missing files, while changed metadata requires a new selection/batch. Original captures are preserved. See [limits, recovery and staging maintenance](docs/import-engine.md). Run only one server process per data root.
 
 ## Game host
+
+For a laptop host and attached TV/monitor, follow [Studio Mode setup, fullscreen, reel-safe composition and recovery](docs/studio-mode.md). Studio reuses the current HTTP game service; WebSocket/Road certification remains a later milestone. Physical-device/offline acceptance is recorded separately from automated checks.
 
 Open **Play** to configure contestants, explicitly select the active contestant and create a primary contestant-display link **before preparing**. Paste it into a separate tab. Prepare stays hidden until the primary has decoded/synchronized and the host selects **Reveal & start**. The server owns the ten-second clock, pause/resume and judgment; display reload/disconnect never resets it. Judgment leaves the contestant result concealed; select **Reveal Result** to present its committed outcome/points and frozen match identity. Reduced motion and refresh show a stable result. Host leases, revisions and receipts protect concurrent/retried requests. Tie-aware scoreboards show server totals and latest outcomes; contestant totals update on Reveal Result. Advance explicitly returns between rounds, keeping the same contestant and previous tier until you choose otherwise. Used matches remain excluded across contestants and tiers. Final-total presentation and confirmed End/New Game controls preserve final results and create independent fresh setups. See [host operation, recovery and manual acceptance](docs/game-host.md).
 

@@ -50,6 +50,17 @@ async function createSession(two = false) {
 }
 
 describe('host setup and preparation UI', () => {
+  it('previews the exact bounded filming text while retaining the full private frozen answer', async () => {
+    const game = pureGame(); const candidate = context();
+    candidate.answer.participantDescription = 'W'.repeat(1000); candidate.answer.promotion = 'P'.repeat(500);
+    candidate.answer.stipulation = 'S'.repeat(500); candidate.answer.championshipInfo = 'C'.repeat(500);
+    game.step({ type: 'START' }); game.step({ type: 'PREPARE', roundId: randomUUID(), tier: 'squash' }); game.step({ type: 'PREPARE_SUCCEEDED', context: candidate }); state = game.state;
+    render(<HostPage />); const summary = await screen.findByText('Private host answer'); fireEvent.click(summary);
+    const preview = screen.getByRole('region', { name: 'Filming answer text preview' });
+    expect(within(preview).getByText('W'.repeat(119) + '…')).toBeInTheDocument(); expect(preview).toHaveTextContent('S'.repeat(79) + '…');
+    expect(summary.closest('details')).toHaveTextContent('W'.repeat(1000)); expect(summary.closest('details')).toHaveTextContent('C'.repeat(500));
+    expect(gameApi.command).not.toHaveBeenCalled(); expect(candidate.answer.participantDescription).toHaveLength(1000);
+  });
   it('shows initial connection loading with no premature create/mutation', async () => {
     let finish!: (value: typeof credential) => void; vi.mocked(gameApi.claim).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
     render(<HostPage />); expect(screen.getByText('Connecting to game server…')).toBeInTheDocument(); expect(gameApi.create).not.toHaveBeenCalled();

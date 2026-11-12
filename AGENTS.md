@@ -6,6 +6,8 @@ Private, portable, offline-first wrestling screenshot trivia for filming at even
 
 Read `README.md` for setup, `docs/local-storage.md` for storage, and relevant `openspec/` artifacts for intended behavior. Inspect actual code, Git status, recent history, and existing instructions before editing. Preserve unrelated user changes. Verify current status: the foundation and Match Library MVP are archived; further features and gameplay require separate approved changes. See the Match Library archive summary for deferred real-collection/device acceptance checks.
 
+For current gameplay operation/architecture, read `docs/game-host.md` and `docs/studio-mode.md`. Host and read-only contestant roots share the authoritative server via HTTP polling until the separately approved WebSocket milestone. Preserve explicit launch/fullscreen gestures and the uniformly scaled logical contestant stage; never treat viewport tests as physical TV/tablet or offline certification.
+
 ## OpenSpec workflow
 
 - Meaningful features, architectural changes, and refactors require an approved change: explore → specify requirements and acceptance criteria → design → tasks → implement → verify → archive and synchronize specs.

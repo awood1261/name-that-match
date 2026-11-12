@@ -6,6 +6,7 @@ import { HostSetup } from './HostSetup';
 import { HostDisplayPanel } from './HostDisplayPanel';
 import { HostRoundControls } from './HostRoundControls';
 import { GameScoreboard } from './GameScoreboard';
+import { stageAnswer } from './stageText';
 import { HostLeaveDialog } from './HostLeaveDialog';
 import type { NavigationGuard } from '../library/useMatchWorkspace';
 import styles from './HostPage.module.css';
@@ -15,6 +16,8 @@ export function HostPage({ registerNavigationGuard }: { registerNavigationGuard?
   const [destination, setDestination] = useState<(() => void) | null>(null); const [leaving, setLeaving] = useState(false); const [leaveError, setLeaveError] = useState('');
   const snapshot = host.status?.snapshot; const session = snapshot?.session ?? null; const round = snapshot?.currentRound;
   const requestedTier = round?.requestedTier;
+  const answer = round && 'context' in round ? round.context?.answer : undefined;
+  const preview = answer ? stageAnswer(answer) : undefined;
   // Retain the observed round's tier across Advance/Cancel, including after reload.
   useEffect(() => { if (requestedTier) setTier(requestedTier); }, [requestedTier]);
   const can = (action: string) => !!host.credential && host.connected && !host.busy && !host.pending && !!host.status?.allowedActions.some((a) => a === action);
@@ -115,7 +118,14 @@ export function HostPage({ registerNavigationGuard }: { registerNavigationGuard?
         {round.phase === 'ready' && <><p className={styles.cover}>Screenshot stays hidden until Reveal</p>
           {!host.status.candidateValid && <p className={styles.warning}>The prepared record changed or needs revalidation. Cancel and prepare again.</p>}
         </>}
-        {'context' in round && round.context && <details><summary>Private host answer</summary><p>{round.context.answer.participantDescription} · {round.context.answer.promotion} · {round.context.answer.event}</p></details>}
+        {answer && preview && <details><summary>Private host answer</summary><p>{answer.participantDescription} · {answer.promotion} · {answer.event}</p>
+          {answer.matchDate && <p>{answer.matchDate}</p>}{answer.stipulation && <p>Stipulation: {answer.stipulation}</p>}{answer.championshipInfo && <p>Championship: {answer.championshipInfo}</p>}
+          <section aria-label="Filming answer text preview"><h4>Filming answer text preview</h4><p>Long text is shortened with an ellipsis on the contestant display. The saved answer above stays unchanged.</p>
+            <p>{preview.participantDescription}</p><p>{preview.promotion} · {preview.event}</p>
+            {answer.matchDate && <p>{answer.matchDate}</p>}
+            {answer.stipulation && <p>Stipulation: {preview.stipulation}</p>}
+            {answer.championshipInfo && <p>Championship: {preview.championshipInfo}</p>}
+          </section></details>}
         {unexposed && <button type="button" disabled={!can('CANCEL_UNEXPOSED')} onClick={() => host.command({ type: 'CANCEL_UNEXPOSED' })}>Cancel preparation</button>}
         <HostRoundControls status={host.status} can={can} command={host.command} />
       </section>}

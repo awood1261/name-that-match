@@ -159,8 +159,8 @@ describe('contestant scoreboard visibility and recovery', () => {
   it('restores final ties without showing an active player, missing winner or reset controls', async () => {
     const b = randomUUID(); phase = { ...base, phase: 'completed', turnsExposed: 8, contestants: [{ id: contestantId, name: 'Alex' }, { id: b, name: 'Jordan' }],
       scores: [{ contestantId, name: 'Alex', total: 5 }, { contestantId: b, name: 'Jordan', total: 5 }], winnerIds: [contestantId, b] };
-    const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('region', { name: 'Final totals' }); expect(screen.getByRole('status')).toHaveTextContent('Tie: Alex & Jordan');
-    expect(screen.getAllByText('Tied 1')).toHaveLength(2); expect(screen.queryByText('Active contestant')).not.toBeInTheDocument(); expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('region', { name: 'Final totals' }); expect(screen.getByText('Tie: Alex & Jordan')).toHaveAttribute('role', 'status');
+    expect(screen.getAllByText('Tied 1')).toHaveLength(2); expect(screen.queryByText('Active contestant')).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: /Correct|Advance|End game|Start game/ })).not.toBeInTheDocument();
     view.unmount(); render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('region', { name: 'Final totals' });
     expect(screen.getByText('Exposed turns: 8')).toBeInTheDocument(); expect(displayApi.image).not.toHaveBeenCalled(); expect(gameApi.command).not.toHaveBeenCalled();
   });
