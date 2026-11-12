@@ -8,6 +8,8 @@ import { GameRepository, fingerprint } from './repository.js';
 import { recoverGameSessions } from './recovery.js';
 
 export interface GameServiceOptions {
+  /** Observation signal only, delivered after persistence; never a second mutation lane. */
+  onChange?: () => void;
   now?: () => number; wallNow?: () => string;
   schedule?: (callback: () => void, delayMs: number) => () => void;
   /** Trusted server observations, never host command fields. M2/M3 supply real adapters. */
@@ -39,10 +41,11 @@ export class GameService {
   }
   private storageAction<T>(action: () => T): T {
     try { return action(); } catch (error) {
-      if (!(error instanceof GameError) || error.code === 'unavailable') { this.failed = true; this.clearClock(); throw new GameError('unavailable', 'Game storage failed; review recovery before further commands'); }
+      if (!(error instanceof GameError) || error.code === 'unavailable') { this.failed = true; this.clearClock(); this.changed(); throw new GameError('unavailable', 'Game storage failed; review recovery before further commands'); }
       throw error;
     }
   }
+  private changed() { try { this.options.onChange?.(); } catch { /* Observation cannot change a committed command's outcome. */ } }
   private clearClock() { this.cancelTimer?.(); this.cancelTimer = null; this.clock = null; }
   private env(state: GameState, intent: { type: string; context?: RoundContext }): TransitionContext {
     const round = currentRound(state);
@@ -79,7 +82,7 @@ export class GameService {
     if (!state || round?.phase !== 'guessing' || round.id !== this.clock.roundId || round.timerGeneration !== this.clock.timerGeneration) { this.clearClock(); return; }
     const intent = { type: 'EXPIRE' as const, timerGeneration: round.timerGeneration }; const env = this.env(state, intent);
     const next = transition(state, intent, env);
-    this.storageAction(() => this.repository.commit(state, next)); this.reconcileClock(next, env.nowMonoMs);
+    this.storageAction(() => this.repository.commit(state, next)); this.reconcileClock(next, env.nowMonoMs); this.changed();
   }
   create(input: unknown): CommandResult {
     this.ensureAvailable(); this.settleDue(); const parsed = parseCreateGame(input); const hash = fingerprint(parsed);
@@ -90,7 +93,7 @@ export class GameService {
     }
     // Validate before entering persistence; createState does not touch operational library data.
     createState(parsed, this.wallNow());
-    const result = this.storageAction(() => this.repository.create(parsed, this.wallNow())); return { ...result, replayed: false };
+    const result = this.storageAction(() => this.repository.create(parsed, this.wallNow())); this.changed(); return { ...result, replayed: false };
   }
   execute(input: unknown): CommandResult {
     this.ensureAvailable(); const command = parseCommand(input); this.settleDue();
@@ -107,7 +110,7 @@ export class GameService {
     requireGame(sessionIntent ? command.roundId === undefined : command.roundId === state.currentRoundId || (intent.type === 'END_GAME' && command.roundId === undefined && state.currentRoundId === null), 'conflict', 'Wrong round identity');
     const env = this.env(state, intent); const next = transition(state, intent, env);
     const accepted = this.storageAction(() => this.repository.commit(state, next, { commandId: command.commandId, roundId: command.roundId ?? (intent.type === 'PREPARE' ? intent.roundId : null), fingerprint: hash }));
-    requireGame(accepted, 'unavailable', 'Missing command receipt'); this.reconcileClock(next, env.nowMonoMs);
+    requireGame(accepted, 'unavailable', 'Missing command receipt'); this.reconcileClock(next, env.nowMonoMs); this.changed();
     return { receipt: accepted, replayed: false, state: this.storageAction(() => this.repository.load(next.id)) };
   }
   /** Trusted, guarded internal events; future adapters own I/O and liveness detection. */
@@ -115,7 +118,7 @@ export class GameService {
     this.ensureAvailable(); this.settleDue(); const state = this.storageAction(() => this.repository.load(sessionId));
     if (state.stateVersion !== expectedVersion || state.currentRoundId !== roundId) return false;
     const env = this.env(state, intent); const next = transition(state, intent, env);
-    this.storageAction(() => this.repository.commit(state, next)); this.reconcileClock(next, env.nowMonoMs); return true;
+    this.storageAction(() => this.repository.commit(state, next)); this.reconcileClock(next, env.nowMonoMs); this.changed(); return true;
   }
   completePreparation(sessionId: string, roundId: string, expectedVersion: number, context: unknown): boolean {
     return this.internal(sessionId, roundId, expectedVersion, { type: 'PREPARE_SUCCEEDED', context: parseRoundContext(context) });
@@ -130,6 +133,7 @@ export class GameService {
     return this.internal(sessionId, roundId, expectedVersion, { type: 'INTERRUPT_IMAGE' });
   }
   state(sessionId: string): GameState { this.ensureAvailable(); this.settleDue(); return this.storageAction(() => this.repository.load(sessionId)); }
+  current(): GameState | null { this.ensureAvailable(); this.settleDue(); return this.storageAction(() => this.repository.current()); }
   snapshot(sessionId: string, role: 'host' | 'display') {
     const state = this.state(sessionId); return role === 'host' ? hostSnapshot(state) : displaySnapshot(state, this.clock, this.now());
   }

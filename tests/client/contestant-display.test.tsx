@@ -7,6 +7,7 @@ import { displayApi, gameApi, GameApiError } from '../../client/src/game/api';
 import type { DisplayObservation } from '../../shared/src/game/display';
 import type { DisplaySnapshot } from '../../shared/src/game/contracts';
 import { isPartialDate } from '../../server/src/library/validation';
+import { mockGameLive } from './mock-game-live';
 
 const sessionId = randomUUID(); const roundId = randomUUID(); const contestantId = randomUUID();
 const credential = { token: 'a'.repeat(64), serverEpoch: randomUUID(), displayId: randomUUID() };
@@ -22,6 +23,7 @@ function observation(): DisplayObservation {
     asset: ['ready', 'guessing', 'paused'].includes(phase.phase) ? { roundId, imageKey: roundId } : null };
 }
 beforeEach(() => {
+  mockGameLive();
   sessionStorage.clear(); history.replaceState(null, '', `/display/${sessionId}#${new URLSearchParams({ token: credential.token, epoch: credential.serverEpoch, display: credential.displayId })}`);
   phase = { ...round, phase: 'ready', imageKey: roundId }; sequence = 0; decode = async () => {};
   createUrl = vi.fn(() => 'blob:opaque-clue'); revokeUrl = vi.fn();
@@ -87,7 +89,7 @@ describe('isolated contestant stage and image lifecycle', () => {
     await screen.findByRole('heading', { name: 'INCORRECT!' }); expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false');
     expect(gameApi.command).not.toHaveBeenCalled();
   });
-  it('animates a connected reveal even when polling skips the brief adjudicated snapshot', async () => {
+  it('animates a connected reveal even when observations skip the brief adjudicated snapshot', async () => {
     phase = { ...round, phase: 'guessing', imageKey: roundId, remainingMs: 5000 };
     render(<ContestantDisplay sessionId={sessionId} />); await screen.findByAltText('Current wrestling match clue');
     phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer };

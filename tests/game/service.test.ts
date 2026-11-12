@@ -11,6 +11,19 @@ function fixture(options: Parameters<typeof serviceFixture>[0] = {}) { const f =
 afterEach(async () => { vi.restoreAllMocks(); for (const f of fixtures.splice(0)) await f.cleanup(); });
 
 describe('transactional game service', () => {
+  it('latches a current-state read failure before accepting further mutations', () => {
+    const f = fixture(); const input = envelope(f.state, { type: 'START' });
+    const read = vi.spyOn(f.service.repository, 'current').mockImplementationOnce(() => { throw new Error('SQLite read failed'); });
+    expect(() => f.service.current()).toThrow(/storage failed/); read.mockRestore();
+    expect(() => f.service.execute(input)).toThrow(/requires recovery/);
+    expect(f.storage.db.prepare('SELECT status FROM game_sessions').get()).toEqual({ status: 'setup' });
+  });
+  it('keeps accepted commits replay-safe when an observation listener fails', () => {
+    const changed = vi.fn(() => { throw new Error('Observer failed'); }); const f = fixture({ onChange: changed });
+    f.ready(); f.command({ type: 'REVEAL_AND_START' }); const input = envelope(f.state, { type: 'CORRECT' });
+    const accepted = f.service.execute(input); expect(accepted.replayed).toBe(false); expect(changed).toHaveBeenCalled();
+    expect(f.service.execute(input)).toMatchObject({ replayed: true, receipt: accepted.receipt }); expect(f.service.state(f.state.id).awards).toHaveLength(1);
+  });
   it('reopens independent completed/new games with separate scores and reusable match history, preserving library rows', () => {
     const f = fixture(); f.ready(); const candidate = currentRound(f.state)!;
     if (!('context' in candidate) || !candidate.context) throw new Error('No candidate');

@@ -4,6 +4,7 @@ import type { ControllerCredential, HostStatus } from '../../../shared/src/game/
 import { id, parseCommand } from '../../../shared/src/game/validation';
 import { clientId } from '../ids';
 import { gameApi, GameApiError } from './api';
+import { openGameLive } from './live';
 
 const CONTROL_KEY = 'ntm.game.controller'; const PENDING_KEY = 'ntm.game.pending'; const OBSERVED_SESSION_KEY = 'ntm.game.observedSession';
 type Pending = { kind: 'create'; input: CreateGame } | { kind: 'command'; input: CommandEnvelope };
@@ -64,8 +65,10 @@ export function useGameHost() {
       }
       if (!owner) owner = await gameApi.claim(signal);
       if (!active.current || lifetime.current !== life) return;
-      currentCredential.current = owner; setCredential(owner); setReleased(false); store(CONTROL_KEY, owner); latest.current = null;
+      currentCredential.current = owner; setReleased(false); store(CONTROL_KEY, owner); latest.current = null;
       const restored = await observedStatus(owner, signal); accept(restored, owner);
+      if (!active.current || lifetime.current !== life) return;
+      setCredential(owner);
       if (restored.snapshot) {
         const phase = restored.snapshot.currentRound?.phase;
         setNotice(phase === 'interrupted' ? 'Recovered interrupted round. Its unknown remaining time cannot restart; explicitly void it.'
@@ -83,25 +86,18 @@ export function useGameHost() {
   }, [connect]);
   useEffect(() => {
     if (!credential) return;
-    let stopped = false; let timer: ReturnType<typeof setTimeout>; let renewal = false; let reading = false;
-    const pollingLife = new AbortController(); const signal = pollingLife.signal;
-    const read = async () => {
-      if (stopped || reading) return;
-      reading = true;
-      try { accept(await observedStatus(credential, signal), credential); }
-      catch (failure) { if (!signal.aborted) controlError(failure, credential); }
-      finally {
-        reading = false;
-        if (!stopped) timer = setTimeout(() => { void read(); }, ['preparing', 'ready', 'guessing', 'paused', 'awaiting_judgment'].includes(latest.current?.snapshot?.currentRound?.phase ?? '') ? 200 : 1000);
-      }
-    };
-    timer = setTimeout(() => { void read(); }, 200);
-    const heartbeat = setInterval(() => {
-      if (renewal) return; renewal = true;
-      void gameApi.renew(credential, signal).catch((failure) => { if (!signal.aborted) controlError(failure, credential); }).finally(() => { renewal = false; });
-    }, 1000);
-    return () => { stopped = true; pollingLife.abort(); clearTimeout(timer); clearInterval(heartbeat); };
+    const life = lifetime.current;
+    const observed = latest.current?.snapshot?.session.id ?? saved<string>(OBSERVED_SESSION_KEY);
+    const live = openGameLive({ type: 'hello', protocolVersion: 1, role: 'host', token: credential.token, serverEpoch: credential.serverEpoch, sessionId: observed }, {
+      snapshot(frame) { if (frame.role === 'host') accept(frame.state, credential); },
+      unavailable(failure) {
+        if (!active.current || lifetime.current !== life || currentCredential.current !== credential) return;
+        setConnected(false); transportLost.current = true; controlError(failure, credential);
+      },
+    });
+    return () => live.close();
   }, [credential, accept, controlError]);
+
   async function send(request: Pending): Promise<boolean> {
     const owner = currentCredential.current; const life = lifetime.current;
     if (!owner || mutation.current) return false;

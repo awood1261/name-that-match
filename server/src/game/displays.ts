@@ -47,7 +47,7 @@ export class GameDisplays {
     if (!viewer || viewer.sessionId !== sessionId || viewer.token !== token) throw new HttpError(403, 'DISPLAY_REQUIRED', 'Use this display’s own join capability.');
     return viewer;
   }
-  report(sessionId: string, displayId: string, token: string, report: DisplayReport, currentImage: string | null): { connectionSequence: number; sample: ClockSample } {
+  report(sessionId: string, displayId: string, token: string, report: DisplayReport, currentImage: string | null, issueSample = true): { connectionSequence: number; sample: ClockSample } {
     const viewer = this.viewer(sessionId, displayId, token); const at = this.now();
     if (report.type === 'connect') {
       if (viewer.connectionId !== report.connectionId) {
@@ -65,16 +65,26 @@ export class GameDisplays {
     }
     viewer.lastSeen = at; viewer.notified = false;
     if (report.type === 'status' && currentImage && this.primary.get(sessionId) === displayId && !this.ready(sessionId, currentImage)) this.lost(sessionId);
-    viewer.sample = { nonce: randomUUID(), serverMonoMs: this.now() };
+    if (issueSample || !viewer.sample) viewer.sample = { nonce: randomUUID(), serverMonoMs: this.now() };
     return { connectionSequence: viewer.generation, sample: viewer.sample };
   }
   tick(): void {
     for (const viewer of this.viewers.values()) {
-      if (!viewer.notified && viewer.connectionId && this.now() - viewer.lastSeen >= 3000) {
+      if (!viewer.notified && viewer.connectionId && (this.now() - viewer.lastSeen >= 3000 || (viewer.decodedRound && this.now() - viewer.clockAt > 3000))) {
         viewer.notified = true; viewer.decodedRound = null; viewer.clockAt = -Infinity;
         if (this.primary.get(viewer.sessionId) === viewer.id) this.lost(viewer.sessionId);
       }
     }
+  }
+  probe(sessionId: string, displayId: string, token: string, nonce: string): ClockSample {
+    const viewer = this.viewer(sessionId, displayId, token);
+    viewer.sample = { nonce, serverMonoMs: this.now() }; return viewer.sample;
+  }
+  disconnected(sessionId: string, displayId: string, token: string, connectionId: string, generation: number): void {
+    const viewer = this.viewer(sessionId, displayId, token);
+    if (viewer.connectionId !== connectionId || viewer.generation !== generation) return;
+    viewer.lastSeen = -Infinity; viewer.clockAt = -Infinity; viewer.decodedRound = null; viewer.notified = true;
+    if (this.primary.get(sessionId) === displayId) this.lost(sessionId);
   }
   ready(sessionId: string, roundId: string): boolean {
     const viewer = this.viewers.get(this.primary.get(sessionId) ?? '');

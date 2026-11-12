@@ -1,5 +1,6 @@
 import type http from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { setImmediate as defer, clearImmediate } from 'node:timers';
 import { ImportError } from '../library/imports/contracts.js';
 import type { StorageSession } from '../storage.js';
@@ -8,6 +9,7 @@ import { GameError, id, parseCommand, parseCreateGame, record } from '../../../s
 import { currentRound, phase } from '../../../shared/src/game/engine.js';
 import { hostSnapshot } from '../../../shared/src/game/projections.js';
 import type { HostStatus } from '../../../shared/src/game/host.js';
+import type { LiveHello, LiveReady } from '../../../shared/src/game/live.js';
 import type { GameState, HostIntent, RoundContext } from '../../../shared/src/game/contracts.js';
 import { GameRepository } from './repository.js';
 import { GameService, type GameServiceOptions } from './service.js';
@@ -18,7 +20,9 @@ import { observeDisplayOrigin, parseDisplayOriginInput, type DisplayOriginOption
 
 export function createGameHttp(storage: StorageSession, origins: Set<string>, runtime: Pick<GameServiceOptions, 'now' | 'schedule'> = {}, joinOptions: DisplayOriginOptions = {}) {
   const repo = new GameRepository(storage.db); const library = new GameLibrary(storage); const serverEpoch = randomUUID();
-  let stopped = false; let sequence = 0; let preparationError: string | null = null;
+  let stopped = false; let draining = false; let sequence = 0; let preparationError: string | null = null;
+  const listeners = new Set<() => void>();
+  const changed = () => { for (const listener of listeners) { try { listener(); } catch { listeners.delete(listener); } } };
   const jobs = new Map<string, ReturnType<typeof defer>>();
   const addressRequests = new Set<AbortController>();
   const displays = new GameDisplays((sessionId) => {
@@ -27,12 +31,13 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
   }, runtime.now);
   const service = new GameService(repo, {
     ...runtime,
+    onChange: changed,
     hasEligibleMatches: () => library.availability(repo.current(), true).distinctMatches > 0,
     candidateCurrent: (context, purpose) => library.current(context, purpose),
     primaryReady: (roundId) => { const state = repo.current(); return !!state && displays.ready(state.id, roundId); },
   });
   const control = new GameControl(serverEpoch, () => {
-    const state = repo.current(); const round = state && currentRound(state);
+    const state = service.current(); const round = state && currentRound(state);
     if (state && round?.phase === 'guessing') service.connectionLost(state.id, round.id, state.stateVersion, 'host-connection');
   }, runtime.now);
   const recovered = repo.current(); const recoveredRound = recovered && currentRound(recovered);
@@ -92,22 +97,70 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
   }
   const token = (req: http.IncomingMessage) => /^Bearer ([a-f0-9]{64})$/.exec(req.headers.authorization ?? '')?.[1];
   function access(req: http.IncomingMessage, sessionId?: string, hostOnly = true): string {
+    if (stopped || draining || !storage.db.open) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Game storage is shutting down.');
     const role = control.authorize(token(req), sessionId);
     if (hostOnly && role !== 'host') throw new HttpError(403, 'HOST_REQUIRED', 'Contestant displays are read-only.');
     if (req.headers['x-name-that-match-epoch'] !== serverEpoch) throw new HttpError(409, 'SERVER_EPOCH_CHANGED', 'The server restarted. Reclaim control and review the recovered session.');
     return role;
   }
+  function liveAccess(hello: LiveHello) {
+    if (stopped || draining || !storage.db.open) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Game storage requires recovery.');
+    if (hello.serverEpoch !== serverEpoch) throw new HttpError(409, 'SERVER_EPOCH_CHANGED', 'Server restarted. Reclaim host control or request a fresh display link.');
+    if (control.authorize(hello.token, hello.sessionId ?? undefined) !== hello.role) throw new HttpError(403, 'ROLE_REJECTED', 'Use the matching game role.');
+  }
+  const live = {
+    serverEpoch,
+    subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    connect(hello: LiveHello) {
+      liveAccess(hello);
+      if (hello.role === 'host') { control.renew(hello.token); return 0; }
+      const state = service.state(hello.sessionId); const round = currentRound(state);
+      return displays.report(hello.sessionId, hello.displayId, hello.token, { type: 'connect', connectionId: hello.connectionId }, round?.id ?? null).connectionSequence;
+    },
+    observe(hello: LiveHello) {
+      liveAccess(hello);
+      if (hello.role === 'host') {
+        const current = service.current();
+        const state = current ?? (hello.sessionId ? service.state(hello.sessionId) : null);
+        return { role: 'host' as const, state: status(state), serverMonoMs: (runtime.now ?? (() => performance.now()))() };
+      }
+      const observation = service.observation(hello.sessionId); const round = currentRound(observation.state);
+      const asset = round && ['ready', 'guessing', 'paused'].includes(round.phase) && library.bytes(hello.sessionId, round.id) ? { roundId: round.id, imageKey: round.id } : null;
+      return { role: 'display' as const, state: { snapshot: observation.snapshot, asset }, serverMonoMs: observation.serverMonoMs };
+    },
+    probe(hello: LiveHello, nonce: string) {
+      liveAccess(hello);
+      return hello.role === 'display' ? displays.probe(hello.sessionId, hello.displayId, hello.token, nonce) : { nonce, serverMonoMs: (runtime.now ?? (() => performance.now()))() };
+    },
+    acknowledge(hello: LiveHello) { liveAccess(hello); if (hello.role === 'host') control.renew(hello.token); },
+    ready(hello: LiveHello, generation: number, report: LiveReady) {
+      liveAccess(hello); if (hello.role !== 'display') throw new HttpError(403, 'DISPLAY_REQUIRED', 'Only viewers report image readiness.');
+      const state = service.state(hello.sessionId); const round = currentRound(state);
+      const image = round && ['ready', 'guessing', 'paused'].includes(round.phase) && library.bytes(hello.sessionId, round.id) ? round.id : null;
+      // Preserve the probe nonce until the next real clock probe; a readiness push is not a new clock sample.
+      const sample = displays.report(hello.sessionId, hello.displayId, hello.token, { ...report, type: 'status', connectionId: hello.connectionId, connectionSequence: generation }, image, false);
+      changed(); return sample;
+    },
+    disconnected(hello: LiveHello, generation: number) {
+      if (stopped) return;
+      if (hello.role === 'host') control.disconnected(hello.token);
+      else displays.disconnected(hello.sessionId, hello.displayId, hello.token, hello.connectionId, generation);
+      changed();
+    },
+  };
   const lifecycle = {
+    live,
+    beginShutdown() { draining = true; for (const controller of addressRequests) controller.abort(); for (const job of jobs.values()) clearImmediate(job); jobs.clear(); },
     stop() {
       if (stopped) return; stopped = true; clearInterval(heartbeat);
       for (const controller of addressRequests) controller.abort(); addressRequests.clear();
       for (const job of jobs.values()) clearImmediate(job); jobs.clear();
-      try { service.close(); } finally { library.release(); control.close(); displays.close(); }
+      try { service.close(); } finally { library.release(); control.close(); displays.close(); listeners.clear(); }
     },
     async handle(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
       let requestSession: string | undefined; let authorizedHost = false;
       try {
-        if (stopped || !storage.db.open) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Game storage is shutting down.');
+        if (stopped || draining || !storage.db.open) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Game storage is shutting down.');
         const origin = req.headers.origin;
         if ((origin !== undefined && !origins.has(origin)) || req.method === 'OPTIONS') throw new HttpError(403, 'ORIGIN_REJECTED', 'Use the configured local application origin.');
         if (req.method !== 'GET' && (!origin || !origins.has(origin) || req.headers['x-name-that-match'] !== 'game')) throw new HttpError(403, 'GAME_HEADER_REQUIRED', 'Use the game application origin and mutation header.');
@@ -165,7 +218,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           json(res, 200, { data: { serverEpoch, released: lease[1] === 'release' } }); return;
         }
         if (req.method === 'GET') {
-          if (route === '/api/game/current') json(res, 200, { data: status(repo.current(), refresh) });
+          if (route === '/api/game/current') json(res, 200, { data: status(service.current(), refresh) });
           else if (session?.[3]) {
             const receipt = repo.receipt(id(session[3]));
             if (!receipt || receipt.receipt.sessionId !== requestSession) throw new HttpError(404, 'RECEIPT_NOT_FOUND', 'No accepted receipt found. Review current state before deliberately retrying the original request.');
@@ -222,6 +275,8 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           if (authorizedHost && requestSession && error.code === 'conflict') { try { currentRevision = repo.load(requestSession).stateVersion; } catch { /* no private data in failure */ } }
           json(res, codes[error.code], { error: { code: error.code.toUpperCase(), message: error.message === 'Stale game revision' ? 'The session changed. Review the refreshed state before retrying.' : error.message, ...(currentRevision ? { currentRevision } : {}) } });
         } else errorResponse(res, error instanceof HttpError || error instanceof ImportError ? error : new HttpError(503, 'GAME_UNAVAILABLE', 'Local game storage or assets are unavailable. Review the session before retrying.'));
+      } finally {
+        if (req.method !== 'GET' && !stopped) changed();
       }
     },
   };

@@ -11,6 +11,7 @@ Name That Match is a local-first wrestling trivia application built with React, 
 - Offline-safe startup with no cloud dependency
 - Authoritative game sessions, ten-second attempts, host judgments and durable scores
 - Explicit Studio display launch, optional fullscreen and a scaled reel-safe stage
+- Shared Studio/Road WebSocket observations with HTTP commands and explicit recovery
 
 ## Requirements
 
@@ -80,7 +81,7 @@ Closing the dialog keeps durable server progress. Reopen **Recent imports** to r
 
 ## Game host
 
-For a laptop host and attached TV/monitor, follow [Studio Mode setup, fullscreen, reel-safe composition and recovery](docs/studio-mode.md). Studio reuses the current HTTP game service; WebSocket/Road certification remains a later milestone. Physical-device/offline acceptance is recorded separately from automated checks.
+For a laptop host and attached TV/monitor, follow [Studio Mode setup, fullscreen, reel-safe composition and recovery](docs/studio-mode.md). For a separate device, follow [Road Mode LAN joining, WebSocket synchronization and interruption recovery](docs/road-mode.md). Both use one server authority with HTTP commands and WebSocket observations. Physical-device/offline acceptance is recorded separately from automated checks.
 
 Open **Play** to configure contestants, explicitly select the active contestant and create a primary contestant-display link **before preparing**. Paste it into a separate tab. Prepare stays hidden until the primary has decoded/synchronized and the host selects **Reveal & start**. The server owns the ten-second clock, pause/resume and judgment; display reload/disconnect never resets it. Judgment leaves the contestant result concealed; select **Reveal Result** to present its committed outcome/points and frozen match identity. Reduced motion and refresh show a stable result. Host leases, revisions and receipts protect concurrent/retried requests. Tie-aware scoreboards show server totals and latest outcomes; contestant totals update on Reveal Result. Advance explicitly returns between rounds, keeping the same contestant and previous tier until you choose otherwise. Used matches remain excluded across contestants and tiers. Final-total presentation and confirmed End/New Game controls preserve final results and create independent fresh setups. See [host operation, recovery and manual acceptance](docs/game-host.md).
 

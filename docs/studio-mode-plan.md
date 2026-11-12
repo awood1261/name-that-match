@@ -1,6 +1,8 @@
-# Studio Mode — implementation plan for review
+# Studio Mode — approved Milestone 5 implementation plan
 
 Status: owner-approved implementation sequence for existing Game Experience MVP tasks 6.1–6.6. Approval followed the Milestone 4 closeout and architecture review. The approved change's D9–D11 and GD-03–06 remain authoritative; no game rules or later-milestone scope change.
+
+This records the Milestone 5 plan and its intermediate HTTP transport. Milestone 6 subsequently replaces polling; see [current Studio operation](studio-mode.md) and [Road/real-time operation](road-mode.md).
 
 ## Architecture and boundaries
 

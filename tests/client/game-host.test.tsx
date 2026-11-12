@@ -10,6 +10,7 @@ import type { CommandEnvelope, GameState, HostIntent } from '../../shared/src/ga
 import type { HostStatus } from '../../shared/src/game/host';
 import { context, NOW, setup, pureGame, envelope } from '../game/fixtures';
 import { randomUUID } from 'node:crypto';
+import { mockGameLive } from './mock-game-live';
 
 let state: GameState | null; let sequence: number;
 const credential = { token: 'a'.repeat(64), serverEpoch: randomUUID(), generation: 1 };
@@ -32,6 +33,7 @@ function apply(command: CommandEnvelope) {
   return response;
 }
 beforeEach(() => {
+  mockGameLive();
   sessionStorage.clear(); state = null; sequence = 0;
   vi.spyOn(gameApi, 'claim').mockResolvedValue(credential); vi.spyOn(gameApi, 'renew').mockResolvedValue({ serverEpoch: credential.serverEpoch });
   vi.spyOn(gameApi, 'current').mockImplementation(async () => status()); vi.spyOn(gameApi, 'release').mockResolvedValue({});

@@ -35,6 +35,10 @@ export class GameControl {
   release(token: string): void {
     this.authorize(token); this.lost(); this.controller = null; this.lossNotified = false;
   }
+  disconnected(token: string): void {
+    if (this.controller?.token !== token || this.lossNotified) return;
+    this.lossNotified = true; this.lost();
+  }
   viewer(token: string, sessionId: string): string {
     this.authorize(token);
     if (this.viewers.size >= 4) throw new HttpError(409, 'DISPLAY_LIMIT', 'This process already has four display capabilities.');

@@ -382,3 +382,7 @@ The owner accepted End/New Game manual verification and explicitly approved begi
 ### Milestone 5 authorization
 
 Following the completed Milestone 4 checkpoint and Studio architecture review, the owner approved proceeding with Milestone 5. Implement tasks 6.1–6.6 using the reviewed `docs/studio-mode-plan.md`: explicit isolated launch, viewer-controlled fullscreen, uniformly scaled safe stage, scoped CSS Modules, accessibility, built-application/load verification and operation guidance. Existing game rules, HTTP polling and primary readiness/recovery stay unchanged. Physical hardware/offline checks must be recorded as performed or explicitly deferred. No Milestone 6 implementation, new dependencies or archive is authorized by this approval.
+
+### Milestone 6 and package authorization
+
+The owner accepted Milestone 5 manual verification and approved beginning Milestone 6, tasks 7.1–7.8. The owner separately approved `ws` **8.22.2** as a direct production dependency and `@types/ws` **8.18.2** as development-only declarations. Both versions are pinned; no optional WebSocket native addon, compression, framework or additional dependency is approved. Earlier milestone-only authorization paragraphs remain historical. Preserve game rules, server ownership, HTTP mutations/receipt review, QR/LAN joining and Studio composition while replacing polling with the single shared observation adapter. Record actual device/offline evidence separately and do not archive without an explicit request.

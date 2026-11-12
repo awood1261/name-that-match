@@ -4,6 +4,8 @@ import path from 'node:path';
 import { isHealthResponse, type HealthResponse } from '../../shared/src/health.js';
 import { closeStorage, initializeStorage, type StorageOptions, type StorageSession } from './storage.js';
 import { createGameHttp } from './game/http.js';
+import { attachGameLive } from './game/live.js';
+import { LIVE_LIMITS } from '../../shared/src/game/live.js';
 import { createLibraryHttp } from './library/http/dispatcher.js';
 import { configuredOrigins, errorResponse, requestUrl as parseRequestUrl } from './library/http/protocol.js';
 
@@ -125,10 +127,11 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
   try { game = createGameHttp(storage, origins, {}, { production: productionMode, host: resolvedHost }); }
   catch (error) { library.stop(); closeStorage(storage); throw error; }
   let storageReleased = false;
+  let live: ReturnType<typeof attachGameLive> | undefined;
   const releaseStorage = () => {
     if (!storageReleased) {
       storageReleased = true;
-      try { game.stop(); }
+      try { live?.stop(true); game.stop(); }
       finally { library.stop(); closeStorage(storage); }
     }
   };
@@ -176,6 +179,20 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
     res.end(JSON.stringify({ error: 'Not found' }));
   });
 
+  try { live = attachGameLive(server, origins, game.live); }
+  catch (error) { releaseStorage(); throw error; }
+  // HTTP close does not close upgraded sockets. Stop both lanes before releasing SQLite.
+  const originalClose = server.close;
+  let closing = false; let closeTimer: ReturnType<typeof setTimeout> | null = null;
+  server.close = function (callback?: (error?: Error) => void) {
+    if (!closing) {
+      closing = true; game.beginShutdown(); live?.stop();
+      closeTimer = setTimeout(() => { live?.stop(true); server.closeAllConnections(); }, LIVE_LIMITS.shutdownMs);
+      closeTimer.unref();
+    }
+    return originalClose.call(this, callback);
+  };
+
   server.on('listening', () => {
     const address = server.address();
     const boundPort = address && typeof address !== 'string' ? address.port : resolvedPort;
@@ -193,6 +210,7 @@ export function createServer(port = DEFAULT_PORT, options: ServerOptions = {}) {
   });
 
   server.on('close', () => {
+    if (closeTimer) clearTimeout(closeTimer);
     releaseStorage();
   });
 
@@ -235,6 +253,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   void startServer(port, {
     host,
     production: productionMode,
+  }).then((server) => {
+    let stopping = false;
+    const stop = () => {
+      if (stopping) return; stopping = true;
+      server.close((error) => { if (error) { console.error('Unable to stop Name That Match server:', error); process.exitCode = 1; } });
+    };
+    process.once('SIGINT', stop); process.once('SIGTERM', stop);
+    server.once('close', () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); });
   }).catch((error: unknown) => {
     console.error('Unable to start Name That Match server:', error);
     process.exitCode = 1;

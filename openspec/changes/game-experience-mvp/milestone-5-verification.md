@@ -59,3 +59,7 @@ Tasks 6.6/D11 explicitly permit honest physical deferrals. This checkpoint can b
 Tasks **6.1–6.6 are complete** with the physical deferrals above explicitly retained. Final strict validation: `openspec validate game-experience-mvp --type change --strict` passed; `openspec validate --all --strict` passed **5 items, 0 failures**. Progress is **38/46 complete**, with eight Milestone 6 tasks remaining unchecked. No archive or main-spec synchronization is performed. Stop for owner manual review/approval before Road/WebSocket work.
 
 Implementation files are the new `ContestantStage`/`DisplayControls` components and CSS Modules, `stageText.ts`, existing contestant/join/score/result/host components and styles, scoped design tokens, Studio component/host/join/display tests, current operation documentation and the active change's design/task/evidence files. Server/shared domain code and dependency manifests are unchanged. Existing staged Milestone 4 evidence is preserved; this checkpoint does not commit, push or alter staging.
+
+## Subsequent owner review
+
+The owner reported manual verification complete with all workflows looking good, then approved beginning Milestone 6. This records Studio workflow acceptance; no specific physical device, viewing distance or disconnected-internet setup was supplied, so the physical deferrals above are not silently relabeled as performed.

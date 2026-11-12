@@ -1,6 +1,6 @@
 # Studio Mode operation
 
-Studio uses a laptop host and a separate contestant browser window on a TV or monitor. Both observe the same local Node game service and SQLite session. The contestant has read-only game access; its fullscreen and guide controls affect presentation only. Current synchronization uses bounded HTTP polling. WebSocket replacement and final Road certification remain Milestone 6.
+Studio uses a laptop host and a separate contestant browser window on a TV or monitor. Both observe the same local Node game service and SQLite session. The contestant has read-only game access; its fullscreen and guide controls affect presentation only. Studio and Road now share the WebSocket observation/readiness/clock adapter, with commands and receipts on HTTP. See [real-time operation, recovery and Road acceptance](road-mode.md). Physical certification remains separately recorded.
 
 ## Start the installed production app
 
@@ -50,4 +50,4 @@ Record actual browser, display resolution, TV/monitor, viewing distance and outc
 - Complete multiple rounds across tiers, host-controlled switching, late credit, winner/tie and End/New Game. Verify saved results/recovery after restart on disposable data first.
 - Disconnect external internet while keeping the required local connection, then repeat preparation through completion. Run the already built app; no download should be needed.
 
-This implementation's automated browser checks and their measured limits are recorded in `openspec/changes/game-experience-mvp/milestone-5-verification.md`. Native fullscreen in desktop Chrome and emulated viewport checks do not certify a physical TV, camera crop, Android tablet, Wi-Fi interruption or actual internet disconnection. Those checks remain explicitly deferred until performed. Archived Photo Library collection/device deferrals are unchanged.
+Studio implementation checks and their measured limits are recorded in `openspec/changes/game-experience-mvp/milestone-5-verification.md`; WebSocket/Studio regression evidence is in `milestone-6-verification.md` in the same change. Native fullscreen in desktop Chrome and emulated viewport checks do not certify a physical TV, camera crop, Android tablet, Wi-Fi interruption or actual internet disconnection. Those checks remain explicitly deferred until performed. Archived Photo Library collection/device deferrals are unchanged.

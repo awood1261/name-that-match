@@ -6,7 +6,7 @@ Private, portable, offline-first wrestling screenshot trivia for filming at even
 
 Read `README.md` for setup, `docs/local-storage.md` for storage, and relevant `openspec/` artifacts for intended behavior. Inspect actual code, Git status, recent history, and existing instructions before editing. Preserve unrelated user changes. Verify current status: the foundation and Match Library MVP are archived; further features and gameplay require separate approved changes. See the Match Library archive summary for deferred real-collection/device acceptance checks.
 
-For current gameplay operation/architecture, read `docs/game-host.md` and `docs/studio-mode.md`. Host and read-only contestant roots share the authoritative server via HTTP polling until the separately approved WebSocket milestone. Preserve explicit launch/fullscreen gestures and the uniformly scaled logical contestant stage; never treat viewport tests as physical TV/tablet or offline certification.
+For current gameplay operation/architecture, read `docs/game-host.md`, `docs/studio-mode.md` and `docs/road-mode.md`. Host and read-only contestant roots share one authoritative server: HTTP commands/receipts plus the shared WebSocket snapshot/readiness/clock adapter. Preserve explicit launch/fullscreen gestures and the uniformly scaled logical contestant stage; never treat local socket or viewport tests as physical TV/tablet or offline certification.
 
 ## OpenSpec workflow
 
@@ -21,10 +21,10 @@ For current gameplay operation/architecture, read `docs/game-host.md` and `docs/
 Use the existing React, strict TypeScript, Vite, Node.js, SQLite, and Vitest stack. New frameworks, databases, state libraries, build systems, or external runtime requirements require a documented need and approval.
 
 - `client/`: React presentation, administration, contestant displays, and interaction. Keep business rules outside components; never access SQLite or the filesystem from the browser.
-- `server/`: HTTP, persistence, filesystem operations, and future authoritative game state. Maintain one server authority. Validate untrusted API requests and future WebSocket messages at runtime.
+- `server/`: HTTP, persistence, filesystem operations, authoritative game state and WebSocket coordination. Maintain one server authority. Validate untrusted API requests and WebSocket messages at runtime.
 - `shared/`: focused client/server contracts and domain types. Avoid speculative schemas, duplication, circular dependencies, and oversized modules.
 - `tests/`: automated verification following existing repository conventions.
-- Keep networking, presentation, business rules, and persistence separate. WebSockets are planned for synchronization; use ordinary HTTP where sufficient.
+- Keep networking, presentation, business rules, and persistence separate. Game observations use the shared WebSocket adapter; commands, receipts, assets and library workflows retain HTTP. Do not introduce another polling/liveness owner or browser-local game authority.
 
 ## Product rules
 
