@@ -56,3 +56,10 @@ Owner approved the refined implementation request on 2026-11-12. Phase A was aut
 - [x] 9.3 Verify held/frozen/zero phases, hidden-result privacy, dynamic 1/2/3 points, image fallback, responsive geometry, reduced motion and restored scenes through component and production browser checks; run all regression/build/OpenSpec checks, record evidence, leave physical acceptance and archive gates open.
 
 Held-clue/result-refinement evidence: `../game-experience-mvp/held-result-verification.md`. Existing physical/closeout tasks remain open.
+
+## 10. Owner-approved tier names
+
+- [x] 10.1 Record the approved Easy/Medium/Hard contestant names and strictly validate the refinement; preserve colors, illustrations and point values under upstream GD-08.
+- [x] 10.2 Verify cards/strip use new shared labels and original assets/color hooks, execute regression/build/spec checks and record evidence; keep physical/closeout tasks open.
+
+Tier-name evidence: `../game-experience-mvp/tier-names-verification.md`. Physical/closeout tasks remain open.

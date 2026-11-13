@@ -101,7 +101,7 @@ describe('host setup and preparation UI', () => {
   });
   it('shows distinct-match counts and empty tiers without changing library classification', async () => {
     await createSession(); fireEvent.click(screen.getByRole('button', { name: 'Start game' })); await screen.findByText('Between rounds');
-    fireEvent.click(screen.getByRole('radio', { name: /Competitive Match/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Medium/ }));
     expect(screen.getByText(/No eligible unseen screenshots in this tier/)).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Prepare screenshot' })).toBeDisabled();
     expect(screen.getByText('2 eligible screenshots · 1 distinct match')).toBeInTheDocument();
   });
@@ -159,7 +159,7 @@ describe('host setup and preparation UI', () => {
     state = transition(state, { type: 'PREPARE', roundId: randomUUID(), tier: 'deathmatch' }, env());
     state = transition(state, { type: 'PREPARE_SUCCEEDED', context: { ...context(), obscurity: 'high', difficulty: 'hard' } }, env());
     render(<HostPage />); await screen.findByText('Screenshot ready · hidden');
-    expect(screen.getByRole('radio', { name: /Deathmatch/ })).toBeChecked(); expect(screen.getByRole('radio', { name: /Squash Match/ })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: /Hard/ })).toBeChecked(); expect(screen.getByRole('radio', { name: /Easy/ })).not.toBeChecked();
   });
   it('restores existing sessions and ignores late responses after leaving the view', async () => {
     state = createState(setup(1), NOW); state.contestants[0].name = 'Restored'; sessionStorage.setItem('ntm.game.controller', JSON.stringify(credential));
@@ -231,9 +231,9 @@ describe('explicit round progression', () => {
   it('retains the restored previous tier, explains exhaustion and requires an explicit different tier', async () => {
     resolved('correct', true, true); render(<HostPage />); await screen.findByRole('button', { name: 'Advance' });
     fireEvent.click(screen.getByRole('button', { name: 'Advance' })); await screen.findByText('Between rounds');
-    expect(screen.getByRole('radio', { name: /Deathmatch/ })).toBeChecked(); expect(screen.getByRole('button', { name: 'Prepare screenshot' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /Hard/ })).toBeChecked(); expect(screen.getByRole('button', { name: 'Prepare screenshot' })).toBeDisabled();
     expect(screen.getByText(/No eligible unseen screenshots in this tier/)).toBeInTheDocument(); expect(gameApi.command).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('radio', { name: /Squash Match/ })); fireEvent.click(screen.getByRole('button', { name: 'Prepare screenshot' }));
+    fireEvent.click(screen.getByRole('radio', { name: /Easy/ })); fireEvent.click(screen.getByRole('button', { name: 'Prepare screenshot' }));
     await screen.findByText('Screenshot ready · hidden', {}, { timeout: 2000 });
     expect(currentRound(state!)?.requestedTier).toBe('squash'); expect(vi.mocked(gameApi.command).mock.calls[1][1]).toMatchObject({ type: 'PREPARE', payload: { tier: 'squash' } });
   });

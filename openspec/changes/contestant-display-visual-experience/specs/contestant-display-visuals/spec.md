@@ -13,7 +13,7 @@ The three screens SHALL follow the corresponding approved files in `design-comps
 - **AND** approved Barlow Condensed faces are self-hosted with offline fallback stacks and their required license, without runtime external stylesheet/font requests
 
 ### Requirement: CV-02 Choose Your Match
-A synchronized public `setup` or `between_rounds` state SHALL show the centered logo, CHOOSE YOUR MATCH heading and three informational cards: Squash Match / 1 POINT / green, Competitive Match / 2 POINTS / yellow, Deathmatch / 3 POINTS / red. Cards SHALL NOT submit commands, act as buttons or enter the tab order. This screen SHALL have no empty clue placeholder or persistent scoreboard in the main area. Selecting a host tier alone SHALL NOT advance it. The existing host SHALL remain the source of truth for tier availability; contestant cards SHALL NOT claim a tier is available or unavailable without authoritative public information.
+A synchronized public `setup` or `between_rounds` state SHALL show the centered logo, CHOOSE YOUR MATCH heading and three informational cards: Easy / 1 POINT / green, Medium / 2 POINTS / yellow, Hard / 3 POINTS / red. Cards SHALL NOT submit commands, act as buttons or enter the tab order. This screen SHALL have no empty clue placeholder or persistent scoreboard in the main area. Selecting a host tier alone SHALL NOT advance it. The existing host SHALL remain the source of truth for tier availability; contestant cards SHALL NOT claim a tier is available or unavailable without authoritative public information.
 
 #### Scenario: Verbal choice and explicit preparation
 - **WHEN** the host changes the selected tier while waiting between rounds

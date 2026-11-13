@@ -33,3 +33,7 @@ The owner explicitly approved implementation with the final refinement request o
 ## Owner-approved result refinement — 2026-11-12
 
 Extend the implemented visuals with held-clue/frozen-time presentation and dynamic green/red revealed feedback based on the two additional screen-updates references specified in design.md. This explicitly authorizes result polish previously excluded; upstream GR-10 owns stopped time and image lifecycle. Retain explicit Reveal Result, frozen answer/score information and all physical acceptance deferrals.
+
+## Owner-approved tier names — 2026-11-13
+
+Use Easy / Medium / Hard in all contestant tier text instead of the match-type-sounding names. Existing 1/2/3 points, illustrations, colors and behavior remain. Original comp text is superseded by the owner-approved name mapping; upstream GD-08 provides the shared mapping.

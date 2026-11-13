@@ -123,3 +123,10 @@ Tasks 9.1–9.3 evidence: `terminal-link-verification.md`.
 - [x] 10.5 Verify integrated correct/incorrect/expiry/late-credit, refresh/reconnect/restart, image failure, scoring/ownership/privacy and import regressions; run tests/typecheck/lint/build and strict validation, document actual results and manual steps. Stop without archive/commit.
 
 Held-clue/result-refinement evidence: `held-result-verification.md`.
+
+## 11. Owner-approved Easy / Medium / Hard tier names
+
+- [x] 11.1 Record the approved display-name mapping and cross-capability deltas, preserving identifiers/matrix/points/data and artwork/colors; strictly validate before code.
+- [x] 11.2 Update shared labels, current operation docs/AGENTS and affected interaction tests; verify host/contestant/library names, stable classification/points/assets and saved IDs, run tests/typecheck/lint/build and strict OpenSpec checks, record results and stop without archive/commit.
+
+Tier-name evidence: `tier-names-verification.md`.

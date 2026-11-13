@@ -3,9 +3,9 @@ import { DIFFICULTIES, OBSCURITIES, type Obscurity, type VisualDifficulty } from
 export const GAME_TIERS = ['squash', 'competitive', 'deathmatch'] as const;
 export type GameTier = typeof GAME_TIERS[number];
 export const GAME_TIER_DETAILS = {
-  squash: { label: 'Squash Match', points: 1 },
-  competitive: { label: 'Competitive Match', points: 2 },
-  deathmatch: { label: 'Deathmatch', points: 3 },
+  squash: { label: 'Easy', points: 1 },
+  competitive: { label: 'Medium', points: 2 },
+  deathmatch: { label: 'Hard', points: 3 },
 } as const;
 export type Classification = { tier: GameTier; points: 1 | 2 | 3 } | { tier: null; points: null };
 const matrix: Readonly<Record<Obscurity, Readonly<Record<VisualDifficulty, GameTier>>>> = {

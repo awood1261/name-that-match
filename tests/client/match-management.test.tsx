@@ -241,7 +241,7 @@ describe('individual screenshot classification and review', () => {
     expect(reviewApi.edit).not.toHaveBeenCalled(); expect(within(screen.getByRole('complementary', { name: 'Review screenshot' })).getByText('Unclassified', { exact: true })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save screenshot' }));
     await waitFor(() => expect(reviewApi.edit).toHaveBeenCalledOnce());
-    expect(await screen.findByText('Competitive Match · 2 points')).toBeInTheDocument();
+    expect(await screen.findByText('Medium · 2 points')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Approve screenshot' }));
     await screen.findByText(/Review: approved/); expect(reviewApi.review).toHaveBeenCalledWith(expect.objectContaining({ difficulty: 'hard', matchRevision: 1 }), 'approved', expect.any(AbortSignal));
     expect(matchApi.update).not.toHaveBeenCalled();
@@ -267,14 +267,14 @@ describe('individual screenshot classification and review', () => {
     expect(screen.getByLabelText('Screenshot difficulty')).toHaveValue('easy'); expect(screen.getByRole('button', { name: 'Use reviewed screenshot revision' })).toBeDisabled();
     fireEvent.click(screen.getByLabelText('I compared the current server values')); fireEvent.click(screen.getByRole('button', { name: 'Use reviewed screenshot revision' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save screenshot' }));
-    await screen.findByText('Squash Match · 1 point'); expect(vi.mocked(reviewApi.edit).mock.calls[1][0].revision).toBe(2);
+    await screen.findByText('Easy · 1 point'); expect(vi.mocked(reviewApi.edit).mock.calls[1][0].revision).toBe(2);
   });
   it('refreshes saved projections after parent obscurity changes and supports cancel/review states without rating other screenshots', async () => {
     images[0] = { ...images[0], difficulty: 'hard' };
-    render(<MatchLibraryPage />); await openReview(); expect(screen.getByText('Competitive Match · 2 points')).toBeInTheDocument();
+    render(<MatchLibraryPage />); await openReview(); expect(screen.getByText('Medium · 2 points')).toBeInTheDocument();
     change('Screenshot difficulty', 'easy'); fireEvent.click(screen.getByRole('button', { name: 'Cancel screenshot changes' })); expect(screen.getByLabelText('Screenshot difficulty')).toHaveValue('hard');
     fireEvent.click(screen.getByRole('button', { name: 'Back to collection' })); change('Match obscurity', 'high'); save(); await waitFor(() => expect(matchApi.update).toHaveBeenCalledOnce());
-    fireEvent.click(await screen.findByRole('button', { name: 'Review capture first' })); await screen.findByText('Deathmatch · 3 points');
+    fireEvent.click(await screen.findByRole('button', { name: 'Review capture first' })); await screen.findByText('Hard · 3 points');
     fireEvent.click(screen.getByRole('button', { name: 'Reject screenshot' })); await screen.findByText(/Review: rejected/);
     fireEvent.click(screen.getByRole('button', { name: 'Mark pending' })); await screen.findByText(/Review: pending/);
     expect(images[1].difficulty).toBeNull(); expect(reviewApi.edit).not.toHaveBeenCalled();
@@ -307,8 +307,8 @@ describe('individual screenshot classification and review', () => {
     expect(within(screen.getByRole('region', { name: 'Entire library statistics' })).getByText('Fully classified')).toBeInTheDocument();
     const totals = within(screen.getByRole('region', { name: 'Entire library statistics' }));
     expect(totals.getByText('Screenshots').nextElementSibling).toHaveTextContent('24');
-    expect(totals.getByText('Classified Deathmatch').nextElementSibling).toHaveTextContent('14');
-    expect(totals.getByText('Eligible Deathmatch').nextElementSibling).toHaveTextContent('0');
+    expect(totals.getByText('Classified Hard').nextElementSibling).toHaveTextContent('14');
+    expect(totals.getByText('Eligible Hard').nextElementSibling).toHaveTextContent('0');
     expect(totals.getByText(/Pending or rejected screenshots are excluded/)).toBeInTheDocument();
     images = []; fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
     await screen.findByText('0 unassigned screenshots');
@@ -321,7 +321,7 @@ describe('individual screenshot classification and review', () => {
     images = [{ ...images[0], difficulty: 'easy', reviewStatus: 'approved' }, { ...images[1], difficulty: 'medium', reviewStatus: 'approved' }, { ...image('third'), matchId, difficulty: 'easy', matchRevision: 1 }];
     vi.mocked(reviewApi.statistics).mockResolvedValue({ totalMatches: 1, totalScreenshots: 3, fullyClassifiedScreenshots: 3, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 3, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 2, competitive: 0, deathmatch: 0 }, asOf: '' });
     render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters'));
-    for (const [group, label] of [['Filter visual difficulty', 'Easy'], ['Filter review', 'approved'], ['Filter game tier', 'Squash Match']]) fireEvent.click(within(screen.getByRole('group', { name: group })).getByLabelText(label));
+    for (const [group, label] of [['Filter visual difficulty', 'Easy'], ['Filter review', 'approved'], ['Filter game tier', 'Easy']]) fireEvent.click(within(screen.getByRole('group', { name: group })).getByLabelText(label));
     fireEvent.click(await screen.findByRole('button', { name: /^A vs B/ })); await screen.findByText('Showing 1 of 3 screenshots');
     expect(matchApi.screenshots).toHaveBeenCalledWith(matchId, expect.any(AbortSignal), 'difficulty=easy&review=approved&tier=squash');
     fireEvent.click(screen.getByRole('button', { name: 'Select all screenshots' })); expect(screen.getByRole('checkbox', { name: 'Select first' })).toBeChecked(); expect(screen.queryByRole('checkbox', { name: 'Select second' })).not.toBeInTheDocument();
@@ -335,11 +335,11 @@ describe('individual screenshot classification and review', () => {
       const result = matches.map((match) => ({ ...match, screenshotCount: images.filter((record) => record.matchId === match.id).length })).filter((match) => !query || filteredImages(images.filter((record) => record.matchId === match.id), query).length > 0);
       return { matches: result, matchedCount: result.length, asOf: '' };
     });
-    render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters')); fireEvent.click(within(screen.getByRole('group', { name: 'Filter game tier' })).getByLabelText('Squash Match'));
+    render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters')); fireEvent.click(within(screen.getByRole('group', { name: 'Filter game tier' })).getByLabelText('Easy'));
     fireEvent.click(await screen.findByRole('button', { name: /^A vs B/ })); await screen.findByText('Showing 1 of 2 screenshots'); fireEvent.click(screen.getByRole('button', { name: 'Edit match details' })); change('Match notes', 'Keep independent match draft');
     fireEvent.click(screen.getByRole('button', { name: 'Review capture first' })); change('Screenshot difficulty', 'hard'); fireEvent.click(screen.getByRole('button', { name: 'Save screenshot' }));
     await screen.findByText('No screenshots match the active filters. Change or clear the filters to see more screenshots.'); expect(screen.getByText('Showing 0 of 2 screenshots')).toBeInTheDocument();
-    expect(screen.getByLabelText('Match notes')).toHaveValue('Keep independent match draft'); expect(within(screen.getByRole('group', { name: 'Filter game tier' })).getByLabelText('Squash Match')).toBeChecked(); expect(matchApi.update).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Match notes')).toHaveValue('Keep independent match draft'); expect(within(screen.getByRole('group', { name: 'Filter game tier' })).getByLabelText('Easy')).toBeChecked(); expect(matchApi.update).not.toHaveBeenCalled();
     expect(vi.mocked(matchApi.list).mock.calls.some((args) => args.length === 1)).toBe(true);
   });
 

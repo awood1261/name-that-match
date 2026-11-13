@@ -53,3 +53,7 @@ Print each newly registered read-only contestant display URL in the Node server 
 ## Owner-approved held clue and result reference refinement — 2026-11-12
 
 Keep the exposed screenshot and round strip visible after Correct/Incorrect, with the authoritative judgment-time remainder frozen, and after expiry at 00:00. Continue concealing the outcome/award/answer until explicit Reveal Result. Recreate the owner-supplied green correct and red incorrect/timeout references with dynamic components over the actual clue, not flattened reference images; retain frozen answer details, scores, explicit progression and all game rules. Persist stopped time and restore the image on refresh/restart without new scoring.
+
+## Owner-approved tier names — 2026-11-13
+
+Rename displayed game tiers throughout contestant/host/library UI and current operation guidance: Squash Match → Easy, Competitive Match → Medium, Deathmatch → Hard. Preserve 1/2/3 points, classifier/matrix, illustrations/colors and saved game compatibility. This is a display-name change, not a change to wrestling-match types, screenshot visual difficulty, protocol identifiers or SQLite schema.

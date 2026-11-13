@@ -7,10 +7,11 @@ it('renders three informational cards with independent approved SVG elements and
   render(<ChooseMatch />);
   expect(screen.getByRole('heading', { name: 'CHOOSE YOUR MATCH' })).toBeInTheDocument();
   const cards = within(screen.getByRole('list', { name: 'Match difficulty tiers' })).getAllByRole('listitem');
-  for (const [index, label] of ['Squash Match', 'Competitive Match', 'Deathmatch'].entries()) {
+  for (const [index, label] of ['Easy', 'Medium', 'Hard'].entries()) {
     expect(within(cards[index]).getByRole('heading', { name: label })).toBeInTheDocument();
     expect(cards[index].querySelector('img')).toHaveAttribute('src', `/images/contestant/${['squash-match', 'competitive-match', 'deathmatch'][index]}.svg`);
     expect(within(cards[index]).getByText(`${index + 1} ${index === 0 ? 'POINT' : 'POINTS'}`)).toBeInTheDocument();
+    expect(cards[index]).toHaveAttribute('data-tier', ['squash', 'competitive', 'deathmatch'][index]);
     expect(cards[index]).not.toHaveAttribute('tabindex');
   }
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
