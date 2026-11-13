@@ -1,0 +1,34 @@
+/* Isolated design review page, never imported by the application. */
+* { box-sizing: border-box; }
+body { margin: 0; background: #000; color: #fff; font-family: var(--font-body); }
+main { width: min(1500px, calc(100% - 48px)); margin: 0 auto; padding: 20px 0 36px; }
+header { text-align: center; }
+.logo { width: min(760px, 70%); height: auto; }
+.reviewNotice { color: #c3d2ff; font: 700 15px var(--font-contestant-support); letter-spacing: 0.08em; }
+h1, h2, .points { font-family: var(--font-contestant-heading); font-style: italic; }
+h1 { display: flex; align-items: center; justify-content: center; gap: 32px; margin: 18px 0 32px; font-size: clamp(32px, 5.8vw, 86px); font-weight: var(--font-contestant-heading-weight); line-height: 1; }
+h1::before, h1::after { content: ''; width: 12%; height: 8px; background: #bf13ff; transform: skew(-25deg); }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.card { --tier-color: #3dff12; display: flex; flex-direction: column; align-items: center; border: 10px solid var(--tier-color); border-radius: 48px; padding: 12px 18px 20px; min-width: 0; }
+.competitive { --tier-color: #ffe500; }
+.deathmatch { --tier-color: #ff1d25; }
+.card > img { width: 100%; height: 245px; object-fit: contain; }
+.card h2 { margin: 0; font-size: clamp(24px, 4.4vw, 64px); font-weight: var(--font-contestant-label-weight); line-height: 0.94; text-align: center; min-height: 132px; display: grid; align-content: center; }
+.points { width: 100%; margin: 16px 0 0; padding: 2px 12px 6px; background: var(--tier-color); color: #000; border-radius: 10px; clip-path: polygon(7% 0, 100% 0, 93% 100%, 0 100%); text-align: center; font-size: clamp(28px, 4vw, 58px); font-weight: var(--font-contestant-label-weight); line-height: 1.15; }
+.fontReview { margin-top: 50px; padding-top: 24px; border-top: 2px solid #7f2dff; }
+.fontReview h2 { font-size: 38px; margin: 0 0 24px; }
+.fontReview p { margin: 12px 0; }
+small { font: 400 16px var(--font-body); color: #c3d2ff; display: block; }
+.oldType { font: italic 900 52px 'Arial Black', 'Segoe UI', sans-serif; }
+.newType { font: italic var(--font-contestant-heading-weight) 52px var(--font-contestant-heading); }
+.labelSample { font: italic var(--font-contestant-label-weight) 40px var(--font-contestant-label); }
+.timerSample { font: normal var(--font-contestant-timer-weight) 90px var(--font-contestant-timer); font-variant-numeric: tabular-nums; }
+.supportSample { font: normal var(--font-contestant-support-weight) 26px var(--font-contestant-support); }
+@media (max-width: 700px) {
+  main { width: calc(100% - 24px); }
+  .cards { grid-template-columns: 1fr; }
+  .card > img { height: 220px; }
+  .card h2 { min-height: auto; font-size: 48px; }
+  .points { font-size: 48px; }
+  .oldType, .newType { font-size: 30px; overflow-wrap: anywhere; }
+}

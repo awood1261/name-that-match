@@ -1,0 +1,1 @@
+$ NAME_THAT_MATCH_UI_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.20:5173 npm run dev

@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import type { StorageSession } from '../storage.js';
-import { catalog } from '../library/catalog.js';
+import { catalog, catalogAsync } from '../library/catalog.js';
 import { assessAsset, publicScreenshot } from '../library/assets.js';
 import { RecordNotFoundError, createLibraryRepository } from '../library/repository.js';
 import { classify, GAME_TIERS, type GameTier } from '../../../shared/src/classification.js';
@@ -13,13 +13,22 @@ import { HttpError } from '../library/http/protocol.js';
 
 export class GameLibrary {
   private cache: { key: string; candidates: GameCandidate[]; asOf: string } | null = null;
+  private assessment: Promise<boolean> | null = null;
+  private assessmentError: unknown = null;
+  private stopped = false;
   private pinned: { sessionId: string; roundId: string; context: RoundContext; bytes: Buffer } | null = null;
   constructor(private readonly storage: StorageSession, private readonly drawIndex = (length: number) => randomInt(length)) {}
-  private observations(fresh: boolean) {
+  private revisionKey() {
     const revisions = this.storage.db.prepare("SELECT 'm' AS kind,id,revision FROM matches UNION ALL SELECT 's',id,revision FROM screenshots ORDER BY kind,id").all();
-    const key = JSON.stringify(revisions);
+    return JSON.stringify(revisions);
+  }
+  private observations(fresh: boolean) {
+    const key = this.revisionKey();
     if (!fresh && this.cache?.key === key) return this.cache;
-    const observed = catalog(this.storage); const parents = new Map(observed.matches.map((m) => [m.id, m]));
+    return this.capture(key, catalog(this.storage));
+  }
+  private capture(key: string, observed: ReturnType<typeof catalog>) {
+    const parents = new Map(observed.matches.map((m) => [m.id, m]));
     const candidates: GameCandidate[] = [];
     for (const shot of observed.screenshots) {
       if (!shot.eligibility.eligible || !shot.matchId) continue;
@@ -32,8 +41,35 @@ export class GameLibrary {
     }
     this.cache = { key, candidates, asOf: observed.asOf }; return this.cache;
   }
+  /** One owned scan; HTTP callers await it while live observations keep their last complete asOf. */
+  refresh(fresh = false): Promise<boolean> {
+    if (this.stopped || !this.storage.db.open) return Promise.reject(new HttpError(503, 'GAME_UNAVAILABLE', 'Library assessment stopped.'));
+    const key = this.revisionKey();
+    if (this.assessment) return this.assessment;
+    if (!fresh && !this.assessmentError && this.cache?.key === key) return Promise.resolve(false);
+    this.assessment = (async () => {
+      try {
+        const observed = await catalogAsync(this.storage, () => this.stopped);
+        if (this.stopped || !this.storage.db.open) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Library assessment stopped.');
+        if (this.revisionKey() !== key) throw new HttpError(409, 'LIBRARY_CHANGED', 'Library changed during assessment. Refresh and try again.');
+        this.capture(key, observed); this.assessmentError = null; return true;
+      } catch (error) { this.assessmentError = error; throw error; }
+      finally { this.assessment = null; }
+    })();
+    return this.assessment;
+  }
+  cachedAvailability(state: GameState | null): GameAvailability {
+    // A concurrent edit invalidates the new scan, not the last complete asOf.
+    // The next observation retries; storage failures still surface explicitly.
+    if (this.assessmentError && !(this.cache && this.assessmentError instanceof HttpError && this.assessmentError.code === 'LIBRARY_CHANGED')) throw this.assessmentError;
+    if (!this.cache) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Library assessment is still in progress.');
+    return this.counts(state, this.cache);
+  }
   availability(state: GameState | null, fresh = false): GameAvailability {
     const observed = this.observations(fresh);
+    return this.counts(state, observed);
+  }
+  private counts(state: GameState | null, observed: { candidates: GameCandidate[]; asOf: string }): GameAvailability {
     const usedState = state ?? { rounds: [] };
     const tiers = { squash: { screenshots: 0, matches: 0 }, competitive: { screenshots: 0, matches: 0 }, deathmatch: { screenshots: 0, matches: 0 } };
     const all = new Set<string>();
@@ -44,8 +80,10 @@ export class GameLibrary {
     }
     return { tiers, distinctMatches: all.size, asOf: observed.asOf };
   }
-  select(state: GameState, tier: GameTier): RoundContext {
-    const pool = unseenPool(this.observations(true).candidates, state, tier);
+  select(state: GameState, tier: GameTier, fresh = true): RoundContext {
+    const observed = fresh ? this.observations(true) : this.cache;
+    if (!observed || this.assessmentError) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Refresh the library before preparing.');
+    const pool = unseenPool(observed.candidates, state, tier);
     if (!pool.length) throw new HttpError(422, 'EMPTY_POOL', 'No eligible unseen screenshots in this tier. Choose another tier or refresh after reviewing the library.');
     const index = this.drawIndex(pool.length);
     if (!Number.isSafeInteger(index) || index < 0 || index >= pool.length) throw new HttpError(503, 'SELECTION_UNAVAILABLE', 'Unable to select a candidate.');
@@ -92,5 +130,6 @@ export class GameLibrary {
     } catch { return false; }
   }
   release(): void { this.pinned = null; }
+  close(): void { this.stopped = true; this.release(); }
   get pinnedBytes(): number { return this.pinned?.bytes.length ?? 0; }
 }

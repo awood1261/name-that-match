@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initializeStorage } from '../../server/src/storage';
 import { applyLibraryMigrations, LIBRARY_SCHEMA_VERSION } from '../../server/src/library/migrations';
 import { GameRepository } from '../../server/src/game/repository';
+import { GameService } from '../../server/src/game/service';
+import { addGameSchema, extendGuessingWindow } from '../../server/src/game/migrations';
 import { createLibraryRepository } from '../../server/src/library/repository';
 import { createTestResources } from '../helpers/resources';
 import { screenshotInput } from '../library/fixtures';
@@ -16,7 +18,7 @@ const fixtures: ReturnType<typeof serviceFixture>[] = [];
 function fixture() { const f = serviceFixture(); fixtures.push(f); return f; }
 afterEach(async () => { vi.restoreAllMocks(); for (const f of fixtures.splice(0)) await f.cleanup(); });
 
-describe('global schema 3 game migration', () => {
+describe('global schema 5 game migration', () => {
   let resources: ReturnType<typeof createTestResources>;
   let rawConnections: Database.Database[];
   beforeEach(() => { resources = createTestResources(); rawConnections = []; });
@@ -30,10 +32,66 @@ describe('global schema 3 game migration', () => {
     if (version === 2) for (const [old, next] of [['iconic', 'low'], ['familiar', 'medium'], ['obscure', 'high'], ['squash', 'easy'], ['competitive', 'medium'], ['deathmatch', 'hard']]) schema = schema.split(`'${old}'`).join(`'${next}'`);
     db.exec(schema); db.pragma(`user_version=${version}`); db.pragma('foreign_keys=ON'); return db;
   }
+  function legacyPausedGame() {
+    const source = fixture(); source.ready(); source.command({ type: 'REVEAL_AND_START' }); source.command({ type: 'CORRECT' });
+    source.command({ type: 'REVEAL_ANSWER' }); source.command({ type: 'ADVANCE' }); source.ready(source.candidate('b'.repeat(64)));
+    source.command({ type: 'REVEAL_AND_START' }); source.setTime(25000); source.command({ type: 'PAUSE' }); const sessionId = source.state.id; source.service.close();
+    const db = legacy(2); addGameSchema(db); db.pragma('foreign_keys=OFF');
+    const tables = ['matches', 'screenshots', 'import_batches', 'import_items', 'game_sessions', 'game_contestants', 'game_rounds', 'game_score_events', 'game_command_receipts'];
+    // Populate the historical schema independently; all old round timings fit its 10s bound.
+    db.transaction(() => {
+      for (const table of tables) {
+        for (const row of source.storage.db.prepare(`SELECT * FROM ${table}`).all() as Array<Record<string, unknown>>) {
+          const columns = (db.pragma(`table_info(${table})`) as Array<{ name: string }>).map(c => c.name); db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(c => `@${c}`).join(',')})`).run(row);
+        }
+      }
+    })(); db.pragma('user_version=3'); db.pragma('foreign_keys=ON');
+    const rows = () => tables.map(table => db.prepare(`SELECT * FROM ${table} ORDER BY ${table === 'game_command_receipts' ? 'command_id' : 'id'}`).all().map(row => { const { stopped_remaining_ms: _stopped, ...old } = row as Record<string, unknown>; void _stopped; return old; }));
+    const objects = () => db.prepare("SELECT name,sql FROM sqlite_master WHERE type IN ('index','trigger') AND name LIKE 'game_%' AND name!='game_stopped_time_immutable' ORDER BY name").all();
+    return { db, rows, objects, sessionId };
+  }
+  it('upgrades a populated v3 game without changing old pause, scores, receipts, library, indexes or triggers', () => {
+    const f = legacyPausedGame(); const rows = f.rows(); const objects = f.objects();
+    expect(f.db.prepare("SELECT sql FROM sqlite_master WHERE name='game_rounds'").get()).toMatchObject({ sql: expect.stringContaining('window_ms <= 10000') });
+    applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(5);
+    expect(f.rows()).toEqual(rows); expect(f.objects()).toEqual(objects); expect(f.db.pragma('foreign_key_check')).toEqual([]);
+    expect(f.db.pragma('foreign_keys', { simple: true })).toBe(1);
+    let now = 0; const service = new GameService(new GameRepository(f.db), { now: () => now, primaryReady: () => true, candidateCurrent: () => true });
+    try {
+      const paused = service.state(f.sessionId); expect(paused.rounds.at(-1)).toMatchObject({ phase: 'paused', remainingMs: 5000 });
+      const running = service.execute(envelope(paused, { type: 'RESUME' })).state;
+      expect(running.rounds.at(-1)).toMatchObject({ phase: 'guessing', windowMs: 5000 });
+      expect(() => f.db.prepare('UPDATE game_rounds SET window_ms=30001 WHERE id=?').run(running.currentRoundId)).toThrow(/CHECK/);
+      now = 5000; expect(service.state(f.sessionId).rounds.at(-1)?.phase).toBe('awaiting_judgment');
+      expect(f.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 1 });
+    } finally { service.close(); }
+    const stable = f.rows(); applyLibraryMigrations(f.db); expect(f.rows()).toEqual(stable);
+  });
+  it('rolls back v3 timing rebuild after destructive DDL and can retry with all records and enforcement intact', () => {
+    const f = legacyPausedGame(); const rows = f.rows(); const objects = f.objects(); const exec = f.db.exec.bind(f.db);
+    vi.spyOn(f.db, 'exec').mockImplementation(sql => { const result = exec(sql); if (sql.startsWith('DROP TABLE game_rounds;')) throw new Error('injected timing rebuild failure'); return result; });
+    expect(() => applyLibraryMigrations(f.db)).toThrow(/injected timing/);
+    expect(f.db.pragma('user_version', { simple: true })).toBe(3); expect(f.rows()).toEqual(rows); expect(f.objects()).toEqual(objects);
+    expect(f.db.pragma('foreign_keys', { simple: true })).toBe(1); expect(f.db.pragma('foreign_key_check')).toEqual([]);
+    expect(f.db.prepare("SELECT name FROM sqlite_master WHERE name='game_rounds_next'").get()).toBeUndefined();
+    vi.restoreAllMocks(); applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(5); expect(f.rows()).toEqual(rows);
+  });
+  it('adds stopped timing to v4 transactionally, preserving unknown historical time and rolling back a failed ALTER', () => {
+    const f = legacyPausedGame(); f.db.pragma('foreign_keys=OFF'); f.db.transaction(() => extendGuessingWindow(f.db))(); f.db.pragma('foreign_keys=ON'); f.db.pragma('user_version=4');
+    const rows = f.rows(); const exec = f.db.exec.bind(f.db);
+    vi.spyOn(f.db, 'exec').mockImplementation(sql => { const result = exec(sql); if (sql.startsWith('ALTER TABLE game_rounds ADD COLUMN stopped_remaining_ms')) throw new Error('injected stopped migration failure'); return result; });
+    expect(() => applyLibraryMigrations(f.db)).toThrow(/injected stopped/);
+    expect(f.db.pragma('user_version', { simple: true })).toBe(4); expect(f.rows()).toEqual(rows);
+    expect(f.db.pragma('table_info(game_rounds)')).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'stopped_remaining_ms' })]));
+    vi.restoreAllMocks(); applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(5); expect(f.rows()).toEqual(rows);
+    expect(f.db.prepare('SELECT stopped_remaining_ms FROM game_rounds').all()).toEqual([{ stopped_remaining_ms: null }, { stopped_remaining_ms: null }]);
+    const old = new GameRepository(f.db).load(f.sessionId).rounds[0]; expect(old).not.toHaveProperty('stoppedRemainingMs');
+    expect(f.db.pragma('foreign_key_check')).toEqual([]);
+  });
   it('creates exactly five STRICT game tables, stable indexes, pragmas and an empty session on fresh/repeated startup', () => {
     const first = open(); const tables = first.db.prepare("SELECT name,strict FROM pragma_table_list WHERE name LIKE 'game_%' ORDER BY name").all();
     expect(tables).toEqual(gameTables.map((name) => ({ name, strict: 1 })));
-    expect(first.db.pragma('user_version', { simple: true })).toBe(3);
+    expect(first.db.pragma('user_version', { simple: true })).toBe(5);
     expect(first.db.pragma('foreign_keys', { simple: true })).toBe(1); expect(first.db.pragma('journal_mode', { simple: true })).toBe('wal');
     expect(first.db.pragma('synchronous', { simple: true })).toBe(1); expect(new GameRepository(first.db).current()).toBeNull();
     const schema = first.db.prepare("SELECT name,sql FROM sqlite_master WHERE name LIKE 'game_%' ORDER BY name").all(); first.db.close();
@@ -56,9 +114,9 @@ describe('global schema 3 game migration', () => {
     expect(fs.statSync(upgraded.dbPath).ino).toBe(inode); expect(fs.readFileSync(path.join(resources.root, 'screenshots', 'kept.txt'), 'utf8')).toBe('unchanged');
     expect(upgraded.db.pragma('foreign_key_check')).toEqual([]);
   });
-  it('retains the existing supported schema-1 mapping on the way to 3', () => {
+  it('retains the existing supported schema-1 mapping on the way to 4', () => {
     const db = legacy(1); db.exec("INSERT INTO matches(id,obscurity,created_at,updated_at) VALUES('legacy','iconic','old','old')"); db.close();
-    const storage = open(); expect(storage.db.pragma('user_version', { simple: true })).toBe(3);
+    const storage = open(); expect(storage.db.pragma('user_version', { simple: true })).toBe(5);
     expect(storage.db.prepare("SELECT obscurity,revision FROM matches WHERE id='legacy'").get()).toEqual({ obscurity: 'low', revision: 2 });
   });
   it('rejects unsupported newer versions without mutation', () => {
@@ -73,7 +131,7 @@ describe('global schema 3 game migration', () => {
     expect(() => applyLibraryMigrations(db)).toThrow(/injected/); expect(db.pragma('user_version', { simple: true })).toBe(2);
     expect(db.prepare("SELECT obscurity,revision FROM matches WHERE id='kept'").get()).toEqual({ obscurity: 'high', revision: 1 });
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'game_%'").all()).toEqual([]); expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
-    vi.restoreAllMocks(); applyLibraryMigrations(db); expect(db.pragma('user_version', { simple: true })).toBe(3); db.close();
+    vi.restoreAllMocks(); applyLibraryMigrations(db); expect(db.pragma('user_version', { simple: true })).toBe(5); db.close();
   });
 });
 
@@ -128,5 +186,18 @@ describe('SQLite game constraints and optimistic persistence', () => {
     const f = fixture(); const command = envelope(f.state, { type: 'START' }); f.service.execute(command); f.reopen(true);
     expect(f.service.execute(command).replayed).toBe(true);
     expect(() => f.service.execute({ ...command, type: 'DISCARD_SETUP' })).toThrow(/different content/);
+  });
+});
+
+describe('saved stopped countdown', () => {
+  it.each(['CORRECT', 'INCORRECT'] as const)('persists %s time without altering it on reveal/restart and enforces constraints', type => {
+    const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' });
+    for (const invalid of [-1, 30001, 5000]) expect(() => f.storage.db.prepare('UPDATE game_rounds SET stopped_remaining_ms=? WHERE id=?').run(invalid, f.state.currentRoundId)).toThrow(/CHECK/);
+    f.setTime(6500); f.command({ type }); const judged = f.state;
+    expect(judged.rounds.at(-1)).toMatchObject({ stoppedRemainingMs: 23500 });
+    expect(() => f.storage.db.prepare('UPDATE game_rounds SET stopped_remaining_ms=0 WHERE id=?').run(judged.currentRoundId)).toThrow(/immutable/);
+    f.setTime(90000); f.reopen(); expect(f.state.rounds.at(-1)).toMatchObject({ stoppedRemainingMs: 23500 });
+    f.command({ type: 'REVEAL_ANSWER' }); f.reopen(); expect(f.state.rounds.at(-1)).toMatchObject({ stoppedRemainingMs: 23500 });
+    expect(f.state.awards).toHaveLength(type === 'CORRECT' ? 1 : 0);
   });
 });

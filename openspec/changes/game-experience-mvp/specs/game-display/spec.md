@@ -21,7 +21,7 @@ The display SHALL support solo and head-to-head layouts for the approved one or 
 
 #### Scenario: Countdown and feedback
 - **WHEN** a ready round starts and is later adjudicated
-- **THEN** the display presents a contained screenshot and readable countdown, then a neutral concealed waiting state
+- **THEN** the display presents a contained screenshot and readable countdown, then the same exposed screenshot and a frozen countdown while the result stays concealed
 - **AND** only the host's subsequent Reveal Result presents the authoritative outcome, earned points and frozen match identity without awarding points locally
 
 #### Scenario: Dramatic correct or incorrect reveal
@@ -29,7 +29,7 @@ The display SHALL support solo and head-to-head layouts for the approved one or 
 - **THEN** a correct outcome presents prominent CORRECT! text, the committed earned points and a green success treatment with a brief energetic entrance
 - **AND** an incorrect outcome presents prominent INCORRECT! text, zero earned points and a distinct red failure entrance
 - **AND** participant/team description, promotion/event and available date/year, stipulation and championship fields use only the frozen answer snapshot
-- **AND** timeout and void retain their distinct zero-point outcomes rather than being relabeled incorrect
+- **AND** timeout uses the red failure treatment but retains its TIME UP label, and void retains its distinct zero-point presentation rather than being relabeled incorrect
 
 #### Scenario: Reduced motion and restored presentation
 - **WHEN** reduced motion is requested, or a viewer initially loads/reconnects into an already revealed result
@@ -41,7 +41,7 @@ The display SHALL support solo and head-to-head layouts for the approved one or 
 - **THEN** the picture stays covered until accepted screenshot Reveal & start and no answer metadata appears before answer Reveal
 
 #### Scenario: Host enters a verbal tier choice
-- **WHEN** the host records Squash Match, Competitive Match or Deathmatch under recommended P7
+- **WHEN** the host records Easy, Medium or Hard under recommended P7
 - **THEN** the corresponding server eligible pool is selected without changing any screenshot classification or point value
 - **AND** contestant devices have no tier-entry or other mutation control
 
@@ -109,3 +109,11 @@ Under the owner-approved LAN join refinement, the host connection panel SHALL sh
 - **WHEN** a device opens the QR URL or a server restart invalidates its capability
 - **THEN** existing fragment-removal/tab-storage and fresh-link recovery behavior remains unchanged
 - **AND** generating, refreshing or copying the QR does not log or persist its full credential-bearing URL in game history or expose controller credentials
+
+### Requirement: GD-08 Clear game tier names
+All contestant, host and library tier presentation SHALL use Easy (1 point), Medium (2 points), and Hard (3 points). Existing illustrations and green/yellow/red card colors SHALL remain unchanged. The classification matrix, point values, stored/protocol tier identities and saved game behavior SHALL remain compatible; no classification-input or schema migration SHALL be performed for this rename. Visual difficulty and derived Game tier SHALL remain distinctly labeled concepts.
+
+#### Scenario: Names throughout game and library
+- **WHEN** a user views tier choices, the contestant round strip, library filters/statistics or screenshot classification
+- **THEN** displayed tier names are Easy, Medium and Hard from the shared label map, with their existing points
+- **AND** existing saved records/rounds use the new displayed names with the same colors, illustrations, classification and scoring

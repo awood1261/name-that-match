@@ -56,7 +56,7 @@ export class GameService {
     const candidateCurrent = needsCandidate && context ? this.options.candidateCurrent?.(context, purpose) ?? false : false;
     const primaryReady = ['REVEAL_AND_START', 'RESUME'].includes(intent.type) && round && context ? this.options.primaryReady?.(round.id, context) ?? false : false;
     // Validate/decode observations before sampling the start time, so preparation work
-    // cannot consume the ten-second guessing window. Judgments perform no such I/O.
+    // cannot consume the thirty-second guessing window. Judgments perform no such I/O.
     return { nowMonoMs: this.now(), nowIso: this.wallNow(), clock: this.clock, awardId: randomUUID(), hasEligibleMatches, candidateCurrent, primaryReady };
   }
   private reconcileClock(state: GameState, atMono: number) {

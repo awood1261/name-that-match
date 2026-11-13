@@ -3,7 +3,7 @@ import type { Obscurity, PartialDate, VisualDifficulty } from '../library.js';
 
 export const GAME_PROTOCOL_VERSION = 1;
 export const GAME_RULES_VERSION = 1;
-export const GUESSING_WINDOW_MS = 10_000;
+export const GUESSING_WINDOW_MS = 30_000;
 export const MAX_GAME_TURNS = 1000;
 export const MAX_GAME_COMMANDS = 10_000;
 export interface Contestant { id: string; name: string }
@@ -27,6 +27,7 @@ interface Prepared extends Attempt { context: RoundContext }
 interface Exposed extends Prepared { turnOrdinal: number; exposedAt: string }
 export interface Judgment {
   outcome: 'correct' | 'incorrect' | 'timeout' | 'void'; award: 0 | 1 | 2 | 3;
+  stoppedRemainingMs?: number;
   lateEntry: boolean; voidReason: VoidReason | null; judgedAt: string;
 }
 export type Round =
@@ -100,7 +101,7 @@ export type DisplaySnapshot = PublicBase & (
   | (PublicRound & { phase: 'ready'; imageKey: string })
   | (PublicRound & { phase: 'guessing'; imageKey: string; remainingMs: number })
   | (PublicRound & { phase: 'paused' | 'awaiting_judgment' | 'interrupted'; remainingMs: number })
-  | (PublicRound & { phase: 'adjudicated' })
+  | (PublicRound & { phase: 'adjudicated'; remainingMs: number | null })
   | (PublicRound & { phase: 'answer_revealed'; outcome: Judgment['outcome']; award: number; answer: Answer })
 );
 export interface HostSnapshot {

@@ -1,5 +1,8 @@
 // @vitest-environment node
 import http from 'node:http';
+import * as assets from '../../server/src/library/assets';
+import { GameLibrary } from '../../server/src/game/library';
+import { HttpError } from '../../server/src/library/http/protocol';
 import net from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
@@ -83,6 +86,40 @@ describe('real local WebSocket game adapter', () => {
     await command('START'); await command('PREPARE', { roundId: randomUUID(), tier: 'squash' });
     await until(() => { const r = storage.db.prepare('SELECT phase FROM game_rounds ORDER BY ordinal DESC LIMIT 1').get() as { phase: string }; return r.phase === 'ready' ? true : undefined; }); await current();
   }
+  it('classifies assessment storage errors as recoverable without claiming the host credential is invalid', async () => {
+    vi.spyOn(GameLibrary.prototype, 'cachedAvailability').mockImplementationOnce(() => { throw new HttpError(503, 'STORAGE_UNAVAILABLE', 'private local failure'); });
+    const host = await connect(hello('host')); const error = host.frames.find(frame => frame.type === 'error');
+    expect(error).toMatchObject({ type: 'error', code: 'STORAGE_UNAVAILABLE', terminal: false });
+    expect(JSON.stringify(error)).not.toMatch(/private local|Live access changed/);
+    expect((await request('/control-lease/renew', {})).status).toBe(200);
+    const restored = await connect(hello('host')); expect(restored.snapshot.role).toBe('host');
+  });
+  it('keeps live heartbeats/clocks responsive through a slow Prepare and resolves a lost response by receipt without replay', async () => {
+    await command('START'); const host = await connect(hello('host')); const primary = await connect();
+    for (let i = 0; i < 65; i++) eligibleCapture(storage);
+    const assess = assets.assessAsset; vi.spyOn(assets, 'assessAsset').mockImplementation((...args) => {
+      const start = performance.now(); while (performance.now() - start < 50) { /* bounded CPU fixture per image */ }
+      return assess(...args);
+    });
+    const input = { protocolVersion: 1, commandId: randomUUID(), sessionId: sessionId(), expectedStateVersion: status.snapshot!.session.stateVersion,
+      type: 'PREPARE', payload: { roundId: randomUUID(), tier: 'squash' } };
+    const controller = new AbortController();
+    const lost = fetch(base + `/api/game/sessions/${sessionId()}/commands`, { method: 'POST', signal: controller.signal,
+      headers: { Origin: origin, 'X-Name-That-Match': 'game', 'Content-Type': 'application/json', Authorization: `Bearer ${owner.token}`, 'X-Name-That-Match-Epoch': owner.serverEpoch }, body: JSON.stringify(input) }).catch(() => null);
+    const abort = setTimeout(() => controller.abort(), 150);
+    let probes = 0; const clock = setInterval(() => { probes++; host.send({ type: 'clock_probe', nonce: randomUUID() }); }, 200);
+    try {
+      expect(await lost).toBeNull();
+      const recovered = await request(`/sessions/${sessionId()}/commands/${input.commandId}`);
+      expect(recovered.status).toBe(200); expect(recovered.data.receipt.commandId).toBe(input.commandId);
+      expect(probes).toBeGreaterThan(5); expect(host.frames.filter(frame => frame.type === 'clock').length).toBeGreaterThan(5);
+      expect(host.ws.readyState).toBe(WebSocket.OPEN); expect(primary.ws.readyState).toBe(WebSocket.OPEN);
+      expect([...host.frames, ...primary.frames].filter(frame => frame.type === 'error')).toEqual([]);
+      expect(storage.db.prepare('SELECT count(*) n FROM game_rounds').get()).toEqual({ n: 1 });
+      expect(storage.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 0 });
+      expect((await request('/control-lease/renew', {})).status).toBe(200);
+    } finally { clearTimeout(abort); clearInterval(clock); }
+  }, 15000);
   it('sends complete private/public projections and commits score once through HTTP while pushing concealed/revealed states', async () => {
     const host = await connect(hello('host')); const primary = await connect(); await prepare();
     await until(() => primary.snapshot.role === 'display' && primary.snapshot.state.snapshot.phase === 'ready' ? true : undefined);
@@ -130,9 +167,9 @@ describe('real local WebSocket game adapter', () => {
     const secondary = await connect({ ...hello(), ...extra }); await prepare(); await primary.ready(); await command('REVEAL_AND_START');
     secondary.ws.terminate(); await sleep(30); expect((await current()).snapshot!.currentRound?.phase).toBe('guessing');
     now = 2000; primary.ws.terminate(); await until(() => { const r = storage.db.prepare('SELECT phase FROM game_rounds').get() as { phase: string }; return r.phase === 'paused' ? true : undefined; });
-    const recovered = await connect(); expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 8000 });
+    const recovered = await connect(); expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 28000 });
     expect((await command('RESUME')).status).toBe(422); await recovered.ready(); expect((await command('RESUME')).status).toBe(200);
-    expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'guessing', windowMs: 8000 });
+    expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'guessing', windowMs: 28000 });
   });
   it('replaces a connection without letting its old close clear the new readiness generation', async () => {
     const first = await connect(); const second = await connect(); await until(() => first.ws.readyState === WebSocket.CLOSED ? true : undefined);
@@ -142,7 +179,7 @@ describe('real local WebSocket game adapter', () => {
   it('pauses on host loss and reconnects as observations only, without replaying judgment or Resume', async () => {
     const host = await connect(hello('host')); const primary = await connect(); await prepare(); await primary.ready(); await command('REVEAL_AND_START'); now = 1200;
     host.ws.terminate(); await sleep(30); const next = await connect(hello('host'));
-    expect(next.snapshot.role === 'host' && next.snapshot.state.snapshot?.currentRound).toMatchObject({ phase: 'paused', remainingMs: 8800 });
+    expect(next.snapshot.role === 'host' && next.snapshot.state.snapshot?.currentRound).toMatchObject({ phase: 'paused', remainingMs: 28800 });
     expect(storage.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 0 });
   });
   it('refuses stale round/image proof and another display identity without bypassing the primary gate', async () => {
@@ -164,13 +201,13 @@ describe('real local WebSocket game adapter', () => {
   });
   it('covers high RTT and stale readiness, preserving elapsed time rather than restarting', async () => {
     const primary = await connect(); await prepare(); await primary.ready(); await command('REVEAL_AND_START'); now = 1500;
-    await primary.ready(501); expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 8500 });
+    await primary.ready(501); expect((await current()).snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 28500 });
     expect((await command('RESUME')).status).toBe(422); await primary.ready(); expect((await command('RESUME')).status).toBe(200);
   });
   it('preserves expiry precedence when loss is detected after the deadline', async () => {
     const primary = await connect(); await prepare(); await primary.ready(); await command('REVEAL_AND_START');
-    for (let step = 1; step <= 9; step++) { now = step * 1000; await request('/control-lease/renew', {}); await primary.ready(); }
-    now = 10_000; primary.ws.terminate();
+    for (let step = 1; step <= 10; step++) { now = step * 2900; await request('/control-lease/renew', {}); await primary.ready(); }
+    now = 30_000; primary.ws.terminate();
     await sleep(30); expect((await current()).snapshot!.currentRound?.phase).toBe('awaiting_judgment'); expect((await command('CORRECT')).status).toBe(409);
   });
   it('bounds a missing HELLO', async () => {

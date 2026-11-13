@@ -41,3 +41,23 @@ A direct production `ws` dependency and TypeScript declarations are proposed for
 The QR/LAN refinement is a separate incremental checkpoint (tasks 5.3a.1–5.3a.4), independent of End/New Game and the later Studio/WebSocket milestones. The owner approved updating all affected planning artifacts; this request does not authorize implementation, install a QR encoder, or complete device acceptance. Any new QR package, declarations or test decoder requires explicit package approval before installation. Keep QR generation local and avoid building a bespoke encoding framework.
 
 Formal Photo Library real-collection/device/offline acceptance was deferred by the owner. It is not a prerequisite to writing this plan and is not marked complete. Game release/device verification must independently record what actually runs. Every implementation milestone ends at review; no automatic next milestone or archive.
+
+## Owner-approved countdown refinement — 2026-11-12
+
+The owner requests changing the standard guessing window from 10 to 30 seconds. This explicitly supersedes the former ten-second duration for newly revealed rounds, including future rounds of an existing session. Preserve server-owned timing, scoring, late judgment, primary readiness, pause/recovery, host leases and match use history. A paused legacy round retains its actual saved remainder; a running crash still becomes interrupted. No duration selector or retroactive history rewrite. Schema 4 widens only the game-round timing CHECK constraints through the existing transactional migration mechanism. Historical milestone verification remains evidence of the former duration, not current operation.
+
+## Owner-requested terminal display link — 2026-11-12
+
+Print each newly registered read-only contestant display URL in the Node server terminal so a phone host can transfer it to the laptop viewer without email. This explicitly permits the display credential in that one terminal message; host credentials, answers and automatic request/snapshot logging remain excluded. No new endpoint, dependency, persistence or gameplay change.
+
+## Owner-approved held clue and result reference refinement — 2026-11-12
+
+Keep the exposed screenshot and round strip visible after Correct/Incorrect, with the authoritative judgment-time remainder frozen, and after expiry at 00:00. Continue concealing the outcome/award/answer until explicit Reveal Result. Recreate the owner-supplied green correct and red incorrect/timeout references with dynamic components over the actual clue, not flattened reference images; retain frozen answer details, scores, explicit progression and all game rules. Persist stopped time and restore the image on refresh/restart without new scoring.
+
+## Owner-approved tier names — 2026-11-13
+
+Rename displayed game tiers throughout contestant/host/library UI and current operation guidance: Squash Match → Easy, Competitive Match → Medium, Deathmatch → Hard. Preserve 1/2/3 points, classifier/matrix, illustrations/colors and saved game compatibility. This is a display-name change, not a change to wrestling-match types, screenshot visual difficulty, protocol identifiers or SQLite schema.
+
+## Preparation and host recovery stall correction — 2026-11-13
+
+Investigate/fix preparation and receipt-recovery failures with larger image collections. Read-only measurement of the owner's 81 managed PNGs (~129MiB) took ~3.1s, exceeding current 3s request/liveness bounds. Preserve full validation, one server authority, fresh eligible selection, immutable receipts, timers and saved state. Use cooperative asynchronous catalog assessments, cached live observations with explicit as-of time, and bounded HTTP request lifetimes appropriate to validation work. No dependency, schema, game-rule or endpoint changes.

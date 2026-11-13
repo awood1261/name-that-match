@@ -1,10 +1,10 @@
 # Road Mode and real-time operation
 
-Studio and Road use the same host controls, contestant display, Node game authority and SQLite session. Host commands and receipt review use HTTP; one shared WebSocket adapter carries observations, readiness, clocks and liveness. The contestant URL/QR still opens an ordinary read-only web page. That page derives its socket URL from its own origin. There is no separate Road game engine or scoring system.
+Studio and Road use the same host controls, contestant display, Node game authority and SQLite session. Host commands and receipt review use HTTP; one shared WebSocket adapter carries observations, readiness, clocks and liveness. The contestant URL/QR still opens an ordinary read-only web page. Its [visual screens](contestant-visuals.md) use the same authoritative public phases and existing clock, with locally bundled typography/illustrations. That page derives its socket URL from its own origin. There is no separate Road game engine or scoring system.
 
 ## Prepare and start
 
-Use Node 20/npm 10 and install the locked dependencies while installation access is available. Before upgrading operational data, stop every writer and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore). Schema remains 3; this transport milestone adds no migration.
+Use Node 20/npm 10 and install the locked dependencies while installation access is available. Before upgrading operational data, stop every writer and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore). Current schema is 5: the 30-second guessing refinement widens game-round timing checks; existing pauses/history are preserved.
 
 ```bash
 npm ci
@@ -51,7 +51,7 @@ When the primary or host connection is lost during guessing, the server pauses a
 
 An uncertain HTTP judgment remains pending even when the socket reports a newer state. Use **Check command status**, review the accepted receipt/current snapshot and retry only deliberately when offered. The existing command identity/revision guards prevent duplicate awards. A socket reconnect never resends that judgment.
 
-For a normal command-line stop, SIGINT/Ctrl-C or SIGTERM uses the bounded `server.close()` path and persists a known pause when storage permits. Wait for exit before reopening the same root. A process kill/power loss during an unknown running window recovers Interrupted/void-only; it cannot supply a new ten seconds. A known committed pause and completed results retain their stored state. Server restarts invalidate capabilities/clock epochs: reclaim host control, request a fresh primary link and review recovery. Storage faults latch mutations and report unavailable rather than publish invented success.
+For a normal command-line stop, SIGINT/Ctrl-C or SIGTERM uses the bounded `server.close()` path and persists a known pause when storage permits. Wait for exit before reopening the same root. A process kill/power loss during an unknown running window recovers Interrupted/void-only; it cannot supply a new thirty seconds. A known committed pause and completed results retain their stored state. Server restarts invalidate capabilities/clock epochs: reclaim host control, request a fresh primary link and review recovery. Storage faults latch mutations and report unavailable rather than publish invented success.
 
 This is trusted-LAN coordination, not account authentication or anti-cheat security. Existing library administration APIs remain available to trusted LAN readers. No cloud service, external font/CDN, TLS provisioning, camera permission or optional WebSocket native addon/compression was added. SQLite WAL/NORMAL power-loss limitations and whole-root backup requirements remain unchanged.
 
@@ -70,3 +70,7 @@ Use disposable data for interruption/fault experiments. Record device/browser, l
 - Disconnect external internet while retaining the required local network. Start the already installed/built app and play through completion without downloads or remote requests.
 
 Automated local sockets, controlled latency, desktop browser runs and zero observed external requests are narrower evidence than physical Android/Wi-Fi/internet-disconnection testing. Unperformed hardware/offline/prolonged checks stay deferred in the [Milestone 6 verification record](../openspec/changes/game-experience-mvp/milestone-6-verification.md). Archived Photo Library real-collection/device deferrals remain separate. Stop for owner review before archive.
+
+Schema 5 additionally saves new judgment-time countdown remainders. After Correct/Incorrect the exposed clue remains with frozen time; expiry stays at 00:00. Only Reveal Result discloses outcome/points/answer using green correct or red incorrect/timeout feedback over the actual image. A legacy judgment with no saved stop time says Time unavailable. Pause/interruption/disconnection covers remain unchanged; see [host guidance](game-host.md).
+
+Game HTTP requests and display-registration wrappers are bounded at ten seconds to permit collection validation. Validation yields between individual PNG checks; live heartbeat/clock processing keeps its existing three-second liveness and 500ms RTT rules. HTTP commands/receipts remain the only mutation/review lane. No timeout automatically retries a command or resets a round.

@@ -115,7 +115,7 @@ describe('pure authoritative transitions and projections', () => {
     expect(state.rounds).toEqual([]);
   });
   it('does not score Reveal, Advance, incorrect or timeout; supports explicit late entry only after expiry', () => {
-    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.setTime(10_000);
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.setTime(30_000);
     expect(() => game.step({ type: 'CORRECT' })).toThrow();
     game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration });
     expect(game.state.awards).toHaveLength(0); game.step({ type: 'CORRECT_BEFORE_BUZZER' });
@@ -130,10 +130,10 @@ describe('pure authoritative transitions and projections', () => {
   });
   it('freezes remainder across pauses and rejects expired pause/stale timer generation', () => {
     const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); const generation = currentRound(game.state)!.timerGeneration;
-    game.setTime(6000); game.step({ type: 'PAUSE' }); expect(currentRound(game.state)).toMatchObject({ remainingMs: 4000 });
-    game.setTime(100_000); game.step({ type: 'RESUME' }); expect(game.clock?.deadlineMonoMs).toBe(104_000);
+    game.setTime(6000); game.step({ type: 'PAUSE' }); expect(currentRound(game.state)).toMatchObject({ remainingMs: 24000 });
+    game.setTime(100_000); game.step({ type: 'RESUME' }); expect(game.clock?.deadlineMonoMs).toBe(124_000);
     expect(() => game.step({ type: 'EXPIRE', timerGeneration: generation })).toThrow();
-    game.setTime(104_000); game.step({ type: 'PAUSE' }); expect(phase(game.state)).toBe('awaiting_judgment');
+    game.setTime(124_000); game.step({ type: 'PAUSE' }); expect(phase(game.state)).toBe('awaiting_judgment');
   });
   it('separates private/public data at every phase and only reveals pinned answer explicitly', () => {
     const game = pureGame(); const candidate = context(); game.ready(candidate);
@@ -201,7 +201,7 @@ describe('pure authoritative transitions and projections', () => {
       if (!['between_rounds', 'preparing'].includes(target)) game.step({ type: 'PREPARE_SUCCEEDED', context: context() });
       if (!['between_rounds', 'preparing', 'ready'].includes(target)) game.step({ type: 'REVEAL_AND_START' });
       if (target === 'paused') game.step({ type: 'PAUSE' });
-      if (target === 'awaiting_judgment') { game.setTime(10_000); game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration }); }
+      if (target === 'awaiting_judgment') { game.setTime(30_000); game.step({ type: 'EXPIRE', timerGeneration: currentRound(game.state)!.timerGeneration }); }
       if (target === 'interrupted') game.step({ type: 'RECOVER_RUNNING' });
       if (target === 'adjudicated' || target === 'answer_revealed') game.step({ type: 'CORRECT' });
       if (target === 'answer_revealed') game.step({ type: 'REVEAL_ANSWER' });
@@ -216,5 +216,21 @@ describe('pure authoritative transitions and projections', () => {
   it('retains the captured answer rather than referencing later input mutations', () => {
     const game = pureGame(); const captured = context(); game.ready(captured); captured.answer.event = 'changed';
     expect((currentRound(game.state) as Extract<Round, { phase: 'ready' }>).context.answer.event).toBe('Private Event');
+  });
+});
+
+// Judgment must freeze server time, not estimate from the next browser frame.
+describe('held clue timing', () => {
+  it.each(['CORRECT', 'INCORRECT'] as const)('freezes exact remaining time for %s and conceals its result', type => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.setTime(6500.5); game.step({ type });
+    expect(currentRound(game.state)).toMatchObject({ stoppedRemainingMs: 23499.5 });
+    const view = displaySnapshot(game.state, null, 900000); expect(view).toMatchObject({ phase: 'adjudicated', remainingMs: 23499.5 });
+    expect(view).not.toHaveProperty('outcome'); expect(view).not.toHaveProperty('award'); expect(view).not.toHaveProperty('answer'); expect(view.scores.every(row => row.total === 0)).toBe(true);
+    game.step({ type: 'REVEAL_ANSWER' }); expect(currentRound(game.state)).toHaveProperty('stoppedRemainingMs', 23499.5);
+  });
+  it.each(['CONFIRM_TIMEOUT', 'CORRECT_BEFORE_BUZZER'] as const)('keeps zero after expiry and %s', type => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.setTime(30000); game.step({ type: 'EXPIRE', timerGeneration: game.clock!.timerGeneration });
+    expect(displaySnapshot(game.state, null, 30000)).toMatchObject({ phase: 'awaiting_judgment', remainingMs: 0 });
+    game.step({ type }); expect(displaySnapshot(game.state, null, 60000)).toMatchObject({ phase: 'adjudicated', remainingMs: 0 });
   });
 });

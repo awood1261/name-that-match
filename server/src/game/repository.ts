@@ -22,6 +22,7 @@ interface SessionRow {
 interface RoundRow {
   id: string; session_id: string; contestant_id: string; ordinal: number; requested_tier: Round['requestedTier'];
   phase: Round['phase']; context_json: string | null; screenshot_id: string | null; match_id: string | null; image_sha256: string | null;
+  stopped_remaining_ms: number | null;
   timer_generation: number; window_ms: number | null; remaining_ms: number | null;
   pause_reason: 'host' | 'primary-display' | 'host-connection' | null; exposed_at: string | null; turn_ordinal: number | null;
   outcome: 'correct' | 'incorrect' | 'timeout' | 'void' | null; award: 0 | 1 | 2 | 3 | null; late_entry: number;
@@ -32,6 +33,7 @@ export interface StoredReceipt { receipt: Receipt; fingerprint: string }
 function roundRow(sessionId: string, round: Round): RoundRow {
   const context = 'context' in round && round.context ? parseRoundContext(round.context) : null;
   return { id: round.id, session_id: sessionId, contestant_id: round.contestantId, ordinal: round.ordinal, requested_tier: round.requestedTier,
+    stopped_remaining_ms: 'stoppedRemainingMs' in round ? round.stoppedRemainingMs ?? null : null,
     phase: round.phase, context_json: context ? canonicalJson(context) : null, screenshot_id: context?.screenshotId ?? null, match_id: context?.matchId ?? null, image_sha256: context?.image.sha256 ?? null,
     timer_generation: round.timerGeneration, window_ms: round.phase === 'guessing' ? round.windowMs : null,
     remaining_ms: round.phase === 'paused' ? round.remainingMs : null, pause_reason: round.phase === 'paused' ? round.pauseReason : null,
@@ -57,7 +59,7 @@ function readRound(row: RoundRow): Round {
     case 'awaiting_judgment': case 'interrupted': return { ...exposed, phase: row.phase };
     case 'adjudicated': case 'answer_revealed':
       requireGame(row.outcome && row.award !== null && row.judged_at, 'unavailable', 'Missing judgment');
-      return { ...exposed, phase: row.phase, outcome: row.outcome, award: row.award, lateEntry: row.late_entry === 1, voidReason: row.void_reason, judgedAt: row.judged_at };
+      return { ...exposed, phase: row.phase, outcome: row.outcome, award: row.award, lateEntry: row.late_entry === 1, voidReason: row.void_reason, judgedAt: row.judged_at, ...(row.stopped_remaining_ms === null ? {} : { stoppedRemainingMs: row.stopped_remaining_ms }) };
   }
 }
 export class GameRepository {

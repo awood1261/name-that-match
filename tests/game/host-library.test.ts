@@ -22,6 +22,32 @@ describe('real library game observations', () => {
     expect(lib.availability(state)).toMatchObject({ tiers: { squash: { screenshots: 2, matches: 2 }, competitive: { screenshots: 5, matches: 5 }, deathmatch: { screenshots: 2, matches: 2 } }, distinctMatches: 9 });
     for (const tier of ['squash', 'competitive', 'deathmatch'] as const) { const selected = lib.select(state, tier); expect(classify(selected.obscurity, selected.difficulty).tier).toBe(tier); }
   });
+  it('coalesces yielding assessments without holding a SQLite transaction or fabricating cold counts', async () => {
+    eligibleCapture(storage); eligibleCapture(storage);
+    const lib = new GameLibrary(storage); expect(() => lib.cachedAvailability(null)).toThrow(/progress/);
+    const first = lib.refresh(); expect(lib.refresh(true)).toBe(first);
+    expect(storage.db.inTransaction).toBe(false); expect(await first).toBe(true);
+    expect(lib.cachedAvailability(null).distinctMatches).toBe(2); expect(await lib.refresh()).toBe(false);
+    const fresh = lib.refresh(true); expect(lib.refresh()).toBe(fresh);
+    expect(lib.cachedAvailability(null).distinctMatches).toBe(2); await fresh;
+  });
+  it('rejects metadata changes during assessment and retries rather than publishing mixed candidates', async () => {
+    const capture = eligibleCapture(storage); const lib = new GameLibrary(storage); await lib.refresh();
+    const before = lib.cachedAvailability(null);
+    const scan = lib.refresh(true); const changed = capture.repo.updateMatch(capture.match.id, capture.match.revision, { notes: 'Changed during scan' });
+    await expect(scan).rejects.toThrow(/changed during/); expect(lib.cachedAvailability(null)).toEqual(before);
+    await lib.refresh(); expect(lib.select(createState(setup(), NOW), 'squash', false).matchRevision).toBe(changed.match.revision);
+  });
+  it('stops pending assessment before accessing a closed database and preserves explicit I/O failures', async () => {
+    eligibleCapture(storage); const lib = new GameLibrary(storage); const scan = lib.refresh(); lib.close(); storage.db.close();
+    await expect(scan).rejects.toThrow(/stopped/); await expect(lib.refresh()).rejects.toThrow(/stopped/);
+  });
+  it('reports storage uncertainty without replacing a previous complete assessment with empty counts', async () => {
+    eligibleCapture(storage); const lib = new GameLibrary(storage); await lib.refresh();
+    const read = vi.spyOn(getImportEngine(storage).files, 'read').mockImplementation(() => { throw Object.assign(new Error('I/O'), { code: 'EIO' }); });
+    await expect(lib.refresh(true)).rejects.toThrow(/unavailable/); expect(() => lib.cachedAvailability(null)).toThrow(/unavailable/);
+    read.mockRestore(); await lib.refresh(); expect(lib.cachedAvailability(null).distinctMatches).toBe(1);
+  });
   it('counts screenshot and distinct match capacity separately and uses injected unbiased candidate indices', () => {
     const first = eligibleCapture(storage); const second = eligibleCapture(storage, { matchId: first.match.id }); const last = eligibleCapture(storage);
     const draw = vi.fn((length: number) => length - 1); const lib = new GameLibrary(storage, draw); const state = createState(setup(), NOW);

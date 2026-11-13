@@ -11,6 +11,12 @@ function fixture(options: Parameters<typeof serviceFixture>[0] = {}) { const f =
 afterEach(async () => { vi.restoreAllMocks(); for (const f of fixtures.splice(0)) await f.cleanup(); });
 
 describe('transactional game service', () => {
+  it('keeps the clue live beyond the old ten-second mark and expires at thirty seconds', () => {
+    const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' });
+    f.setTime(10000); expect(f.service.snapshot(f.state.id, 'display')).toMatchObject({ phase: 'guessing', remainingMs: 20000 });
+    f.setTime(29999); expect(f.service.snapshot(f.state.id, 'display')).toMatchObject({ phase: 'guessing', remainingMs: 1 });
+    f.setTime(30000); expect(phase(f.state)).toBe('awaiting_judgment'); expect(f.state.awards).toEqual([]);
+  });
   it('latches a current-state read failure before accepting further mutations', () => {
     const f = fixture(); const input = envelope(f.state, { type: 'START' });
     const read = vi.spyOn(f.service.repository, 'current').mockImplementationOnce(() => { throw new Error('SQLite read failed'); });
@@ -83,7 +89,7 @@ describe('transactional game service', () => {
   });
   it('settles expiry before commands despite a delayed timeout callback and supports distinct late judgment', () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' }); const ordinary = envelope(f.state, { type: 'CORRECT' });
-    f.setTime(10_000); expect(() => f.service.execute(ordinary)).toThrow(/Stale/);
+    f.setTime(30_000); expect(() => f.service.execute(ordinary)).toThrow(/Stale/);
     expect(phase(f.state)).toBe('awaiting_judgment'); expect(f.state.awards).toEqual([]);
     f.command({ type: 'CORRECT_BEFORE_BUZZER' }); expect(currentRound(f.state)).toMatchObject({ outcome: 'correct', lateEntry: true, award: 1 });
     expect(f.scheduled.every((job) => job.cancelled)).toBe(true);
@@ -91,20 +97,20 @@ describe('transactional game service', () => {
   it('starts time only after trusted pre-exposure observations and does no image work on judgment', () => {
     let observe = () => {}; const observation = vi.fn(() => { observe(); return true; });
     const f = fixture({ candidateCurrent: observation }); f.ready(); observe = () => f.setTime(6000);
-    f.command({ type: 'REVEAL_AND_START' }); expect(f.service.snapshot(f.state.id, 'display')).toMatchObject({ remainingMs: 10_000 });
+    f.command({ type: 'REVEAL_AND_START' }); expect(f.service.snapshot(f.state.id, 'display')).toMatchObject({ remainingMs: 30_000 });
     const calls = observation.mock.calls.length; f.setTime(15_999); f.command({ type: 'CORRECT' });
     expect(observation).toHaveBeenCalledTimes(calls); expect(f.state.awards).toHaveLength(1);
   });
   it('latches a timer read failure and leaves recovery-required state without an unhandled callback', () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' });
     vi.spyOn(f.service.repository, 'current').mockImplementationOnce(() => { throw new Error('read failure'); });
-    f.setTime(10_000); expect(() => f.scheduled[0].callback()).not.toThrow(); expect(f.scheduled[0].cancelled).toBe(true);
+    f.setTime(30_000); expect(() => f.scheduled[0].callback()).not.toThrow(); expect(f.scheduled[0].cancelled).toBe(true);
     expect(() => f.service.state(randomUUID())).toThrow(/recovery/);
   });
   it('reschedules an early callback and expires at the actual monotonic deadline', () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' });
-    f.setTime(9999); f.scheduled[0].callback(); expect(f.scheduled).toHaveLength(2);
-    expect(phase(f.state)).toBe('guessing'); f.setTime(10_000); f.scheduled[1].callback(); expect(phase(f.state)).toBe('awaiting_judgment');
+    f.setTime(29999); f.scheduled[0].callback(); expect(f.scheduled).toHaveLength(2);
+    expect(phase(f.state)).toBe('guessing'); f.setTime(30_000); f.scheduled[1].callback(); expect(phase(f.state)).toBe('awaiting_judgment');
   });
   it('allows only one of two different judgment identities from the same revision', () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' });
@@ -116,8 +122,8 @@ describe('transactional game service', () => {
     const state = f.state; f.service.failPreparation(state.id, state.currentRoundId!, state.stateVersion);
     expect(f.state.rounds[0]).toMatchObject({ phase: 'cancelled', cancelReason: 'preparation-failed' }); expect(f.state.nextTurnOrdinal).toBe(1); expect(f.state.activeContestantId).toBe(state.activeContestantId);
   });
-  it('accepts correct at 9999ms, regardless of wall-clock jumps', () => {
-    const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' }); f.setTime(9999); f.setWall('1990-01-01T00:00:00.000Z');
+  it('accepts correct at 29999ms, regardless of wall-clock jumps', () => {
+    const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' }); f.setTime(29999); f.setWall('1990-01-01T00:00:00.000Z');
     f.command({ type: 'CORRECT' }); expect(f.state.awards).toHaveLength(1);
   });
   it('ends incorrect immediately and never scores an already resolved round', () => {
@@ -127,17 +133,17 @@ describe('transactional game service', () => {
   });
   it('preserves remaining time through repeated pause/resume and ignores replaced timer callbacks', () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' }); const firstJob = f.scheduled[0];
-    f.setTime(6000); f.command({ type: 'PAUSE' }); expect(currentRound(f.state)).toMatchObject({ remainingMs: 4000 });
+    f.setTime(6000); f.command({ type: 'PAUSE' }); expect(currentRound(f.state)).toMatchObject({ remainingMs: 24000 });
     f.setTime(100_000); f.command({ type: 'RESUME' }); firstJob.callback(); expect(phase(f.state)).toBe('guessing');
-    f.setTime(101_000); f.command({ type: 'PAUSE' }); expect(currentRound(f.state)).toMatchObject({ remainingMs: 3000 });
-    f.setTime(200_000); f.command({ type: 'RESUME' }); f.setTime(202_999); expect(f.service.snapshot(f.state.id, 'display')).toMatchObject({ phase: 'guessing', remainingMs: 1 });
-    f.setTime(203_000); f.scheduled.at(-1)!.callback(); expect(phase(f.state)).toBe('awaiting_judgment');
+    f.setTime(101_000); f.command({ type: 'PAUSE' }); expect(currentRound(f.state)).toMatchObject({ remainingMs: 23000 });
+    f.setTime(200_000); f.command({ type: 'RESUME' }); f.setTime(222_999); expect(f.service.snapshot(f.state.id, 'display')).toMatchObject({ phase: 'guessing', remainingMs: 1 });
+    f.setTime(223_000); f.scheduled.at(-1)!.callback(); expect(phase(f.state)).toBe('awaiting_judgment');
   });
   it('pauses at detected loss with consumed detection time and gives expiry priority', () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' }); f.setTime(3000);
     const state = f.state; expect(f.service.connectionLost(state.id, state.currentRoundId!, state.stateVersion, 'primary-display')).toBe(true);
-    expect(currentRound(f.state)).toMatchObject({ remainingMs: 7000, pauseReason: 'primary-display' });
-    f.command({ type: 'RESUME' }); const running = f.state; f.setTime(10_001);
+    expect(currentRound(f.state)).toMatchObject({ remainingMs: 27000, pauseReason: 'primary-display' });
+    f.command({ type: 'RESUME' }); const running = f.state; f.setTime(30_001);
     expect(f.service.connectionLost(running.id, running.currentRoundId!, running.stateVersion, 'host-connection')).toBe(false);
     expect(phase(f.state)).toBe('awaiting_judgment'); expect(f.state.awards).toEqual([]);
   });
@@ -171,14 +177,14 @@ describe('durable recovery and cleanup', () => {
   });
   it('restores a known paused remainder requiring fresh explicit resume', () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' }); f.setTime(6000); f.command({ type: 'PAUSE' });
-    f.reopen(true); expect(currentRound(f.state)).toMatchObject({ phase: 'paused', remainingMs: 4000 });
-    f.setTime(100_000); f.command({ type: 'RESUME' }); f.setTime(104_000); expect(phase(f.state)).toBe('awaiting_judgment');
+    f.reopen(true); expect(currentRound(f.state)).toMatchObject({ phase: 'paused', remainingMs: 24000 });
+    f.setTime(100_000); f.command({ type: 'RESUME' }); f.setTime(124_000); expect(phase(f.state)).toBe('awaiting_judgment');
   });
   it('recovers pending preparation as cancelled, ready as covered and expired judgment as zero-time', () => {
     const f = fixture(); f.command({ type: 'START' }); f.command({ type: 'PREPARE', roundId: randomUUID(), tier: 'squash' });
     f.reopen(true); expect(phase(f.state)).toBe('between_rounds'); expect(f.state.rounds[0]).toMatchObject({ phase: 'cancelled', cancelReason: 'recovery' });
     f.ready(); f.reopen(true); expect(phase(f.state)).toBe('ready'); expect(f.service.snapshot(f.state.id, 'display')).not.toHaveProperty('answer');
-    f.command({ type: 'REVEAL_AND_START' }); f.setTime(10_000); expect(phase(f.state)).toBe('awaiting_judgment');
+    f.command({ type: 'REVEAL_AND_START' }); f.setTime(30_000); expect(phase(f.state)).toBe('awaiting_judgment');
     f.reopen(true); expect(phase(f.state)).toBe('awaiting_judgment'); f.command({ type: 'CONFIRM_TIMEOUT' }); expect(f.state.awards).toEqual([]);
   });
   it('unavailable clue can interrupt paused recovery without erasing an already committed score', () => {
@@ -206,13 +212,13 @@ describe('durable recovery and cleanup', () => {
   it('handles timer write failure without unhandled callback errors or publishing success', () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' });
     vi.spyOn(f.service.repository, 'commit').mockImplementationOnce(() => { throw new Error('disk failure'); });
-    f.setTime(10_000); expect(() => f.scheduled[0].callback()).not.toThrow(); expect(() => f.service.state(f.state.id)).toThrow();
+    f.setTime(30_000); expect(() => f.scheduled[0].callback()).not.toThrow(); expect(() => f.service.state(f.state.id)).toThrow();
     expect(f.scheduled[0].cancelled).toBe(true);
   });
   it('checkpoints graceful shutdown, cancels owned resources, closes storage and cleans temporary files', async () => {
     const f = fixture(); f.ready(); f.command({ type: 'REVEAL_AND_START' }); f.setTime(3000); const id = f.state.id;
     f.service.close(); f.service.close(); expect(f.scheduled.every((job) => job.cancelled)).toBe(true);
-    expect(f.service.repository.load(id).rounds.at(-1)).toMatchObject({ phase: 'paused', remainingMs: 7000 });
+    expect(f.service.repository.load(id).rounds.at(-1)).toMatchObject({ phase: 'paused', remainingMs: 27000 });
     await f.cleanup(); expect(f.storage.db.open).toBe(false); const fs = await import('node:fs'); expect(fs.existsSync(f.resources.root)).toBe(false);
   });
 });

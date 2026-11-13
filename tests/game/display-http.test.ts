@@ -62,6 +62,31 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     return result;
   }
   async function reveal() { await prepare(); await connect(); await report(); await current(); expect((await command('REVEAL_AND_START')).status).toBe(200); }
+  it.each(['CORRECT', 'INCORRECT'] as const)('holds the same image and stopped timer for %s across viewer/server refresh and reveal', async type => {
+    await reveal(); now = 1500; const judged = await command(type); expect(judged.status).toBe(200);
+    await report(); expect(observation.snapshot).toMatchObject({ phase: 'adjudicated', remainingMs: 28500 }); expect(observation.asset?.imageKey).toBe(state.snapshot!.session.currentRoundId);
+    expect(JSON.stringify(observation)).not.toMatch(/Private Wrestler|Alpha|"outcome"|"award"|"answer"/);
+    const image = async () => fetch(base + '/api/game' + sessionPath() + `/rounds/${state.snapshot!.session.currentRoundId}/image`, { headers: { Authorization: `Bearer ${viewer.token}`, 'X-Name-That-Match-Epoch': viewer.serverEpoch } });
+    const before = await image(); expect(before.status).toBe(200); const bytes = Buffer.from(await before.arrayBuffer());
+    connectionId = randomUUID(); await connect(); await report(); expect(observation.snapshot).toMatchObject({ remainingMs: 28500 });
+    game.stop(); game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now });
+    owner = (await request('/control-lease', {})).data; await current(); viewer = (await request(sessionPath() + '/displays', {})).data; connectionId = randomUUID(); await connect(); await report();
+    expect(observation.snapshot).toMatchObject({ phase: 'adjudicated', remainingMs: 28500 }); expect(observation.asset).not.toBeNull();
+    const restored = await image(); expect(restored.status).toBe(200); expect(Buffer.from(await restored.arrayBuffer())).toEqual(bytes);
+    await command('REVEAL_ANSWER'); await report(); expect(observation.snapshot).toMatchObject({ phase: 'answer_revealed', outcome: type === 'CORRECT' ? 'correct' : 'incorrect' }); expect(observation.asset).not.toBeNull();
+    expect(storage.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: type === 'CORRECT' ? 1 : 0 });
+    const staleImagePath = sessionPath() + `/rounds/${state.snapshot!.session.currentRoundId}/image`; await command('ADVANCE'); await report(); expect(observation.asset).toBeNull();
+    const stale = await fetch(base + '/api/game' + staleImagePath, { headers: { Authorization: `Bearer ${viewer.token}`, 'X-Name-That-Match-Epoch': viewer.serverEpoch } }); expect(stale.status).toBe(404);
+  });
+  it('restores an unavailable judged image as a fallback without losing saved time or revealing the answer', async () => {
+    await reveal(); now = 1000; await command('INCORRECT'); const id = state.snapshot!.session.currentRoundId;
+    const file = storage.db.prepare('SELECT image_path FROM screenshots LIMIT 1').get() as { image_path: string }; fs.unlinkSync(path.join(storage.rootDir, file.image_path));
+    game.stop(); game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now }); owner = (await request('/control-lease', {})).data; await current();
+    viewer = (await request(sessionPath() + '/displays', {})).data; connectionId = randomUUID(); await connect(); await report();
+    expect(observation.snapshot).toMatchObject({ phase: 'adjudicated', remainingMs: 29000 }); expect(observation.asset).toBeNull();
+    await command('REVEAL_ANSWER'); await report(); expect(observation.snapshot).toMatchObject({ phase: 'answer_revealed', outcome: 'incorrect' });
+    expect(state.snapshot!.session.currentRoundId).toBe(id); expect(storage.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 0 });
+  });
   it.each([false, true])('ends resolved rounds with reveal=%s and preserves final scores across new setup and restart', async (revealed) => {
     await reveal(); const oldSessionId = state.snapshot!.session.id; const oldViewer = viewer;
     const libraryBefore = storage.db.prepare('SELECT id,revision,review_status,image_path FROM screenshots').all();
@@ -94,7 +119,7 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     await connect(); await report(); await current(); await command('REVEAL_AND_START');
     expect((await command('END_GAME')).status).toBe(409);
     await command('PAUSE'); expect((await command('END_GAME')).status).toBe(409);
-    await report(); await current(); await command('RESUME'); now = 10000; await report();
+    await report(); await current(); await command('RESUME'); now = 30000; await report();
     owner = (await request('/control-lease', {})).data; await current(); expect((await command('END_GAME')).status).toBe(409);
     await command('CONFIRM_TIMEOUT');
     expect((await request(sessionPath() + '/commands', { type: 'END_GAME' }, viewer)).status).toBe(403);
@@ -167,7 +192,7 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     expect((await command('REVEAL_AND_START')).status).toBe(422);
     await report(false); await current(); expect(state.primaryDisplay.ready).toBe(false);
     await report(); await current(); expect(state.primaryDisplay.ready).toBe(true);
-    const result = await command('REVEAL_AND_START'); expect(result.status).toBe(200); expect(state.timing?.remainingMs).toBe(10000);
+    const result = await command('REVEAL_AND_START'); expect(result.status).toBe(200); expect(state.timing?.remainingMs).toBe(30000);
     await report(); expect(observation.snapshot.phase).toBe('guessing');
     expect(storage.db.prepare('SELECT COUNT(*) n FROM game_rounds WHERE exposed_at IS NOT NULL').get()).toEqual({ n: 1 });
   });
@@ -180,14 +205,14 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     await command('CANCEL_UNEXPOSED'); expect((await fetch(url, { headers: { Authorization: `Bearer ${viewer.token}`, 'X-Name-That-Match-Epoch': viewer.serverEpoch } })).status).toBe(404);
   });
   it('preserves paused time, covers it, requires explicit resume and rejects stale commands', async () => {
-    await reveal(); now = 1500; await command('PAUSE'); expect(state.timing?.remainingMs).toBe(8500);
-    await report(); expect(observation.snapshot).toMatchObject({ phase: 'paused', remainingMs: 8500 });
+    await reveal(); now = 1500; await command('PAUSE'); expect(state.timing?.remainingMs).toBe(28500);
+    await report(); expect(observation.snapshot).toMatchObject({ phase: 'paused', remainingMs: 28500 });
     const previous = state.snapshot!.session.stateVersion;
     await current(); expect(state.snapshot!.currentRound?.phase).toBe('paused');
-    expect((await command('RESUME')).status).toBe(200); expect(state.timing?.remainingMs).toBe(8500);
+    expect((await command('RESUME')).status).toBe(200); expect(state.timing?.remainingMs).toBe(28500);
     const stale = { protocolVersion: 1, commandId: randomUUID(), sessionId: state.snapshot!.session.id, roundId: state.snapshot!.session.currentRoundId, expectedStateVersion: previous, type: 'CORRECT', payload: {} };
     expect((await command('CORRECT', {}, stale)).status).toBe(409);
-    now = 2000; await current(); expect(state.timing?.remainingMs).toBe(8000);
+    now = 2000; await current(); expect(state.timing?.remainingMs).toBe(28000);
   });
   it.each(['CORRECT', 'INCORRECT', 'VOID_EXPOSED'])('commits %s exactly once without answer reveal or advancement', async (type) => {
     await reveal(); const result = await command(type, type === 'VOID_EXPOSED' ? { reason: 'skip' } : {});
@@ -229,7 +254,7 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     expect(storage.db.prepare('SELECT COUNT(*) n FROM game_score_events').get()).toEqual({ n: 1 });
   });
   it('settles expiry before late ordinary Correct and permits distinct pre-buzzer attestation once', async () => {
-    await reveal(); now = 10000; await report(); expect(observation.snapshot.phase).toBe('awaiting_judgment');
+    await reveal(); now = 30000; await report(); expect(observation.snapshot.phase).toBe('awaiting_judgment');
     owner = (await request('/control-lease', {})).data; await current();
     expect((await command('CORRECT')).status).toBe(409);
     const result = await command('CORRECT_BEFORE_BUZZER'); expect(result.status).toBe(200);
@@ -250,7 +275,7 @@ describe('contestant HTTP readiness, timing and recovery', () => {
   });
   it('reload replaces the primary connection and covers instead of starting a new window', async () => {
     await reveal(); now = 500; connectionId = randomUUID(); await connect();
-    expect(observation.snapshot).toMatchObject({ phase: 'paused', remainingMs: 9500 });
+    expect(observation.snapshot).toMatchObject({ phase: 'paused', remainingMs: 29500 });
     await report(); await current(); expect(state.snapshot!.currentRound?.phase).toBe('paused');
   });
   it('refuses viewer mutations, wrong capabilities, stale epochs and primary changes during attempts', async () => {
@@ -280,7 +305,7 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     await reveal(); now = 1200; await command('PAUSE'); const round = state.snapshot!.currentRound!;
     game.stop(); game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now });
     expect((await request('/current')).status).toBe(401); owner = (await request('/control-lease', {})).data; await current();
-    expect(state.snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 8800 }); expect(state.primaryDisplay.ready).toBe(false);
+    expect(state.snapshot!.currentRound).toMatchObject({ phase: 'paused', remainingMs: 28800 }); expect(state.primaryDisplay.ready).toBe(false);
     if (!('context' in round) || !round.context) throw new Error('No context');
     game.stop(); fs.unlinkSync(path.join(storage.rootDir, `screenshots/${round.context.screenshotId}.png`));
     game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now });

@@ -2,13 +2,15 @@ import type { CommandEnvelope, CreateGame, Receipt } from '../../../shared/src/g
 import type { ControllerCredential, GameApiFailure, HostCommandResponse, HostStatus } from '../../../shared/src/game/host';
 import type { DisplayCredential, DisplayObservation, DisplayReport } from '../../../shared/src/game/display';
 import type { DisplayOriginInput, DisplayOriginObservation } from '../../../shared/src/game/join';
+// Whole-library assessments can exceed three seconds; socket liveness stays independent.
+export const GAME_REQUEST_TIMEOUT_MS = 10_000;
 export class GameApiError extends Error {
   constructor(readonly detail: GameApiFailure, readonly status: number) { super(detail.message); }
 }
 async function request<T>(path: string, signal: AbortSignal, credential?: Pick<ControllerCredential, 'token' | 'serverEpoch'>, payload?: unknown): Promise<T> {
   const controller = new AbortController(); const abort = () => controller.abort();
   signal.addEventListener('abort', abort, { once: true }); if (signal.aborted) abort();
-  const timeout = setTimeout(abort, 3000);
+  const timeout = setTimeout(abort, GAME_REQUEST_TIMEOUT_MS);
   try {
     const response = await fetch(`/api/game${path}`, { signal: controller.signal, method: payload === undefined ? 'GET' : 'POST', headers: {
       ...(credential ? { Authorization: `Bearer ${credential.token}`, 'X-Name-That-Match-Epoch': credential.serverEpoch } : {}),

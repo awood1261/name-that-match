@@ -92,3 +92,49 @@ Checkpoint evidence: `task-5.3a-verification.md`. All four 5.3a tasks are comple
 - [x] 7.6 Integrate owned socket/timer/lease lifecycle with startup/shutdown and storage fault handling; verify failed listen, open/slow clients, primary/host loss, queued writes, DB failure, bounded termination and clean reopen with no resource leak/hang (GN-04/08; D7/D9). Evidence: `milestone-6-verification.md`; physical checks are separately recorded as deferred.
 - [x] 7.7 Run packet delay/drop, high RTT/stale clock, primary/secondary/host disconnect, controller recovery, lost adjudication response and restart scenarios; automated two-display tests must preserve deadline/score/use history and role isolation across reconnect (GN-02–08; D11). Evidence: `milestone-6-verification.md`; physical checks are separately recorded as deferred.
 - [x] 7.8 Complete the final milestone checkpoint and full Studio/Road/offline manual checklist, recording real devices and deferred checks separately; report all executed results, remaining release limitations and Git status, then stop for review. Do not mark deferred Photo Library tasks complete or archive without an explicit request. Acceptance reference: GN-01–08, GD-03–06; D11. Evidence: `milestone-6-verification.md`; physical checks are separately recorded as deferred.
+
+## 8. Owner-approved refinement — thirty-second guessing window
+
+The owner directly requested 30 seconds on 2026-11-12. These six focused tasks extend the 46-task MVP checklist to 52; previous milestones and verification records remain historical. This is not authorization to archive or complete the visual change's remaining physical acceptance.
+
+- [x] 8.1 Record the approved 30s rule, preservation of legacy remainders/history, schema-4 design and unchanged non-game timeout behavior; strictly validate the updated change before implementation. Evidence: direct owner request recorded in proposal/design/GR-09; strict change and whole-project validation passed before implementation.
+- [x] 8.2 Add the transactional schema-3-to-4 timing-constraint migration through the existing runner; verify old rows/indexes/triggers/FKs, repeated/fresh initialization, >10s new timing support, newer-version rejection and injected failure rollback.
+- [x] 8.3 Change the single standard window to 30,000ms and reuse it in live timing validation; verify new Reveal uses 30s while Resume preserves its actual remainder and host leases/heartbeats/resource limits are unchanged.
+- [x] 8.4 Update focused timing/storage/API/component tests for 29,999/30,000ms, old pauses, no reset after reconnect/restart, 00:30 rendering, invalid >30s and once-only scoring; run focused tests and the full regression suite.
+- [x] 8.5 Update current setup/upgrade/operation and durable project instructions to 30s/schema4, retaining WAL-safe backup guidance and legacy-pause behavior; verify current references without rewriting archived or past verification evidence.
+- [x] 8.6 Run npm test/typecheck/lint/build, strict MVP/visual/whole-project OpenSpec validation, production browser smoke and Git tracking audit; record actual results and manual verification steps, then stop without archive/commit/push.
+
+Tasks 8.2–8.6 evidence: `thirty-second-verification.md`.
+
+## 9. Owner-requested terminal contestant link
+
+- [x] 9.1 Record and strictly validate the explicit terminal-only credential exception and frontend-origin behavior (GN-10).
+- [x] 9.2 Print each successfully registered display link from the existing authorized HTTP handler; test primary/secondary creation, LAN/localhost frontend origins, rejected requests, designation/status silence and host-token exclusion.
+- [x] 9.3 Document phone-host/laptop-viewer operation, run regression tests/typecheck/lint/build and strict OpenSpec validation, record results and stop without archive or commit.
+
+Tasks 9.1–9.3 evidence: `terminal-link-verification.md`.
+
+## 10. Owner-approved held clue and frozen countdown
+
+- [x] 10.1 Reconcile approved held-clue/reveal behavior and supplied result references across current planning artifacts; strictly validate before code.
+- [x] 10.2 Add schema-5 nullable immutable stopped timing and domain/repository support; test exact judgment remainder, zero expiry, legacy unknown, bounds, migration preservation/rollback and reopen.
+- [x] 10.3 Extend allowlisted public/live/HTTP image lifecycle for awaiting judgment, concealed judgment and revealed feedback; restore current frozen assets at startup, preserve role/privacy/recovery and clear on Advance.
+- [x] 10.4 Keep ScreenshotRound mounted in synchronized held phases with frozen/zero/unknown timer; preserve paused/stale covers, read-only controls and single-clock authority.
+- [x] 10.5 Verify integrated correct/incorrect/expiry/late-credit, refresh/reconnect/restart, image failure, scoring/ownership/privacy and import regressions; run tests/typecheck/lint/build and strict validation, document actual results and manual steps. Stop without archive/commit.
+
+Held-clue/result-refinement evidence: `held-result-verification.md`.
+
+## 11. Owner-approved Easy / Medium / Hard tier names
+
+- [x] 11.1 Record the approved display-name mapping and cross-capability deltas, preserving identifiers/matrix/points/data and artwork/colors; strictly validate before code.
+- [x] 11.2 Update shared labels, current operation docs/AGENTS and affected interaction tests; verify host/contestant/library names, stable classification/points/assets and saved IDs, run tests/typecheck/lint/build and strict OpenSpec checks, record results and stop without archive/commit.
+
+Tier-name evidence: `tier-names-verification.md`.
+
+## 12. Preparation and recovery stall correction
+
+- [x] 12.1 Record measured failure, bounded cooperative-assessment design and unchanged authority/freshness/receipt/timing guarantees; validate before code.
+- [x] 12.2 Implement short metadata snapshots, yielding/coalesced catalog refresh, revision/error/shutdown checks, cached live observations and reauthorized fresh HTTP selection; test slow-scan liveness, consistency and cleanup.
+- [x] 12.3 Align bounded HTTP/registration lifetimes, verify explicit pending-command recovery without replay, run full checks and disposable collection/browser acceptance, record actual results and remaining risks; stop without archive/commit.
+
+Task 12 evidence: `preparation-stall-verification.md`.

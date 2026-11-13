@@ -54,7 +54,7 @@ export function displaySnapshot(state: GameState, clock: RunningClock | null, no
       return { ...view, phase: 'guessing', imageKey: round.id, remainingMs: Math.max(0, clock.deadlineMonoMs - nowMonoMs) };
     case 'paused': return { ...view, phase: 'paused', remainingMs: round.remainingMs };
     case 'awaiting_judgment': case 'interrupted': return { ...view, phase: round.phase, remainingMs: 0 };
-    case 'adjudicated': return { ...view, phase: 'adjudicated' };
+    case 'adjudicated': return { ...view, phase: 'adjudicated', remainingMs: round.stoppedRemainingMs ?? null };
     case 'answer_revealed': return { ...view, phase: 'answer_revealed', outcome: round.outcome, award: round.award, answer: { ...round.context.answer } };
     case 'cancelled': return { ...base, phase: 'between_rounds' };
   }

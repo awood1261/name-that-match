@@ -1,5 +1,6 @@
 :root {
   --color-bg: #090b13;
+  --color-bg-black: #000;
   --color-bg-alt: #111722;
   --color-panel: rgba(12, 15, 23, 0.92);
   --color-panel-strong: #171b2b;
@@ -46,4 +47,34 @@
   --game-stage-width: 1080px;
   --game-stage-height: 960px;
   --game-stage-outline: 2px;
+}
+
+/* Approved visual scenes only; legacy results and host/admin keep existing fonts. */
+[data-contestant-stage][data-visual-scene],
+[data-contestant-font-preview] {
+  --font-contestant-heading: 'Barlow Condensed', 'Name That Match Fallback', var(--font-display, 'Arial Black', 'Segoe UI', sans-serif);
+  --font-contestant-label: 'Barlow Condensed', 'Name That Match Fallback', var(--font-display, 'Arial Black', 'Segoe UI', sans-serif);
+  --font-contestant-timer: 'Barlow Condensed', 'Name That Match Fallback', var(--font-display, 'Arial Black', 'Segoe UI', sans-serif);
+  --font-contestant-support: 'Barlow Condensed', 'Name That Match Fallback', var(--font-body, 'Segoe UI', sans-serif);
+  --font-contestant-heading-weight: 900;
+  --font-contestant-label-weight: 800;
+  --font-contestant-timer-weight: 900;
+  --font-contestant-support-weight: 700;
+}
+
+[data-contestant-stage][data-visual-scene] {
+  --game-scene-black: #000;
+  --game-result-image-opacity: 0.26;
+  --game-scene-white: #fff;
+  --game-scene-yellow: #ffe500;
+  --game-scene-purple: #bf13ff;
+  --game-scene-green: #3dff12;
+  --game-scene-red: #ff1d25;
+  --game-scene-frame: 12px;
+  --game-scene-radius: 48px;
+  --game-scene-gap: 28px;
+  --game-scene-heading-size: 112px;
+  --game-scene-label-size: 84px;
+  --game-scene-intro: 2400ms;
+  --game-scene-wait: 3000ms;
 }

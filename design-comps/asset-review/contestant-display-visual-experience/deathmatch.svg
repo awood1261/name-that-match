@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-labelledby="title">
+  <title id="title">Skull encircled by barbed wire — proposed artwork</title>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="200" cy="149" rx="126" ry="123" stroke-width="5"/>
+    <path d="M83 173C56 93 118 26 186 23c76-7 138 40 144 109 7 71-43 137-116 141-67 5-119-32-131-100Z" stroke-width="2.5"/>
+    <!-- Separate crossed barbs follow the wire's changing tangent. -->
+    <path d="m128 31 12 27m-22-12 29-2m-19-13 1 23m100-33-3 29m-12-17 28 10m-15-22 10 23m71 19-21 21m-1-22 26 22m-5-21-12 25m40 36-28 5m12-20 9 29m7-19-25 14m14 55-28-7m21-10-14 28m16-7-25-13m-1 66-23-19m25-1-25 22m20 1-13-27m-51 58-7-29m21 15-30 3m9 10 6-27m-69 24 10-29m-23 12 28 12m-9 4-3-29m-57-15 23-20m-26 1 25 21m-20-1 12-25m-32-37 29 3m-12-18-9 29m-7-18 25 14m-13-70 27 10m-23 7 16-26m-18 6 25 15" stroke-width="3.5"/>
+  </g>
+  <path fill="#fff" d="M200 66c-42 0-72 25-72 62 0 21 7 34 17 45l-3 17 13 12 9-3 5 26 13 13h36l13-13 5-26 9 3 13-12-3-17c10-11 17-24 17-45 0-37-30-62-72-62Z"/>
+  <g fill="#000">
+    <path d="M146 131c2-9 10-12 23-8l20 10-4 18c-4 13-16 15-25 8-9-7-16-16-14-28Zm108 0c-2-9-10-12-23-8l-20 10 4 18c4 13 16 15 25 8 9-7 16-16 14-28Z"/>
+    <path d="m200 153-12 23c-2 7 6 9 12 4 6 5 14 3 12-4Z"/>
+    <path d="m161 190 13 5 26 2 26-2 13-5-7 12-13 5h-38l-13-5Z"/>
+  </g>
+  <g fill="none" stroke="#000" stroke-width="3" stroke-linecap="round">
+    <path d="m178 207 3 19m9-18 1 22m9-22v23m10-23-1 22m13-23-3 19m-41-11 22 3 22-3"/>
+  </g>
+</svg>

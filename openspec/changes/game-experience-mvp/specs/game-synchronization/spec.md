@@ -16,7 +16,7 @@ Each connection SHALL receive a complete role-appropriate snapshot before render
 
 #### Scenario: Reload during a round
 - **WHEN** the display reloads or reconnects
-- **THEN** it resumes the current authoritative phase and remaining time, never a new ten-second window or new score
+- **THEN** it resumes the current authoritative phase and remaining time, never a new full-duration window or new score
 
 ### Requirement: GN-03 Display readiness and clock estimation
 The designated primary display SHALL confirm its selected round image has decoded and its clock observation is sufficiently current before reveal/resume. Viewers SHALL interpolate countdowns from server timing observations and local monotonic elapsed time, not award points, extend deadlines or expire the server round. Server restart SHALL invalidate old clock epochs and readiness acknowledgments.
@@ -110,4 +110,36 @@ The derived device origin SHALL replace only a loopback UI hostname, retaining t
 #### Scenario: Observe address without leaking game authority
 - **WHEN** a viewer or unauthorized caller requests host-only address observation
 - **THEN** access is refused under existing role/epoch/origin/header rules
-- **AND** no controller token, private answer or complete capability-bearing join URL enters observation responses, logs or persistent game state
+- **AND** no controller token, private answer or complete capability-bearing join URL enters observation responses, general logs or persistent game state; the explicit local terminal exception in GN-10 applies only to successful new viewer registration
+
+### Requirement: GN-10 Newly registered contestant link in the server terminal
+The server SHALL print one labeled complete read-only contestant URL for each successful host-authorized new display registration. It SHALL use the validated browser Origin and fragment-carried display ID/token/server epoch, retaining the frontend protocol/port. This owner-requested terminal output is the sole exception to the full-display-link logging exclusion; it SHALL NOT include controller credentials or private answers, persist the link in game storage, or print links from general request/snapshot logging. Existing-display designation and failed requests SHALL NOT print a new link. No address discovery or game rule changes are required.
+
+#### Scenario: Phone host creates a laptop contestant link
+- **WHEN** an authorized host registers a new primary or secondary viewer from a configured LAN application origin
+- **THEN** the server terminal prints one URL with that application origin, session path and the issued viewer fragment credentials
+- **AND** opening that link uses the existing read-only contestant route
+
+#### Scenario: Local frontend port is preserved
+- **WHEN** a host registers from an allowed localhost frontend origin in development
+- **THEN** the printed URL keeps the frontend origin and port rather than using the backend or forwarded Host header
+
+#### Scenario: Other requests do not emit viewer credentials
+- **WHEN** registration is rejected, an existing display is designated, or state/origin observations are requested
+- **THEN** no new terminal display link is emitted
+- **AND** controller credentials and private answers remain absent from terminal link output
+
+### Requirement: GN-11 Cooperative image assessment and host recovery
+Collection-wide PNG assessment SHALL yield between bounded individual validations so live heartbeat/clock processing and receipt access remain responsive. Metadata SHALL be captured in a short SQLite snapshot without holding its transaction across asynchronous work; revision changes SHALL prevent publishing a mixed assessment. Concurrent refreshes SHALL coalesce and shutdown SHALL cancel owned work. Prepare/Start/explicit Refresh SHALL use fresh complete assessments and recheck authorization/revision after waits; no image validation or eligibility gate SHALL be bypassed. Live observations MAY retain the last complete assessment's explicit asOf during a refresh; failed/unknown assessments SHALL not invent counts. HTTP/registration operations SHALL have bounded ten-second lifetimes and view-lifetime cancellation. Existing liveness, control leases, scoring, reveal readiness and explicit uncertain-command receipt review SHALL remain unchanged.
+
+#### Scenario: A collection scan exceeds three seconds
+- **WHEN** a host prepares a clue from a collection whose full validation takes more than the live stale threshold
+- **THEN** heartbeat/clock observations continue while validation yields, the bounded HTTP response can complete, and no controller or viewer is lost merely because the whole catalog was processed synchronously
+
+#### Scenario: Lost response and review
+- **WHEN** a preparation response is lost or times out after acceptance
+- **THEN** the host can explicitly check its immutable receipt and restore current state without reapplying Prepare, consuming a match or losing the pending command silently
+
+#### Scenario: Changes or shutdown during assessment
+- **WHEN** metadata changes during validation or the server shuts down
+- **THEN** incomplete/mixed results are not committed as a fresh catalog and work terminates predictably without an unhandled rejection or database access after closure

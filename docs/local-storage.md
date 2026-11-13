@@ -24,7 +24,7 @@ data/
 - `screenshots/`: committed local screenshot assets with generated relative filenames.
 - `staging/`: owned incomplete uploads/imports and retained recovery evidence.
 
-Match Library Milestones 1–4 add transactional schema migration, a durable import engine, import endpoints/dialog, match management and screenshot assignment. See [import engine limits, recovery and staging maintenance](import-engine.md) and [match management](match-management.md). The approved classification continuation upgrades schema 1 to 2 transactionally; see [classification migration](classification.md#migration). Game Experience Milestone 1 adds schema 3 game tables without rewriting schema-2 library classifications or metadata; see [game foundation and recovery](game-foundation.md). No image files are moved or rewritten. Back up the complete stopped dataset before starting the upgraded app.
+Match Library Milestones 1–4 add transactional schema migration, a durable import engine, import endpoints/dialog, match management and screenshot assignment. See [import engine limits, recovery and staging maintenance](import-engine.md) and [match management](match-management.md). The approved classification continuation upgrades schema 1 to 2 transactionally; see [classification migration](classification.md#migration). Game Experience Milestone 1 adds schema 3 game tables without rewriting schema-2 library classifications or metadata; see [game foundation and recovery](game-foundation.md). The thirty-second timer refinement adds schema 4, transactionally widening only round timing constraints while preserving saved pauses, history, awards, receipts and library metadata. No image files are moved or rewritten. Back up the complete stopped dataset before starting the upgraded app.
 
 ## Development and production behavior
 
@@ -65,3 +65,5 @@ Technical references: [SQLite backup safety](https://sqlite.org/howtocorrupt.htm
 - Relative screenshot paths should resolve from the configured data root, not from Vite's public directory.
 - Existing Chrome extension captures remain untouched because their source directories are outside the app's managed data root.
 - `data/` is excluded from Git via the repository ignore rules.
+
+Schema 5 adds nullable `game_rounds.stopped_remaining_ms`, bounded to 0–30,000ms for judgments and immutable after judgment. New correct/incorrect decisions save the authoritative remainder; timeout decisions save zero. Existing historical judgments remain NULL (unknown), without fabricated countdowns or changed awards/receipts. The migration is transactional and does not rewrite captures or images. Older binaries cannot open schema 5; retain the complete stopped-root backup and compatible code for rollback.

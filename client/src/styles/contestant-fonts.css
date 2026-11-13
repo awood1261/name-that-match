@@ -1,0 +1,61 @@
+/* Self-hosted Barlow Condensed; license/provenance: public/fonts/barlow-condensed/.
+   Imported by contestant presentation; no global font-family replacement. */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: italic;
+  font-weight: 800;
+  font-display: swap;
+  src: url(/fonts/barlow-condensed/barlow-condensed-latin-800-italic.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: italic;
+  font-weight: 900;
+  font-display: swap;
+  src: url(/fonts/barlow-condensed/barlow-condensed-latin-900-italic.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(/fonts/barlow-condensed/barlow-condensed-latin-700-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url(/fonts/barlow-condensed/barlow-condensed-latin-900-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Match the condensed text's approximate advance width using existing local
+   fonts when a bundled face is slow/missing. Fixed scene tracks reserve layout. */
+@font-face {
+  font-family: 'Name That Match Fallback';
+  src: local('Arial-BoldItalicMT'), local('Arial Black'), local('Segoe UI Bold Italic'), local('Roboto-BoldItalic'), local('Roboto Bold Italic'), local('NotoSans-BoldItalic'), local('Liberation Sans Bold Italic');
+  font-style: italic;
+  font-weight: 800 900;
+  size-adjust: 60%;
+  ascent-override: 100%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Name That Match Fallback';
+  src: local('Arial Black'), local('Arial-BoldMT'), local('Segoe UI Bold'), local('Roboto-Bold'), local('Roboto Bold'), local('NotoSans-Bold'), local('Liberation Sans Bold');
+  font-style: normal;
+  font-weight: 700 900;
+  size-adjust: 60%;
+  ascent-override: 100%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+

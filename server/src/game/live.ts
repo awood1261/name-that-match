@@ -42,7 +42,7 @@ export function attachGameLive(server: http.Server, origins: Set<string>, bridge
   function fail(client: Client, error: unknown) {
     const known = error instanceof HttpError || error instanceof GameError;
     const code = error instanceof HttpError ? error.code : error instanceof GameError ? error.code.toUpperCase() : 'GAME_UNAVAILABLE';
-    const terminal = !['GAME_UNAVAILABLE', 'UNAVAILABLE'].includes(code);
+    const terminal = error instanceof HttpError ? error.status < 500 : error instanceof GameError ? error.code !== 'unavailable' : false;
     const message = code === 'SERVER_EPOCH_CHANGED' ? 'Server restarted. Reclaim host control or request a fresh display link.'
       : terminal ? 'Live access changed or the message was invalid. Rejoin using the current game link.' : 'Local game storage is unavailable. Review recovery before further commands.';
     if (client.socket.readyState === WebSocket.OPEN) client.socket.send(JSON.stringify({ ...tag(client), type: 'error', code: known ? code : 'GAME_UNAVAILABLE', message, terminal }));

@@ -87,7 +87,7 @@ describe('executable startup and signal shutdown', () => {
       const restored = initializeStorage({ dataDir: resources.root });
       try {
         const round = restored.db.prepare('SELECT phase,remaining_ms FROM game_rounds').get() as { phase: string; remaining_ms: number };
-        expect(round.phase).toBe('paused'); expect(round.remaining_ms).toBeGreaterThan(0); expect(round.remaining_ms).toBeLessThanOrEqual(10_000);
+        expect(round.phase).toBe('paused'); expect(round.remaining_ms).toBeGreaterThan(0); expect(round.remaining_ms).toBeLessThanOrEqual(30_000);
         expect(restored.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 0 });
       } finally { closeStorage(restored); }
     } finally { if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await exit; } }

@@ -19,6 +19,7 @@ import { GameDisplays, parseDisplayReport } from './displays.js';
 import { observeDisplayOrigin, parseDisplayOriginInput, type DisplayOriginOptions } from './join.js';
 
 export function createGameHttp(storage: StorageSession, origins: Set<string>, runtime: Pick<GameServiceOptions, 'now' | 'schedule'> = {}, joinOptions: DisplayOriginOptions = {}) {
+  const imagePhases = ['ready', 'guessing', 'paused', 'awaiting_judgment', 'adjudicated', 'answer_revealed'];
   const repo = new GameRepository(storage.db); const library = new GameLibrary(storage); const serverEpoch = randomUUID();
   let stopped = false; let draining = false; let sequence = 0; let preparationError: string | null = null;
   const listeners = new Set<() => void>();
@@ -32,7 +33,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
   const service = new GameService(repo, {
     ...runtime,
     onChange: changed,
-    hasEligibleMatches: () => library.availability(repo.current(), true).distinctMatches > 0,
+    hasEligibleMatches: () => library.cachedAvailability(repo.current()).distinctMatches > 0,
     candidateCurrent: (context, purpose) => library.current(context, purpose),
     primaryReady: (roundId) => { const state = repo.current(); return !!state && displays.ready(state.id, roundId); },
   });
@@ -49,11 +50,15 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
     try { if (!library.restore(recovered.id, recoveredRound.id, recoveredRound.context)) service.interruptImage(recovered.id, recoveredRound.id, recovered.stateVersion); }
     catch { preparationError = 'The paused clue could not be revalidated. Review local storage before continuing.'; }
   }
+  if (recovered && recoveredRound && ['awaiting_judgment', 'adjudicated', 'answer_revealed'].includes(recoveredRound.phase) && 'context' in recoveredRound && recoveredRound.context) {
+    try { library.restore(recovered.id, recoveredRound.id, recoveredRound.context); }
+    catch { /* Resolved timing/history stay authoritative even if the frozen image is unavailable. */ }
+  }
   const heartbeat = setInterval(() => { try { if (!stopped) { control.tick(); displays.tick(); } } catch { /* Storage failures remain explicit on the next host request. */ } }, 1000);
   heartbeat.unref();
-  function status(state: GameState | null, fresh = false): HostStatus {
+  function status(state: GameState | null): HostStatus {
     if (state) state = service.state(state.id);
-    const availability = library.availability(state, fresh);
+    const availability = library.cachedAvailability(state);
     const observation = state ? service.observation(state.id) : null;
     if (observation) state = observation.state;
     const lastRound = state?.rounds[state.rounds.length - 1];
@@ -76,7 +81,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
     if (state?.status === 'completed' || state?.status === 'discarded') allowedActions = [];
     return { protocolVersion: 1, serverEpoch, sequence: ++sequence, snapshot: state ? hostSnapshot(state) : null, availability, allowedActions,
       candidateValid, primaryDisplay,
-      timing: observation && 'remainingMs' in observation.snapshot ? { serverMonoMs: observation.serverMonoMs, remainingMs: observation.snapshot.remainingMs } : null,
+      timing: observation && 'remainingMs' in observation.snapshot && typeof observation.snapshot.remainingMs === 'number' ? { serverMonoMs: observation.serverMonoMs, remainingMs: observation.snapshot.remainingMs } : null,
       preparationError: preparationError ?? (lastRound?.phase === 'cancelled' && lastRound.cancelReason === 'preparation-failed' ? 'The last preparation failed. Refresh availability and prepare another candidate.' : null) };
   }
   function processPreparation(state: GameState, context: RoundContext): void {
@@ -120,12 +125,13 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
     observe(hello: LiveHello) {
       liveAccess(hello);
       if (hello.role === 'host') {
+        void library.refresh().then(updated => { if (updated && !stopped) changed(); }).catch(() => { /* The assessment failure is surfaced by the next observation/request. */ });
         const current = service.current();
         const state = current ?? (hello.sessionId ? service.state(hello.sessionId) : null);
         return { role: 'host' as const, state: status(state), serverMonoMs: (runtime.now ?? (() => performance.now()))() };
       }
       const observation = service.observation(hello.sessionId); const round = currentRound(observation.state);
-      const asset = round && ['ready', 'guessing', 'paused'].includes(round.phase) && library.bytes(hello.sessionId, round.id) ? { roundId: round.id, imageKey: round.id } : null;
+      const asset = round && imagePhases.includes(round.phase) && library.bytes(hello.sessionId, round.id) ? { roundId: round.id, imageKey: round.id } : null;
       return { role: 'display' as const, state: { snapshot: observation.snapshot, asset }, serverMonoMs: observation.serverMonoMs };
     },
     probe(hello: LiveHello, nonce: string) {
@@ -136,7 +142,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
     ready(hello: LiveHello, generation: number, report: LiveReady) {
       liveAccess(hello); if (hello.role !== 'display') throw new HttpError(403, 'DISPLAY_REQUIRED', 'Only viewers report image readiness.');
       const state = service.state(hello.sessionId); const round = currentRound(state);
-      const image = round && ['ready', 'guessing', 'paused'].includes(round.phase) && library.bytes(hello.sessionId, round.id) ? round.id : null;
+      const image = round && imagePhases.includes(round.phase) && library.bytes(hello.sessionId, round.id) ? round.id : null;
       // Preserve the probe nonce until the next real clock probe; a readiness push is not a new clock sample.
       const sample = displays.report(hello.sessionId, hello.displayId, hello.token, { ...report, type: 'status', connectionId: hello.connectionId, connectionSequence: generation }, image, false);
       changed(); return sample;
@@ -150,12 +156,12 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
   };
   const lifecycle = {
     live,
-    beginShutdown() { draining = true; for (const controller of addressRequests) controller.abort(); for (const job of jobs.values()) clearImmediate(job); jobs.clear(); },
+    beginShutdown() { draining = true; library.close(); for (const controller of addressRequests) controller.abort(); for (const job of jobs.values()) clearImmediate(job); jobs.clear(); },
     stop() {
       if (stopped) return; stopped = true; clearInterval(heartbeat);
       for (const controller of addressRequests) controller.abort(); addressRequests.clear();
       for (const job of jobs.values()) clearImmediate(job); jobs.clear();
-      try { service.close(); } finally { library.release(); control.close(); displays.close(); listeners.clear(); }
+      try { service.close(); } finally { library.close(); control.close(); displays.close(); listeners.clear(); }
     },
     async handle(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
       let requestSession: string | undefined; let authorizedHost = false;
@@ -195,19 +201,23 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           } finally { addressRequests.delete(controller); res.off('close', abort); }
           return;
         }
+        if (authorizedHost && !lease && !(session?.[2] === 'commands' && req.method === 'POST')) {
+          await library.refresh(refresh);
+          access(req, requestSession, !(displayStatus || imageRoute) && (!session || !!session[2]));
+        }
         displays.tick();
         if (displayStatus) {
           if (role !== 'display') throw new HttpError(403, 'DISPLAY_REQUIRED', 'Use a read-only display capability.');
           const report = parseDisplayReport(await body(req, 16 * 1024)); access(req, requestSession, false);
           const state = service.state(requestSession!); const round = currentRound(state);
-          const asset = round && ['ready', 'guessing', 'paused'].includes(round.phase) && library.bytes(state.id, round.id) ? { roundId: round.id, imageKey: round.id } : null;
+          const asset = round && imagePhases.includes(round.phase) && library.bytes(state.id, round.id) ? { roundId: round.id, imageKey: round.id } : null;
           const transport = displays.report(state.id, id(displayStatus[2]), token(req)!, report, asset?.imageKey ?? null);
           const observation = service.observation(state.id);
           json(res, 200, { data: { protocolVersion: 1, serverEpoch, sequence: ++sequence, ...transport, sample: { ...transport.sample, serverMonoMs: observation.serverMonoMs }, snapshot: observation.snapshot, asset } }); return;
         }
         if (imageRoute) {
           const state = service.state(requestSession!); const roundId = id(imageRoute[2]); const round = currentRound(state);
-          if (!round || round.id !== roundId || !['ready', 'guessing', 'paused'].includes(round.phase)) throw new HttpError(404, 'IMAGE_NOT_AVAILABLE', 'No current clue is available for preload.');
+          if (!round || round.id !== roundId || !imagePhases.includes(round.phase)) throw new HttpError(404, 'IMAGE_NOT_AVAILABLE', 'No current clue is available for preload.');
           const bytes = library.bytes(state.id, roundId);
           if (!bytes) throw new HttpError(422, 'IMAGE_UNAVAILABLE', 'The current clue is unavailable.');
           res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': bytes.length, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(bytes); return;
@@ -218,7 +228,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           json(res, 200, { data: { serverEpoch, released: lease[1] === 'release' } }); return;
         }
         if (req.method === 'GET') {
-          if (route === '/api/game/current') json(res, 200, { data: status(service.current(), refresh) });
+          if (route === '/api/game/current') json(res, 200, { data: status(service.current()) });
           else if (session?.[3]) {
             const receipt = repo.receipt(id(session[3]));
             if (!receipt || receipt.receipt.sessionId !== requestSession) throw new HttpError(404, 'RECEIPT_NOT_FOUND', 'No accepted receipt found. Review current state before deliberately retrying the original request.');
@@ -243,10 +253,15 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           const capability = control.viewer(token(req)!, requestSession!);
           const displayId = displays.add(state.id, capability);
           if (values.primary) displays.designate(state.id, displayId);
+          // Owner-requested terminal handoff; only the read-only viewer credential is printed.
+          const displayLink = `${origin}/display/${state.id}#${new URLSearchParams({ display: displayId, token: capability, epoch: serverEpoch })}`;
+          console.log(`Contestant display link (read-only):\n${displayLink}`);
           json(res, 201, { data: { token: capability, serverEpoch, displayId } }); return;
         }
         const command = parseCommand(input);
         if (command.sessionId !== requestSession) throw new HttpError(400, 'SESSION_MISMATCH', 'Command session does not match its URL.');
+        await library.refresh(['START', 'PREPARE'].includes(command.type) && !repo.receipt(command.commandId));
+        access(req, requestSession);
         // M2 exposes preparation and the existing domain lane; no browser can supply readiness.
         let selected: RoundContext | null = null;
         if (command.type === 'RESUME' && !repo.receipt(command.commandId)) {
@@ -261,7 +276,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           if (state.stateVersion !== command.expectedStateVersion || phase(state) !== 'between_rounds') {
             service.execute(command); // use the domain's own revision/phase error
           }
-          selected = library.select(state, command.payload.tier); access(req, requestSession);
+          selected = library.select(state, command.payload.tier, false); access(req, requestSession);
         }
         const result = service.execute(command);
         if (command.type === 'PREPARE' && selected && !result.replayed) { preparationError = null; processPreparation(result.state, selected); }
