@@ -131,6 +131,8 @@ The OpenSpec commands validate the current capability specifications. Match Libr
 
 ## Troubleshooting
 
+For HTTP 400/RPC errors during `git push`, see [Git push troubleshooting and repository-local settings](docs/git-troubleshooting.md).
+
 - If the app cannot serve the built client, run `npm run build` before `npm run prod`.
 - If the database directory is not writable, verify the configured data path and file permissions.
 - If the server cannot bind to the requested port, check whether the port is already in use or whether the host binding is restricted.
