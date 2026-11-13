@@ -116,12 +116,13 @@ export function parseLiveServer(input: unknown): LiveServerMessage {
 }
 const PHASES = ['preparing', 'ready', 'guessing', 'paused', 'awaiting_judgment', 'interrupted', 'adjudicated', 'answer_revealed', 'cancelled'];
 function validateHostRound(input: unknown) {
-  const r = record(input, ['id', 'contestantId', 'ordinal', 'requestedTier', 'createdAt', 'timerGeneration', 'phase', 'context', 'turnOrdinal', 'exposedAt', 'windowMs', 'remainingMs', 'pauseReason', 'outcome', 'award', 'lateEntry', 'voidReason', 'judgedAt', 'cancelReason']);
+  const r = record(input, ['id', 'contestantId', 'ordinal', 'requestedTier', 'createdAt', 'timerGeneration', 'phase', 'context', 'turnOrdinal', 'exposedAt', 'windowMs', 'remainingMs', 'pauseReason', 'outcome', 'award', 'lateEntry', 'voidReason', 'judgedAt', 'cancelReason', 'stoppedRemainingMs']);
   requireGame(PHASES.includes(r.phase as string), 'validation', 'Invalid round'); id(r.id); id(r.contestantId); positive(r.ordinal);
   requireGame(['squash', 'competitive', 'deathmatch'].includes(r.requestedTier as string) && typeof r.createdAt === 'string' && Number.isSafeInteger(r.timerGeneration), 'validation', 'Invalid round fields'); nonnegative(r.timerGeneration);
   if (r.phase !== 'preparing' && !(r.phase === 'cancelled' && r.context === null)) parseRoundContext(r.context);
   if (r.phase === 'guessing' || r.phase === 'paused') { const ms = nonnegative(r.phase === 'guessing' ? r.windowMs : r.remainingMs); requireGame(ms <= GUESSING_WINDOW_MS, 'validation', 'Invalid round time'); }
   if (r.phase === 'adjudicated' || r.phase === 'answer_revealed') { validateOutcome(r); requireGame(typeof r.lateEntry === 'boolean' && typeof r.judgedAt === 'string', 'validation', 'Invalid judgment'); }
+  if (r.stoppedRemainingMs !== undefined) requireGame(nonnegative(r.stoppedRemainingMs) <= GUESSING_WINDOW_MS && ['adjudicated', 'answer_revealed'].includes(r.phase as string), 'validation', 'Invalid stopped time');
   if (r.turnOrdinal !== undefined) positive(r.turnOrdinal);
 }
 function validateRoster(input: unknown) {
@@ -153,9 +154,9 @@ function validateDisplaySnapshot(input: unknown) {
     for (const key of ['participantDescription', 'promotion', 'event']) requireGame(typeof answer[key] === 'string' && (answer[key] as string).length <= 4000, 'validation', 'Invalid answer');
     for (const key of ['matchDate', 'stipulation', 'championshipInfo']) requireGame(answer[key] === null || (typeof answer[key] === 'string' && (answer[key] as string).length <= 2000), 'validation', 'Invalid answer');
   } else {
-    const timed = ['guessing', 'paused', 'awaiting_judgment', 'interrupted'].includes(v.phase as string); const image = ['ready', 'guessing'].includes(v.phase as string);
+    const timed = ['guessing', 'paused', 'awaiting_judgment', 'interrupted', 'adjudicated'].includes(v.phase as string); const image = ['ready', 'guessing'].includes(v.phase as string);
     record(input, [...round, ...(timed ? ['remainingMs'] : []), ...(image ? ['imageKey'] : [])]);
-    if (timed) { const remaining = nonnegative(v.remainingMs); requireGame(remaining <= GUESSING_WINDOW_MS, 'validation', 'Invalid remaining time'); }
+    if (timed && !(v.phase === 'adjudicated' && v.remainingMs === null)) { const remaining = nonnegative(v.remainingMs); requireGame(remaining <= GUESSING_WINDOW_MS, 'validation', 'Invalid remaining time'); }
     if (image) requireGame(id(v.imageKey) === v.roundId, 'validation', 'Invalid image identity');
   }
 }

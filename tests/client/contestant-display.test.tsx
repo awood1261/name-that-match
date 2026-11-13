@@ -20,7 +20,7 @@ let createUrl: ReturnType<typeof vi.fn>; let revokeUrl: ReturnType<typeof vi.fn>
 function observation(): DisplayObservation {
   return { protocolVersion: 1, serverEpoch: credential.serverEpoch, sequence: ++sequence, connectionSequence: 1,
     snapshot: phase, sample: { nonce: randomUUID(), serverMonoMs: performance.now() },
-    asset: ['ready', 'guessing', 'paused'].includes(phase.phase) ? { roundId, imageKey: roundId } : null };
+    asset: ['ready', 'guessing', 'paused', 'awaiting_judgment', 'adjudicated', 'answer_revealed'].includes(phase.phase) ? { roundId, imageKey: roundId } : null };
 }
 beforeEach(() => {
   mockGameLive();
@@ -101,13 +101,13 @@ describe('isolated contestant stage and image lifecycle', () => {
   });
   it('renders expiry then conceals judgment until the host reveals the result and answer', async () => {
     phase = { ...round, phase: 'awaiting_judgment', remainingMs: 0 };
-    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'Time up' }); expect(screen.getByRole('timer')).toHaveTextContent('00');
-    expect(displayApi.image).not.toHaveBeenCalled();
-    phase = { ...round, stateVersion: 3, phase: 'adjudicated' };
-    await screen.findByRole('heading', { name: 'Waiting for the host' }); expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByAltText('Current wrestling match clue'); expect(screen.getByRole('timer')).toHaveTextContent('00:00');
+    expect(displayApi.image).toHaveBeenCalledOnce();
+    phase = { ...round, stateVersion: 3, phase: 'adjudicated', remainingMs: 0 };
+    await waitFor(() => expect(screen.getByRole('timer')).toHaveTextContent('00:00')); expect(screen.getByAltText('Current wrestling match clue')).toBeInTheDocument();
     expect(screen.queryByText('CORRECT!')).not.toBeInTheDocument(); expect(document.body.innerHTML).not.toContain('Alpha');
     phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer };
-    await screen.findByRole('heading', { name: 'CORRECT!' }); expect(screen.getByText('3 POINTS EARNED')).toBeInTheDocument(); expect(screen.getByText('Alpha vs Beta')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'CORRECT!' }); expect(screen.getByText('+3 POINTS EARNED')).toBeInTheDocument(); expect(screen.getByText('Alpha vs Beta')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'true');
     await waitFor(() => expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false'));
     expect(gameApi.command).not.toHaveBeenCalled();
@@ -186,7 +186,7 @@ describe('contestant scoreboard visibility and recovery', () => {
     const zero = [{ contestantId, name: 'Contestant One', total: 0 }];
     phase = { ...base, phase: 'between_rounds', scores: zero };
     render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'CHOOSE YOUR MATCH' }); expect(screen.queryByRole('region', { name: 'Scoreboard' })).not.toBeInTheDocument();
-    phase = { ...round, stateVersion: 3, phase: 'adjudicated', scores: zero, turnsExposed: 1 };
+    phase = { ...round, stateVersion: 3, phase: 'adjudicated', remainingMs: 0, scores: zero, turnsExposed: 1 };
     await screen.findByRole('heading', { name: 'Waiting for the host' }); expect(screen.queryByRole('region', { name: 'Scoreboard' })).not.toBeInTheDocument(); expect(document.body.textContent).not.toContain('Correct');
     phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer, turnsExposed: 1,
       scores: [{ contestantId, name: 'Contestant One', total: 3, lastOutcome: { outcome: 'correct', award: 3, turnOrdinal: 1 } }] };

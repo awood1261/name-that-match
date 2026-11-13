@@ -25,6 +25,31 @@ describe('host-only LAN origin HTTP observation', () => {
     }, body: payload === undefined ? undefined : JSON.stringify(payload) });
     return { status: response.status, ...(await response.json()) };
   }
+  it.each([uiOrigin, lanOrigin])('prints only new read-only viewer links using the validated frontend origin %s', async (origin) => {
+    const session = (await request('/sessions', setup())).data.status.snapshot.session;
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const viewers = [];
+      for (const primary of [true, false]) {
+        const result = await request(`/sessions/${session.id}/displays`, { primary }, { Origin: origin, 'X-Forwarded-Host': 'foreign.invalid:9999' });
+        expect(result.status).toBe(201); viewers.push(result.data);
+        const viewer = result.data;
+        const link = new URL(`${origin}/display/${session.id}`);
+        link.hash = new URLSearchParams({ display: viewer.displayId, token: viewer.token, epoch: viewer.serverEpoch }).toString();
+        expect(log).toHaveBeenLastCalledWith(`Contestant display link (read-only):\n${link.href}`);
+      }
+      expect(log).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(log.mock.calls)).not.toContain(owner.token);
+      expect(JSON.stringify(log.mock.calls)).not.toContain('foreign.invalid');
+      log.mockClear();
+      expect((await request(`/sessions/${session.id}/displays`, { displayId: viewers[1].displayId })).status).toBe(200);
+      await request('/current'); await request('/display-origin', { uiOrigin });
+      expect((await request(`/sessions/${session.id}/displays`, {}, {}, '')).status).toBe(401);
+      expect((await request(`/sessions/${session.id}/displays`, {}, { Origin: 'https://foreign.invalid' })).status).toBe(403);
+      expect((await request(`/sessions/${session.id}/displays`, { primary: 'invalid' })).status).toBe(400);
+      expect(log).not.toHaveBeenCalled();
+    } finally { log.mockRestore(); }
+  });
   it('detects only on demand and does not mutate a session, primary or display registrations', async () => {
     const session = (await request('/sessions', setup())).data.status.snapshot.session;
     const viewer = (await request(`/sessions/${session.id}/displays`, { primary: true })).data;

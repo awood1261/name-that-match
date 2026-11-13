@@ -60,7 +60,7 @@ export function useContestantDisplay(sessionId: string, credential: DisplayCrede
         setValue(next); setStale(!timing.synchronized); setError(imageFailure);
         const nextKey = next.asset?.imageKey ?? null;
         if (nextKey !== imageKey) { clearImage(); imageKey = nextKey; report(); if (next.asset) void loadImage(next.asset.roundId); }
-        const ms = 'remainingMs' in next.snapshot ? next.snapshot.remainingMs : 0;
+        const ms = 'remainingMs' in next.snapshot ? next.snapshot.remainingMs ?? 0 : 0;
         setRemaining({ ms: Math.max(0, ms - (next.snapshot.phase === 'guessing' && timing.serverNow !== null ? Math.max(0, timing.serverNow - frame.serverMonoMs) : 0)), at: performance.now() });
       },
       unavailable(failure) { if (!stopped) { setStale(true); setError(failure.message); } },

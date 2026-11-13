@@ -62,6 +62,31 @@ describe('contestant HTTP readiness, timing and recovery', () => {
     return result;
   }
   async function reveal() { await prepare(); await connect(); await report(); await current(); expect((await command('REVEAL_AND_START')).status).toBe(200); }
+  it.each(['CORRECT', 'INCORRECT'] as const)('holds the same image and stopped timer for %s across viewer/server refresh and reveal', async type => {
+    await reveal(); now = 1500; const judged = await command(type); expect(judged.status).toBe(200);
+    await report(); expect(observation.snapshot).toMatchObject({ phase: 'adjudicated', remainingMs: 28500 }); expect(observation.asset?.imageKey).toBe(state.snapshot!.session.currentRoundId);
+    expect(JSON.stringify(observation)).not.toMatch(/Private Wrestler|Alpha|"outcome"|"award"|"answer"/);
+    const image = async () => fetch(base + '/api/game' + sessionPath() + `/rounds/${state.snapshot!.session.currentRoundId}/image`, { headers: { Authorization: `Bearer ${viewer.token}`, 'X-Name-That-Match-Epoch': viewer.serverEpoch } });
+    const before = await image(); expect(before.status).toBe(200); const bytes = Buffer.from(await before.arrayBuffer());
+    connectionId = randomUUID(); await connect(); await report(); expect(observation.snapshot).toMatchObject({ remainingMs: 28500 });
+    game.stop(); game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now });
+    owner = (await request('/control-lease', {})).data; await current(); viewer = (await request(sessionPath() + '/displays', {})).data; connectionId = randomUUID(); await connect(); await report();
+    expect(observation.snapshot).toMatchObject({ phase: 'adjudicated', remainingMs: 28500 }); expect(observation.asset).not.toBeNull();
+    const restored = await image(); expect(restored.status).toBe(200); expect(Buffer.from(await restored.arrayBuffer())).toEqual(bytes);
+    await command('REVEAL_ANSWER'); await report(); expect(observation.snapshot).toMatchObject({ phase: 'answer_revealed', outcome: type === 'CORRECT' ? 'correct' : 'incorrect' }); expect(observation.asset).not.toBeNull();
+    expect(storage.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: type === 'CORRECT' ? 1 : 0 });
+    const staleImagePath = sessionPath() + `/rounds/${state.snapshot!.session.currentRoundId}/image`; await command('ADVANCE'); await report(); expect(observation.asset).toBeNull();
+    const stale = await fetch(base + '/api/game' + staleImagePath, { headers: { Authorization: `Bearer ${viewer.token}`, 'X-Name-That-Match-Epoch': viewer.serverEpoch } }); expect(stale.status).toBe(404);
+  });
+  it('restores an unavailable judged image as a fallback without losing saved time or revealing the answer', async () => {
+    await reveal(); now = 1000; await command('INCORRECT'); const id = state.snapshot!.session.currentRoundId;
+    const file = storage.db.prepare('SELECT image_path FROM screenshots LIMIT 1').get() as { image_path: string }; fs.unlinkSync(path.join(storage.rootDir, file.image_path));
+    game.stop(); game = createGameHttp(storage, new Set(['http://localhost:3001']), { now: () => now }); owner = (await request('/control-lease', {})).data; await current();
+    viewer = (await request(sessionPath() + '/displays', {})).data; connectionId = randomUUID(); await connect(); await report();
+    expect(observation.snapshot).toMatchObject({ phase: 'adjudicated', remainingMs: 29000 }); expect(observation.asset).toBeNull();
+    await command('REVEAL_ANSWER'); await report(); expect(observation.snapshot).toMatchObject({ phase: 'answer_revealed', outcome: 'incorrect' });
+    expect(state.snapshot!.session.currentRoundId).toBe(id); expect(storage.db.prepare('SELECT count(*) n FROM game_score_events').get()).toEqual({ n: 0 });
+  });
   it.each([false, true])('ends resolved rounds with reveal=%s and preserves final scores across new setup and restart', async (revealed) => {
     await reveal(); const oldSessionId = state.snapshot!.session.id; const oldViewer = viewer;
     const libraryBefore = storage.db.prepare('SELECT id,revision,review_status,image_path FROM screenshots').all();

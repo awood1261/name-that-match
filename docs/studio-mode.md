@@ -15,7 +15,7 @@ Open `http://localhost:3001`. This serves the built UI, logo, favicon and screen
 
 Use the same configured `NAME_THAT_MATCH_DATA_DIR` on every start. It defaults to `./data`, resolved from the server's working directory. Run one server per data root. Changing the root or working directory can open a different collection. Custom ports and LAN devices need the exact bind/origin configuration in [game host joining guidance](game-host.md); Open contestant display uses the local host-window origin while the QR/copy field preserves the separately configured device origin.
 
-Before upgrading existing data, stop all writers/watchers and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore), including screenshot files and any sidecars. Current schema is 4; the timer refinement widens game-round timing checks while preserving old pauses/history. Restore to a separate root, verify integrity/assets and use compatible code for rollback. Do not copy only a live database, delete sidecars or reset operational data to troubleshoot presentation.
+Before upgrading existing data, stop all writers/watchers and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore), including screenshot files and any sidecars. Current schema is 5; the timer refinement widens game-round timing checks while preserving old pauses/history. Restore to a separate root, verify integrity/assets and use compatible code for rollback. Do not copy only a live database, delete sidecars or reset operational data to troubleshoot presentation.
 
 ## Set up the external display
 
@@ -51,3 +51,5 @@ Record actual browser, display resolution, TV/monitor, viewing distance and outc
 - Disconnect external internet while keeping the required local connection, then repeat preparation through completion. Run the already built app; no download should be needed.
 
 Studio implementation checks and their measured limits are recorded in `openspec/changes/game-experience-mvp/milestone-5-verification.md`; WebSocket/Studio regression evidence is in `milestone-6-verification.md` in the same change. Native fullscreen in desktop Chrome and emulated viewport checks do not certify a physical TV, camera crop, Android tablet, Wi-Fi interruption or actual internet disconnection. Those checks remain explicitly deferred until performed. Archived Photo Library collection/device deferrals are unchanged.
+
+Schema 5 additionally saves new judgment-time countdown remainders. After Correct/Incorrect the exposed clue remains with frozen time; expiry stays at 00:00. Only Reveal Result discloses outcome/points/answer using green correct or red incorrect/timeout feedback over the actual image. A legacy judgment with no saved stop time says Time unavailable. Pause/interruption/disconnection covers remain unchanged; see [host guidance](game-host.md).

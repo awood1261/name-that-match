@@ -28,7 +28,8 @@ export function transition(state: GameState, intent: HostIntent | InternalIntent
     requireGame(round && 'exposedAt' in round, 'invalid_transition', 'Round is not exposed');
     const points = classify(round.context.obscurity, round.context.difficulty).points!;
     const award = outcome === 'correct' ? points : 0;
-    replace({ ...round, phase: 'adjudicated', outcome, award, lateEntry, voidReason, judgedAt: env.nowIso });
+    const stoppedRemainingMs = round.phase === 'guessing' ? remaining() : round.phase === 'paused' ? round.remainingMs : round.phase === 'awaiting_judgment' ? 0 : undefined;
+    replace({ ...round, phase: 'adjudicated', outcome, award, lateEntry, voidReason, judgedAt: env.nowIso, ...(stoppedRemainingMs === undefined ? {} : { stoppedRemainingMs }) });
     if (award) next.awards.push({ id: env.awardId, roundId: round.id, contestantId: round.contestantId, points: award, createdAt: env.nowIso });
   };
   switch (intent.type) {

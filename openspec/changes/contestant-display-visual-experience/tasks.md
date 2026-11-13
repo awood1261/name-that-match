@@ -48,3 +48,11 @@ Owner approved the refined implementation request on 2026-11-12. Phase A was aut
 
 - [ ] 8.1 Before archive, verify separate owner authorization for upstream MVP archive/sync or coordinated sync and reconcile materialized game-display GD-02/GD-04 with this approved three-screen refinement; review the exact current-spec wording/diff and strict validation while preserving completed MVP history. If authorization or materialized baseline is absent, report the archive dependency instead of silently changing or archiving the upstream change. CV-07; D8.
 - [ ] 8.2 Present complete implementation/asset/browser/physical evidence, remaining limitations or explicit owner dispositions, all verification results, files/tasks and Git status; confirm required acceptance is satisfied and stop for review. Do not archive, commit, push or start result-screen polish without an explicit request. CV-10; D8.
+
+## 9. Owner-approved held clue and result feedback refinement
+
+- [x] 9.1 Record/reconcile owner-approved held-clue behavior, two supplied reference files and preserved result/answer gate with upstream GR-10; validate current artifacts.
+- [x] 9.2 Implement dynamic dimmed actual-image feedback, check/cross, green/red frame and earned points using scoped tokens/CSS Modules and existing local assets; preserve answer details, timeout/void distinctions and score summaries.
+- [x] 9.3 Verify held/frozen/zero phases, hidden-result privacy, dynamic 1/2/3 points, image fallback, responsive geometry, reduced motion and restored scenes through component and production browser checks; run all regression/build/OpenSpec checks, record evidence, leave physical acceptance and archive gates open.
+
+Held-clue/result-refinement evidence: `../game-experience-mvp/held-result-verification.md`. Existing physical/closeout tasks remain open.

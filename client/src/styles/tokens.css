@@ -63,6 +63,7 @@
 
 [data-contestant-stage][data-visual-scene] {
   --game-scene-black: #000;
+  --game-result-image-opacity: 0.26;
   --game-scene-white: #fff;
   --game-scene-yellow: #ffe500;
   --game-scene-purple: #bf13ff;

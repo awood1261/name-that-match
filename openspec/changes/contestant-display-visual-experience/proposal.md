@@ -29,3 +29,7 @@ Client presentation, contestant-only tokens, reviewed local SVG assets, focused 
 ## Implementation approval and refinements
 
 The owner explicitly approved implementation with the final refinement request on 2026-11-12. Update/validate planning first, then perform Phase A only: evaluate/bundle the approved local font and prepare the three SVG illustrations. Stop for explicit artwork approval before illustration integration or later screen work. Selecting retains continuous low-intensity activity after its approved 2.4-second intro, with a static reduced-motion alternative and no Reveal gate. The earlier fallback-only font decision is superseded by self-hosted Barlow Condensed.
+
+## Owner-approved result refinement — 2026-11-12
+
+Extend the implemented visuals with held-clue/frozen-time presentation and dynamic green/red revealed feedback based on the two additional screen-updates references specified in design.md. This explicitly authorizes result polish previously excluded; upstream GR-10 owns stopped time and image lifecycle. Retain explicit Reveal Result, frozen answer/score information and all physical acceptance deferrals.

@@ -65,3 +65,5 @@ Technical references: [SQLite backup safety](https://sqlite.org/howtocorrupt.htm
 - Relative screenshot paths should resolve from the configured data root, not from Vite's public directory.
 - Existing Chrome extension captures remain untouched because their source directories are outside the app's managed data root.
 - `data/` is excluded from Git via the repository ignore rules.
+
+Schema 5 adds nullable `game_rounds.stopped_remaining_ms`, bounded to 0–30,000ms for judgments and immutable after judgment. New correct/incorrect decisions save the authoritative remainder; timeout decisions save zero. Existing historical judgments remain NULL (unknown), without fabricated countdowns or changed awards/receipts. The migration is transactional and does not rewrite captures or images. Older binaries cannot open schema 5; retain the complete stopped-root backup and compatible code for rollback.

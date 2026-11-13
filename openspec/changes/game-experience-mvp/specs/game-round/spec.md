@@ -92,7 +92,7 @@ Under the owner-approved task 5.1 refinement of P9, judgment and contestant resu
 
 #### Scenario: Recover before or after result reveal
 - **WHEN** a contestant refreshes or reconnects in adjudicated or answer-revealed state
-- **THEN** the server restores respectively the concealed waiting state or the already revealed frozen result/answer without scoring, replaying a reveal command or automatically starting an entrance animation
+- **THEN** the server restores respectively the exposed clue with saved stopped timer and concealed result, or the already revealed frozen result/answer without scoring, replaying a reveal command or automatically starting an entrance animation
 
 #### Scenario: Repeated Reveal and Advance do not score
 - **WHEN** the host reveals an adjudicated answer and advances, retries accepted commands, or sends new commands for an already completed transition
@@ -125,3 +125,20 @@ Newly revealed rounds SHALL use a standard 30,000ms server-owned guessing window
 #### Scenario: Failed timing migration
 - **WHEN** migration fails after replacement-table or drop/rename work
 - **THEN** the old schema version, rows, indexes, triggers and foreign-key enforcement remain recoverable without data loss
+
+### Requirement: GR-10 Hold the exposed clue and stopped countdown
+The server SHALL preserve the exact judgment-time remaining duration for new Correct/Incorrect judgments and zero for expiry/late-before-buzzer judgments. The synchronized contestant SHALL retain the same exposed screenshot and strip in awaiting-judgment/adjudicated, freezing time rather than running another clock. Outcome, points and answer SHALL remain concealed until explicit Reveal Result. Paused/interrupted/stale covers and existing scoring/Advance/End rules SHALL remain unchanged. Saved stopped time and current frozen image SHALL restore across refresh/reconnect/restart without scoring again. Schema 5 SHALL add bounded nullable immutable stopped timing transactionally; legacy judgments with unknown stopped time SHALL remain unknown rather than invent a remainder. Missing/changed images SHALL show an honest fallback without changing judgment/history.
+
+#### Scenario: Host judges with time left
+- **WHEN** Correct or Incorrect is accepted with 23,500ms left
+- **THEN** the same clue remains with a frozen 00:24 countdown through observations, refresh and restart
+- **AND** neither judgment nor award/answer is publicly disclosed before Reveal Result
+
+#### Scenario: Time expires
+- **WHEN** the thirty-second guessing deadline expires
+- **THEN** the same clue remains at 00:00 while awaiting judgment and after Confirm timeout or Correct before buzzer
+- **AND** no further ordinary guesses, automatic result reveal, restart or duplicate award occurs
+
+#### Scenario: Existing judgment or unavailable asset
+- **WHEN** an old judgment has no recorded stopped duration or its frozen asset cannot be validated
+- **THEN** unknown time or unavailable image is represented honestly without fabricated timing, substituted image or changed scores

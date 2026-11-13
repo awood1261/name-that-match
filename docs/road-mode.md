@@ -4,7 +4,7 @@ Studio and Road use the same host controls, contestant display, Node game author
 
 ## Prepare and start
 
-Use Node 20/npm 10 and install the locked dependencies while installation access is available. Before upgrading operational data, stop every writer and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore). Current schema is 4: the 30-second guessing refinement widens game-round timing checks; existing pauses/history are preserved.
+Use Node 20/npm 10 and install the locked dependencies while installation access is available. Before upgrading operational data, stop every writer and follow the [whole-root WAL-safe backup procedure](local-storage.md#backup-and-restore). Current schema is 5: the 30-second guessing refinement widens game-round timing checks; existing pauses/history are preserved.
 
 ```bash
 npm ci
@@ -70,3 +70,5 @@ Use disposable data for interruption/fault experiments. Record device/browser, l
 - Disconnect external internet while retaining the required local network. Start the already installed/built app and play through completion without downloads or remote requests.
 
 Automated local sockets, controlled latency, desktop browser runs and zero observed external requests are narrower evidence than physical Android/Wi-Fi/internet-disconnection testing. Unperformed hardware/offline/prolonged checks stay deferred in the [Milestone 6 verification record](../openspec/changes/game-experience-mvp/milestone-6-verification.md). Archived Photo Library real-collection/device deferrals remain separate. Stop for owner review before archive.
+
+Schema 5 additionally saves new judgment-time countdown remainders. After Correct/Incorrect the exposed clue remains with frozen time; expiry stays at 00:00. Only Reveal Result discloses outcome/points/answer using green correct or red incorrect/timeout feedback over the actual image. A legacy judgment with no saved stop time says Time unavailable. Pause/interruption/disconnection covers remain unchanged; see [host guidance](game-host.md).

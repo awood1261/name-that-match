@@ -16,3 +16,5 @@
 :global([data-layout='compact']) .tier { grid-column: 1 / -1; grid-row: 2; font-size: 64px; }
 :global([data-layout='compact']) .tier::before, :global([data-layout='compact']) .tier::after { content: none; }
 :global([data-layout='compact']) .timer { font-size: 96px; }
+
+.unknown { font: normal var(--font-contestant-label-weight) 38px/1.2 var(--font-contestant-label); }

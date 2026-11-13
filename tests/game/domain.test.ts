@@ -218,3 +218,19 @@ describe('pure authoritative transitions and projections', () => {
     expect((currentRound(game.state) as Extract<Round, { phase: 'ready' }>).context.answer.event).toBe('Private Event');
   });
 });
+
+// Judgment must freeze server time, not estimate from the next browser frame.
+describe('held clue timing', () => {
+  it.each(['CORRECT', 'INCORRECT'] as const)('freezes exact remaining time for %s and conceals its result', type => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.setTime(6500.5); game.step({ type });
+    expect(currentRound(game.state)).toMatchObject({ stoppedRemainingMs: 23499.5 });
+    const view = displaySnapshot(game.state, null, 900000); expect(view).toMatchObject({ phase: 'adjudicated', remainingMs: 23499.5 });
+    expect(view).not.toHaveProperty('outcome'); expect(view).not.toHaveProperty('award'); expect(view).not.toHaveProperty('answer'); expect(view.scores.every(row => row.total === 0)).toBe(true);
+    game.step({ type: 'REVEAL_ANSWER' }); expect(currentRound(game.state)).toHaveProperty('stoppedRemainingMs', 23499.5);
+  });
+  it.each(['CONFIRM_TIMEOUT', 'CORRECT_BEFORE_BUZZER'] as const)('keeps zero after expiry and %s', type => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.setTime(30000); game.step({ type: 'EXPIRE', timerGeneration: game.clock!.timerGeneration });
+    expect(displaySnapshot(game.state, null, 30000)).toMatchObject({ phase: 'awaiting_judgment', remainingMs: 0 });
+    game.step({ type }); expect(displaySnapshot(game.state, null, 60000)).toMatchObject({ phase: 'adjudicated', remainingMs: 0 });
+  });
+});

@@ -105,3 +105,21 @@ The owner directly requested 30 seconds on 2026-11-12. These six focused tasks e
 - [x] 8.6 Run npm test/typecheck/lint/build, strict MVP/visual/whole-project OpenSpec validation, production browser smoke and Git tracking audit; record actual results and manual verification steps, then stop without archive/commit/push.
 
 Tasks 8.2–8.6 evidence: `thirty-second-verification.md`.
+
+## 9. Owner-requested terminal contestant link
+
+- [x] 9.1 Record and strictly validate the explicit terminal-only credential exception and frontend-origin behavior (GN-10).
+- [x] 9.2 Print each successfully registered display link from the existing authorized HTTP handler; test primary/secondary creation, LAN/localhost frontend origins, rejected requests, designation/status silence and host-token exclusion.
+- [x] 9.3 Document phone-host/laptop-viewer operation, run regression tests/typecheck/lint/build and strict OpenSpec validation, record results and stop without archive or commit.
+
+Tasks 9.1–9.3 evidence: `terminal-link-verification.md`.
+
+## 10. Owner-approved held clue and frozen countdown
+
+- [x] 10.1 Reconcile approved held-clue/reveal behavior and supplied result references across current planning artifacts; strictly validate before code.
+- [x] 10.2 Add schema-5 nullable immutable stopped timing and domain/repository support; test exact judgment remainder, zero expiry, legacy unknown, bounds, migration preservation/rollback and reopen.
+- [x] 10.3 Extend allowlisted public/live/HTTP image lifecycle for awaiting judgment, concealed judgment and revealed feedback; restore current frozen assets at startup, preserve role/privacy/recovery and clear on Advance.
+- [x] 10.4 Keep ScreenshotRound mounted in synchronized held phases with frozen/zero/unknown timer; preserve paused/stale covers, read-only controls and single-clock authority.
+- [x] 10.5 Verify integrated correct/incorrect/expiry/late-credit, refresh/reconnect/restart, image failure, scoring/ownership/privacy and import regressions; run tests/typecheck/lint/build and strict validation, document actual results and manual steps. Stop without archive/commit.
+
+Held-clue/result-refinement evidence: `held-result-verification.md`.

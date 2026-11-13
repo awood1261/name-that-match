@@ -32,6 +32,13 @@ describe('live runtime message contracts', () => {
     }
     game.step({ type: 'REVEAL_ANSWER' }); check(); game.step({ type: 'ADVANCE' }); check(); game.step({ type: 'END_GAME' }); check();
   });
+  it('validates a concealed stopped timer including unknown legacy time and rejects outcome fields or invalid durations', () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.setTime(6500); game.step({ type: 'CORRECT' });
+    const snapshot = displaySnapshot(game.state, null, 0);
+    const frame = { ...tag, type: 'snapshot', role: 'display', sequence: 1, sessionId: snapshot.sessionId, stateVersion: snapshot.stateVersion, serverMonoMs: 0, state: { snapshot, asset: null } };
+    for (const remainingMs of [23500, 0, null]) expect(() => parseLiveServer({ ...frame, state: { snapshot: { ...snapshot, remainingMs }, asset: null } })).not.toThrow();
+    for (const remainingMs of [-1, 30001, '23500', undefined, Infinity]) expect(() => parseLiveServer({ ...frame, state: { snapshot: { ...snapshot, remainingMs }, asset: null } })).toThrow();
+  });
   it('accepts thirty-second public timing and rejects a duration above the standard bound', () => {
     const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' });
     const snapshot = displaySnapshot(game.state, game.clock, 0);

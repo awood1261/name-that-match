@@ -110,4 +110,21 @@ The derived device origin SHALL replace only a loopback UI hostname, retaining t
 #### Scenario: Observe address without leaking game authority
 - **WHEN** a viewer or unauthorized caller requests host-only address observation
 - **THEN** access is refused under existing role/epoch/origin/header rules
-- **AND** no controller token, private answer or complete capability-bearing join URL enters observation responses, logs or persistent game state
+- **AND** no controller token, private answer or complete capability-bearing join URL enters observation responses, general logs or persistent game state; the explicit local terminal exception in GN-10 applies only to successful new viewer registration
+
+### Requirement: GN-10 Newly registered contestant link in the server terminal
+The server SHALL print one labeled complete read-only contestant URL for each successful host-authorized new display registration. It SHALL use the validated browser Origin and fragment-carried display ID/token/server epoch, retaining the frontend protocol/port. This owner-requested terminal output is the sole exception to the full-display-link logging exclusion; it SHALL NOT include controller credentials or private answers, persist the link in game storage, or print links from general request/snapshot logging. Existing-display designation and failed requests SHALL NOT print a new link. No address discovery or game rule changes are required.
+
+#### Scenario: Phone host creates a laptop contestant link
+- **WHEN** an authorized host registers a new primary or secondary viewer from a configured LAN application origin
+- **THEN** the server terminal prints one URL with that application origin, session path and the issued viewer fragment credentials
+- **AND** opening that link uses the existing read-only contestant route
+
+#### Scenario: Local frontend port is preserved
+- **WHEN** a host registers from an allowed localhost frontend origin in development
+- **THEN** the printed URL keeps the frontend origin and port rather than using the backend or forwarded Host header
+
+#### Scenario: Other requests do not emit viewer credentials
+- **WHEN** registration is rejected, an existing display is designated, or state/origin observations are requested
+- **THEN** no new terminal display link is emitted
+- **AND** controller credentials and private answers remain absent from terminal link output

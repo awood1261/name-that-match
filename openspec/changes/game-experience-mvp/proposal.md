@@ -45,3 +45,11 @@ Formal Photo Library real-collection/device/offline acceptance was deferred by t
 ## Owner-approved countdown refinement — 2026-11-12
 
 The owner requests changing the standard guessing window from 10 to 30 seconds. This explicitly supersedes the former ten-second duration for newly revealed rounds, including future rounds of an existing session. Preserve server-owned timing, scoring, late judgment, primary readiness, pause/recovery, host leases and match use history. A paused legacy round retains its actual saved remainder; a running crash still becomes interrupted. No duration selector or retroactive history rewrite. Schema 4 widens only the game-round timing CHECK constraints through the existing transactional migration mechanism. Historical milestone verification remains evidence of the former duration, not current operation.
+
+## Owner-requested terminal display link — 2026-11-12
+
+Print each newly registered read-only contestant display URL in the Node server terminal so a phone host can transfer it to the laptop viewer without email. This explicitly permits the display credential in that one terminal message; host credentials, answers and automatic request/snapshot logging remain excluded. No new endpoint, dependency, persistence or gameplay change.
+
+## Owner-approved held clue and result reference refinement — 2026-11-12
+
+Keep the exposed screenshot and round strip visible after Correct/Incorrect, with the authoritative judgment-time remainder frozen, and after expiry at 00:00. Continue concealing the outcome/award/answer until explicit Reveal Result. Recreate the owner-supplied green correct and red incorrect/timeout references with dynamic components over the actual clue, not flattened reference images; retain frozen answer details, scores, explicit progression and all game rules. Persist stopped time and restore the image on refresh/restart without new scoring.

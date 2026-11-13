@@ -131,3 +131,12 @@ export function extendGuessingWindow(db: Database.Database): void {
   db.exec('DROP TABLE game_rounds; ALTER TABLE game_rounds_next RENAME TO game_rounds');
   for (const object of objects) db.exec(object.sql);
 }
+
+/** Schema 5: historical judgments retain NULL rather than invented clock readings. */
+export function addStoppedTiming(db: Database.Database): void {
+  db.exec(`ALTER TABLE game_rounds ADD COLUMN stopped_remaining_ms REAL
+    CHECK (stopped_remaining_ms IS NULL OR (phase IN ('adjudicated','answer_revealed') AND stopped_remaining_ms BETWEEN 0 AND 30000));
+CREATE TRIGGER game_stopped_time_immutable BEFORE UPDATE OF stopped_remaining_ms ON game_rounds
+WHEN OLD.outcome IS NOT NULL AND NEW.stopped_remaining_ms IS NOT OLD.stopped_remaining_ms
+BEGIN SELECT RAISE(ABORT,'Stopped time is immutable'); END;`);
+}

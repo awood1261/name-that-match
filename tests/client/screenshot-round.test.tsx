@@ -33,3 +33,11 @@ it('keeps clock-format pause frozen and uses only a supplied remainder when resu
   await act(async () => { vi.advanceTimersByTime(1000); }); expect(screen.getByRole('timer')).toHaveTextContent('00:04');
   view.unmount(); expect(vi.getTimerCount()).toBe(0);
 });
+
+it('freezes a held clue and renders unknown old time without starting a local clock', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'performance'] });
+  const view = render(<ScreenshotRound imageUrl="blob:same" turnOrdinal={1} tier="squash" remaining={{ ms: 23500, at: performance.now() }} running={false} onImageError={() => {}} />);
+  await act(async () => { vi.advanceTimersByTime(60000); }); expect(screen.getByRole('timer')).toHaveTextContent('00:24'); expect(screen.getByAltText('Current wrestling match clue')).toHaveAttribute('src', 'blob:same');
+  view.rerender(<ScreenshotRound imageUrl="blob:same" turnOrdinal={1} tier="squash" remaining={null} running={false} onImageError={() => {}} />);
+  expect(screen.queryByRole('timer')).not.toBeInTheDocument(); expect(screen.getByText('Time unavailable')).toBeInTheDocument();
+});

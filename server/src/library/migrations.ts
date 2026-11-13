@@ -1,8 +1,8 @@
 import type Database from 'better-sqlite3';
-import { addGameSchema, extendGuessingWindow } from '../game/migrations.js';
+import { addGameSchema, extendGuessingWindow, addStoppedTiming } from '../game/migrations.js';
 
 // Historical name: this is the global schema sequence, including game storage.
-export const LIBRARY_SCHEMA_VERSION = 4;
+export const LIBRARY_SCHEMA_VERSION = 5;
 
 export class LibraryMigrationError extends Error {
   constructor(message: string) {
@@ -147,6 +147,7 @@ export function applyLibraryMigrations(db: Database.Database): void {
       if (version < 2) upgradeClassifications(db);
       if (version < 3) addGameSchema(db);
       if (version < 4) extendGuessingWindow(db);
+      if (version < 5) addStoppedTiming(db);
       if ((db.pragma('foreign_key_check') as unknown[]).length) throw new LibraryMigrationError('Foreign key verification failed; migration rolled back.');
       db.pragma(`user_version = ${LIBRARY_SCHEMA_VERSION}`);
     }).immediate();
