@@ -130,3 +130,11 @@ Held-clue/result-refinement evidence: `held-result-verification.md`.
 - [x] 11.2 Update shared labels, current operation docs/AGENTS and affected interaction tests; verify host/contestant/library names, stable classification/points/assets and saved IDs, run tests/typecheck/lint/build and strict OpenSpec checks, record results and stop without archive/commit.
 
 Tier-name evidence: `tier-names-verification.md`.
+
+## 12. Preparation and recovery stall correction
+
+- [x] 12.1 Record measured failure, bounded cooperative-assessment design and unchanged authority/freshness/receipt/timing guarantees; validate before code.
+- [x] 12.2 Implement short metadata snapshots, yielding/coalesced catalog refresh, revision/error/shutdown checks, cached live observations and reauthorized fresh HTTP selection; test slow-scan liveness, consistency and cleanup.
+- [x] 12.3 Align bounded HTTP/registration lifetimes, verify explicit pending-command recovery without replay, run full checks and disposable collection/browser acceptance, record actual results and remaining risks; stop without archive/commit.
+
+Task 12 evidence: `preparation-stall-verification.md`.

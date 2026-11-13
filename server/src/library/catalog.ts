@@ -1,4 +1,5 @@
 import type { Match } from '../../../shared/src/library.js';
+import { setImmediate as yieldToIo } from 'node:timers/promises';
 import { OBSCURITIES, DIFFICULTIES, REVIEW_STATUSES } from '../../../shared/src/library.js';
 import type { MatchSummary } from '../../../shared/src/matches.js';
 import type { ScreenshotSummary } from '../../../shared/src/imports.js';
@@ -6,7 +7,7 @@ import type { LibraryStatistics } from '../../../shared/src/classification.js';
 import type { StorageSession } from '../storage.js';
 import { createLibraryRepository } from './repository.js';
 import { missingMatchFields } from './validation.js';
-import { filterValues, publicScreenshot, screenshotFilter } from './assets.js';
+import { assessAsset, filterValues, publicScreenshot, screenshotFilter } from './assets.js';
 import { HttpError } from './http/protocol.js';
 
 /** One synchronous SQLite snapshot and one asset assessment per screenshot in this response. */
@@ -22,6 +23,27 @@ export function catalog(storage: StorageSession) {
     for (const record of screenshots) if (record.matchId) { const items = byMatch.get(record.matchId) ?? []; items.push(record); byMatch.set(record.matchId, items); }
     return { matches: matches.map((match) => matchSummary(match, byMatch.get(match.id) ?? [])), screenshots, asOf: new Date().toISOString() };
   })();
+}
+
+/** Game refreshes release the SQLite snapshot before expensive file validation. */
+export async function catalogAsync(storage: StorageSession, cancelled: () => boolean) {
+  const { matches, records } = storage.db.transaction(() => {
+    const repo = createLibraryRepository(storage.db);
+    const matches = (storage.db.prepare('SELECT id FROM matches ORDER BY created_at DESC,id ASC').all() as Array<{ id: string }>).map(({ id }) => repo.getMatch(id));
+    const records = (storage.db.prepare('SELECT id FROM screenshots ORDER BY captured_at ASC,id ASC').all() as Array<{ id: string }>).map(({ id }) => repo.getScreenshot(id));
+    return { matches, records };
+  })();
+  const parents = new Map(matches.map(match => [match.id, match]));
+  const screenshots: ScreenshotSummary[] = [];
+  for (const record of records) {
+    await yieldToIo();
+    if (cancelled() || !storage.db.open) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Library assessment stopped.');
+    const asset = assessAsset(storage, record);
+    screenshots.push(publicScreenshot(storage, record, record.matchId ? parents.get(record.matchId) ?? null : null, asset.status));
+  }
+  const byMatch = new Map<string, ScreenshotSummary[]>();
+  for (const record of screenshots) if (record.matchId) { const items = byMatch.get(record.matchId) ?? []; items.push(record); byMatch.set(record.matchId, items); }
+  return { matches: matches.map(match => matchSummary(match, byMatch.get(match.id) ?? [])), screenshots, asOf: new Date().toISOString() };
 }
 export function matchSummary(match: Match, screenshots: ScreenshotSummary[]): MatchSummary {
   const missingFields = missingMatchFields(match);

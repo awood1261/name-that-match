@@ -8,6 +8,7 @@ import type { DisplayObservation } from '../../shared/src/game/display';
 import type { DisplaySnapshot } from '../../shared/src/game/contracts';
 import { isPartialDate } from '../../server/src/library/validation';
 import { mockGameLive } from './mock-game-live';
+import { openGameLive, type LiveCallbacks } from '../../client/src/game/live';
 
 const sessionId = randomUUID(); const roundId = randomUUID(); const contestantId = randomUUID();
 const credential = { token: 'a'.repeat(64), serverEpoch: randomUUID(), displayId: randomUUID() };
@@ -36,6 +37,74 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); history.replaceState(null, '', '/'); });
 
 describe('isolated contestant stage and image lifecycle', () => {
+  it('keeps untimed choice/selection visible during clock synchronization without bypassing clue or recovery gates', async () => {
+    let callbacks!: LiveCallbacks; let finishDecode!: () => void;
+    const ready = vi.fn(); const close = vi.fn();
+    decode = () => new Promise(resolve => { finishDecode = resolve; });
+    vi.mocked(openGameLive).mockImplementation((_join, value) => { callbacks = value; return { ready, close }; });
+    phase = { ...base, phase: 'between_rounds' };
+    const view = render(<ContestantDisplay sessionId={sessionId} />);
+    const send = async (synchronized: boolean) => {
+      const next = observation();
+      await act(async () => callbacks.snapshot({ type: 'snapshot', role: 'display', protocolVersion: 1, serverEpoch: credential.serverEpoch,
+        connectionSequence: 1, sequence: next.sequence, sessionId, stateVersion: phase.stateVersion, serverMonoMs: performance.now(),
+        state: { snapshot: phase, asset: next.asset } }, { synchronized, serverNow: synchronized ? performance.now() : null }));
+    };
+    await send(true); expect(screen.getByRole('heading', { name: 'CHOOSE YOUR MATCH' })).toBeInTheDocument();
+    await send(false); expect(screen.getByRole('heading', { name: 'CHOOSE YOUR MATCH' })).toBeInTheDocument();
+    phase = { ...round, stateVersion: 3, phase: 'preparing' }; await send(false);
+    expect(screen.getByRole('heading', { name: 'SELECTING MATCH...' })).toBeInTheDocument();
+    expect(document.querySelector('[data-intro]')).toHaveAttribute('data-intro', 'true');
+    phase = { ...round, stateVersion: 4, phase: 'ready', imageKey: roundId }; await send(false);
+    await waitFor(() => expect(finishDecode).toBeTypeOf('function'));
+    expect(screen.getByRole('heading', { name: 'SELECTING MATCH...' })).toBeInTheDocument();
+    expect(ready).toHaveBeenCalledWith({ roundId, imageKey: roundId, decoded: false });
+    await send(true); await send(false); await send(true);
+    expect(document.querySelector('[data-intro]')).toHaveAttribute('data-intro', 'true');
+    expect(screen.queryByText(/Connecting display|Ready · waiting for reveal|synchronization/i)).not.toBeInTheDocument();
+    expect(screen.queryByAltText('Current wrestling match clue')).not.toBeInTheDocument();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    await act(async () => { finishDecode(); });
+    expect(screen.getByRole('heading', { name: 'SELECTING MATCH...' })).toBeInTheDocument();
+    phase = { ...round, stateVersion: 5, phase: 'guessing', imageKey: roundId, remainingMs: 5000 }; await send(false);
+    expect(screen.queryByAltText('Current wrestling match clue')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Connecting display' })).toBeInTheDocument();
+    await send(true); expect(screen.getByAltText('Current wrestling match clue')).toBeInTheDocument();
+    await act(async () => { callbacks.unavailable(new Error('Connection lost'), false); callbacks.reset?.(); });
+    expect(screen.queryByRole('heading', { name: 'SELECTING MATCH...' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Display unavailable' })).toBeInTheDocument();
+    expect(gameApi.command).not.toHaveBeenCalled(); view.unmount(); expect(close).toHaveBeenCalledOnce();
+  });
+  it.each(['between_rounds', 'preparing', 'ready'] as const)('keeps %s through brief recovery but bounds repeated failures and shows terminal errors', async stage => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let callbacks!: LiveCallbacks; const close = vi.fn();
+    vi.mocked(openGameLive).mockImplementation((_join, value) => { callbacks = value; return { ready: vi.fn(), close }; });
+    phase = stage === 'between_rounds' ? { ...base, phase: stage } : stage === 'preparing' ? { ...round, phase: stage } : { ...round, phase: stage, imageKey: roundId };
+    const view = render(<ContestantDisplay sessionId={sessionId} />);
+    const send = async () => {
+      const next = observation();
+      await act(async () => callbacks.snapshot({ type: 'snapshot', role: 'display', protocolVersion: 1, serverEpoch: credential.serverEpoch,
+        connectionSequence: 1, sequence: next.sequence, sessionId, stateVersion: phase.stateVersion, serverMonoMs: performance.now(),
+        state: { snapshot: phase, asset: next.asset } }, { synchronized: true, serverNow: performance.now() }));
+    };
+    const title = stage === 'between_rounds' ? 'CHOOSE YOUR MATCH' : 'SELECTING MATCH...';
+    await send();
+    await act(async () => { callbacks.unavailable(new Error('Connection lost'), false); callbacks.reset?.(); });
+    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Display unavailable' })).not.toBeInTheDocument();
+    expect(screen.queryByAltText('Current wrestling match clue')).not.toBeInTheDocument(); expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(1000); callbacks.unavailable(new Error('Another failed reconnect'), false); });
+    await act(async () => { vi.advanceTimersByTime(1999); }); expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(1); }); expect(screen.getByRole('heading', { name: 'Display unavailable' })).toBeInTheDocument();
+    await send(); expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+    await act(async () => { callbacks.unavailable(new Error('A new brief interruption'), false); callbacks.reset?.(); });
+    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(1000); }); await send();
+    await act(async () => { callbacks.unavailable(new Error('Fresh display link required'), true); callbacks.reset?.(); });
+    expect(screen.getByRole('heading', { name: 'Display unavailable' })).toBeInTheDocument();
+    expect(screen.getByText('Fresh display link required')).toBeInTheDocument();
+    expect(gameApi.command).not.toHaveBeenCalled(); view.unmount(); expect(close).toHaveBeenCalledOnce(); expect(vi.getTimerCount()).toBe(0);
+  });
   it('keeps choice until preparation, preserves the intro through Ready and reveals without waiting for cosmetic completion', async () => {
     phase = { ...base, phase: 'between_rounds' };
     render(<ContestantDisplay sessionId={sessionId} />);
@@ -61,10 +130,12 @@ describe('isolated contestant stage and image lifecycle', () => {
   it('restores selection settled after refresh or loss, and returns to choice on cancellation/failure', async () => {
     render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'SELECTING MATCH...' });
     expect(document.querySelector('[data-intro]')).toHaveAttribute('data-intro', 'false');
+    const observed = vi.mocked(displayApi.status).mock.calls.length;
     vi.mocked(displayApi.status).mockRejectedValueOnce(new TypeError('connection lost'));
-    await screen.findByRole('heading', { name: 'Display unavailable' });
-    expect(screen.queryByRole('heading', { name: 'SELECTING MATCH...' })).not.toBeInTheDocument();
-    await screen.findByRole('heading', { name: 'SELECTING MATCH...' });
+    await waitFor(() => expect(vi.mocked(displayApi.status).mock.calls.length).toBeGreaterThan(observed));
+    expect(screen.queryByRole('heading', { name: 'Display unavailable' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'SELECTING MATCH...' })).toBeInTheDocument();
+    await waitFor(() => expect(createUrl).toHaveBeenCalledTimes(2));
     expect(document.querySelector('[data-intro]')).toHaveAttribute('data-intro', 'false');
     phase = { ...base, stateVersion: 4, phase: 'between_rounds' };
     await screen.findByRole('heading', { name: 'CHOOSE YOUR MATCH' });

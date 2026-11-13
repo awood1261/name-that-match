@@ -57,3 +57,7 @@ Keep the exposed screenshot and round strip visible after Correct/Incorrect, wit
 ## Owner-approved tier names — 2026-11-13
 
 Rename displayed game tiers throughout contestant/host/library UI and current operation guidance: Squash Match → Easy, Competitive Match → Medium, Deathmatch → Hard. Preserve 1/2/3 points, classifier/matrix, illustrations/colors and saved game compatibility. This is a display-name change, not a change to wrestling-match types, screenshot visual difficulty, protocol identifiers or SQLite schema.
+
+## Preparation and host recovery stall correction — 2026-11-13
+
+Investigate/fix preparation and receipt-recovery failures with larger image collections. Read-only measurement of the owner's 81 managed PNGs (~129MiB) took ~3.1s, exceeding current 3s request/liveness bounds. Preserve full validation, one server authority, fresh eligible selection, immutable receipts, timers and saved state. Use cooperative asynchronous catalog assessments, cached live observations with explicit as-of time, and bounded HTTP request lifetimes appropriate to validation work. No dependency, schema, game-rule or endpoint changes.

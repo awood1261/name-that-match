@@ -33,7 +33,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
   const service = new GameService(repo, {
     ...runtime,
     onChange: changed,
-    hasEligibleMatches: () => library.availability(repo.current(), true).distinctMatches > 0,
+    hasEligibleMatches: () => library.cachedAvailability(repo.current()).distinctMatches > 0,
     candidateCurrent: (context, purpose) => library.current(context, purpose),
     primaryReady: (roundId) => { const state = repo.current(); return !!state && displays.ready(state.id, roundId); },
   });
@@ -56,9 +56,9 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
   }
   const heartbeat = setInterval(() => { try { if (!stopped) { control.tick(); displays.tick(); } } catch { /* Storage failures remain explicit on the next host request. */ } }, 1000);
   heartbeat.unref();
-  function status(state: GameState | null, fresh = false): HostStatus {
+  function status(state: GameState | null): HostStatus {
     if (state) state = service.state(state.id);
-    const availability = library.availability(state, fresh);
+    const availability = library.cachedAvailability(state);
     const observation = state ? service.observation(state.id) : null;
     if (observation) state = observation.state;
     const lastRound = state?.rounds[state.rounds.length - 1];
@@ -125,6 +125,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
     observe(hello: LiveHello) {
       liveAccess(hello);
       if (hello.role === 'host') {
+        void library.refresh().then(updated => { if (updated && !stopped) changed(); }).catch(() => { /* The assessment failure is surfaced by the next observation/request. */ });
         const current = service.current();
         const state = current ?? (hello.sessionId ? service.state(hello.sessionId) : null);
         return { role: 'host' as const, state: status(state), serverMonoMs: (runtime.now ?? (() => performance.now()))() };
@@ -155,12 +156,12 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
   };
   const lifecycle = {
     live,
-    beginShutdown() { draining = true; for (const controller of addressRequests) controller.abort(); for (const job of jobs.values()) clearImmediate(job); jobs.clear(); },
+    beginShutdown() { draining = true; library.close(); for (const controller of addressRequests) controller.abort(); for (const job of jobs.values()) clearImmediate(job); jobs.clear(); },
     stop() {
       if (stopped) return; stopped = true; clearInterval(heartbeat);
       for (const controller of addressRequests) controller.abort(); addressRequests.clear();
       for (const job of jobs.values()) clearImmediate(job); jobs.clear();
-      try { service.close(); } finally { library.release(); control.close(); displays.close(); listeners.clear(); }
+      try { service.close(); } finally { library.close(); control.close(); displays.close(); listeners.clear(); }
     },
     async handle(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
       let requestSession: string | undefined; let authorizedHost = false;
@@ -200,6 +201,10 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           } finally { addressRequests.delete(controller); res.off('close', abort); }
           return;
         }
+        if (authorizedHost && !lease && !(session?.[2] === 'commands' && req.method === 'POST')) {
+          await library.refresh(refresh);
+          access(req, requestSession, !(displayStatus || imageRoute) && (!session || !!session[2]));
+        }
         displays.tick();
         if (displayStatus) {
           if (role !== 'display') throw new HttpError(403, 'DISPLAY_REQUIRED', 'Use a read-only display capability.');
@@ -223,7 +228,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           json(res, 200, { data: { serverEpoch, released: lease[1] === 'release' } }); return;
         }
         if (req.method === 'GET') {
-          if (route === '/api/game/current') json(res, 200, { data: status(service.current(), refresh) });
+          if (route === '/api/game/current') json(res, 200, { data: status(service.current()) });
           else if (session?.[3]) {
             const receipt = repo.receipt(id(session[3]));
             if (!receipt || receipt.receipt.sessionId !== requestSession) throw new HttpError(404, 'RECEIPT_NOT_FOUND', 'No accepted receipt found. Review current state before deliberately retrying the original request.');
@@ -255,6 +260,8 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
         }
         const command = parseCommand(input);
         if (command.sessionId !== requestSession) throw new HttpError(400, 'SESSION_MISMATCH', 'Command session does not match its URL.');
+        await library.refresh(['START', 'PREPARE'].includes(command.type) && !repo.receipt(command.commandId));
+        access(req, requestSession);
         // M2 exposes preparation and the existing domain lane; no browser can supply readiness.
         let selected: RoundContext | null = null;
         if (command.type === 'RESUME' && !repo.receipt(command.commandId)) {
@@ -269,7 +276,7 @@ export function createGameHttp(storage: StorageSession, origins: Set<string>, ru
           if (state.stateVersion !== command.expectedStateVersion || phase(state) !== 'between_rounds') {
             service.execute(command); // use the domain's own revision/phase error
           }
-          selected = library.select(state, command.payload.tier); access(req, requestSession);
+          selected = library.select(state, command.payload.tier, false); access(req, requestSession);
         }
         const result = service.execute(command);
         if (command.type === 'PREPARE' && selected && !result.replayed) { preparationError = null; processPreparation(result.state, selected); }

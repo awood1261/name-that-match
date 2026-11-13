@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ControllerCredential, HostStatus } from '../../../shared/src/game/host';
-import { gameApi } from './api';
+import { gameApi, GAME_REQUEST_TIMEOUT_MS } from './api';
 import { ContestantJoin } from './ContestantJoin';
 import styles from './HostPage.module.css';
 
@@ -13,7 +13,7 @@ export function HostDisplayPanel({ credential, status, disabled, refresh }: { cr
   const canDesignate = !round || round.phase === 'paused';
   async function register() {
     if (!session || busy) return; setBusy(true); setError('');
-    const controller = request.current = new AbortController(); const timeout = setTimeout(() => controller.abort(), 3000);
+    const controller = request.current = new AbortController(); const timeout = setTimeout(() => controller.abort(), GAME_REQUEST_TIMEOUT_MS);
     try {
       const viewer = await gameApi.registerDisplay(credential, session.id, primary, controller.signal);
       if (controller.signal.aborted) return;
@@ -24,7 +24,7 @@ export function HostDisplayPanel({ credential, status, disabled, refresh }: { cr
   }
   async function designate(displayId: string) {
     if (!session || busy) return; setBusy(true); setError('');
-    const controller = request.current = new AbortController(); const timeout = setTimeout(() => controller.abort(), 3000);
+    const controller = request.current = new AbortController(); const timeout = setTimeout(() => controller.abort(), GAME_REQUEST_TIMEOUT_MS);
     try { await gameApi.designateDisplay(credential, session.id, displayId, controller.signal); await refresh(); }
     catch (failure) { setError(failure instanceof Error ? failure.message : 'Cannot designate display.'); }
     finally { clearTimeout(timeout); setBusy(false); }

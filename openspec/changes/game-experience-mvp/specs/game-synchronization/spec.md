@@ -128,3 +128,18 @@ The server SHALL print one labeled complete read-only contestant URL for each su
 - **WHEN** registration is rejected, an existing display is designated, or state/origin observations are requested
 - **THEN** no new terminal display link is emitted
 - **AND** controller credentials and private answers remain absent from terminal link output
+
+### Requirement: GN-11 Cooperative image assessment and host recovery
+Collection-wide PNG assessment SHALL yield between bounded individual validations so live heartbeat/clock processing and receipt access remain responsive. Metadata SHALL be captured in a short SQLite snapshot without holding its transaction across asynchronous work; revision changes SHALL prevent publishing a mixed assessment. Concurrent refreshes SHALL coalesce and shutdown SHALL cancel owned work. Prepare/Start/explicit Refresh SHALL use fresh complete assessments and recheck authorization/revision after waits; no image validation or eligibility gate SHALL be bypassed. Live observations MAY retain the last complete assessment's explicit asOf during a refresh; failed/unknown assessments SHALL not invent counts. HTTP/registration operations SHALL have bounded ten-second lifetimes and view-lifetime cancellation. Existing liveness, control leases, scoring, reveal readiness and explicit uncertain-command receipt review SHALL remain unchanged.
+
+#### Scenario: A collection scan exceeds three seconds
+- **WHEN** a host prepares a clue from a collection whose full validation takes more than the live stale threshold
+- **THEN** heartbeat/clock observations continue while validation yields, the bounded HTTP response can complete, and no controller or viewer is lost merely because the whole catalog was processed synchronously
+
+#### Scenario: Lost response and review
+- **WHEN** a preparation response is lost or times out after acceptance
+- **THEN** the host can explicitly check its immutable receipt and restore current state without reapplying Prepare, consuming a match or losing the pending command silently
+
+#### Scenario: Changes or shutdown during assessment
+- **WHEN** metadata changes during validation or the server shuts down
+- **THEN** incomplete/mixed results are not committed as a fresh catalog and work terminates predictably without an unhandled rejection or database access after closure

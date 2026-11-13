@@ -29,12 +29,13 @@ export function useContestantDisplay(sessionId: string, credential: DisplayCrede
   const [value, setValue] = useState<DisplayLiveState | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null); const [stale, setStale] = useState(true);
+  const [recovering, setRecovering] = useState(false);
   const [remaining, setRemaining] = useState({ ms: 0, at: 0 }); const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (!credential) return;
     let stopped = false; let imageKey: string | null = null; let blobUrl: string | null = null; let decoded = false;
     let imageController: AbortController | null = null; let imageFailure: string | null = null;
-    setValue(null); setStale(true); setError(null); setImageUrl(null);
+    setValue(null); setStale(true); setError(null); setImageUrl(null); setRecovering(false);
     const report = () => live.ready({ roundId: imageKey, imageKey, decoded });
     function clearImage() {
       imageController?.abort(); imageController = null; decoded = false; imageFailure = null;
@@ -57,17 +58,17 @@ export function useContestantDisplay(sessionId: string, credential: DisplayCrede
       snapshot(frame, timing) {
         if (stopped || frame.role !== 'display') return;
         const next = frame.state;
-        setValue(next); setStale(!timing.synchronized); setError(imageFailure);
+        setValue(next); setStale(!timing.synchronized); setError(imageFailure); setRecovering(false);
         const nextKey = next.asset?.imageKey ?? null;
         if (nextKey !== imageKey) { clearImage(); imageKey = nextKey; report(); if (next.asset) void loadImage(next.asset.roundId); }
         const ms = 'remainingMs' in next.snapshot ? next.snapshot.remainingMs ?? 0 : 0;
         setRemaining({ ms: Math.max(0, ms - (next.snapshot.phase === 'guessing' && timing.serverNow !== null ? Math.max(0, timing.serverNow - frame.serverMonoMs) : 0)), at: performance.now() });
       },
-      unavailable(failure) { if (!stopped) { setStale(true); setError(failure.message); } },
+      unavailable(failure, terminal) { if (!stopped) { setStale(true); setError(failure.message); setRecovering(!terminal); } },
       reset() { clearImage(); imageKey = null; },
     });
     return () => { stopped = true; live.close(); clearImage(); };
 
   }, [sessionId, credential, retry]);
-  return { value, imageUrl, error, stale, remaining, retry: () => setRetry((n) => n + 1) };
+  return { value, imageUrl, error, stale, recovering, remaining, retry: () => setRetry((n) => n + 1) };
 }
