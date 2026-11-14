@@ -11,6 +11,8 @@
     linear-gradient(180deg, rgba(9, 11, 19, 0.98), rgba(17, 20, 33, 0.96));
 }
 
+.hostMenu { display: none; }
+
 .topBar {
   width: var(--content-width);
   display: grid;
@@ -216,5 +218,21 @@
 
   .navButton {
     flex: 1 1 calc(50% - 0.5rem);
+  }
+}
+
+@media (max-width: 768px) {
+  .appShell[data-host-view='true'] {
+    padding: var(--space-3);
+    gap: var(--space-3);
+
+    .topBar { position: relative; width: 100%; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); text-align: left; background: transparent; border: 0; box-shadow: none; }
+    .brandBlock { max-width: 10rem; justify-self: start; }
+    .statusBadge { grid-column: 1 / -1; justify-self: start; padding: 0; font-size: var(--font-size-xs); border: 0; background: transparent; }
+    .hostMenu { display: block; min-width: 44px; min-height: 44px; padding: var(--space-3); background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); cursor: pointer; }
+    .hostMenu:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+    .nav { display: none; position: absolute; right: 0; top: 3.5rem; width: min(18rem, 100%); z-index: 3; background: var(--color-panel-strong); padding: var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); }
+    .nav[data-open='true'] { display: grid; }
+    .navButton { flex: none; }
   }
 }

@@ -4,6 +4,26 @@ Open **Play** from the application navigation. Setup, hidden preparation, a sepa
 
 ## Setup and preparation
 
+### Phone host console
+
+On a phone held upright, Play uses a compact header with **Menu** for application navigation. The first panel is the current game console: phase, assigned contestant, tier/points and compact host totals. During a round, the authoritative timer and private answer precede the phase actions. **Full match details / filming preview** expands the complete frozen answer, including optional fields. Long summaries are visually shortened; the expanded details retain the full text.
+
+Between rounds, choose the contestant and game tier, then **Prepare screenshot**. Ready offers **Reveal & start** and **Cancel preparation**. Guessing offers **Correct**, **Incorrect** and separate **Pause** controls. **Round options · Skip / Void** contains the exceptional zero-point action and its reason. Expiry offers the explicit timely-answer attestation and no-credit confirmation; it does not offer ordinary Correct. After judging, use **Reveal Result**, then **Advance**. No layout transition submits the next action automatically.
+
+Connection errors, primary readiness, candidate revalidation and uncertain-command review appear beside the affected actions. A primary that is decoded and synchronized does not imply the host is connected or its previous command is resolved. If **Reveal & start** is disabled, read the adjacent messages. Reconnect when offered and use **Check command status** for an uncertain request. Retry/dismiss remain deliberate, reviewed operations; a reconnect does not replay a judgment. **Open display connection** expands the supporting panel when the primary needs attention.
+
+The supporting sections follow the console on phones and sit beside it on wider screens:
+
+- **Display connection** retains display registration/opening, the copyable URL and QR, LAN address settings and primary/secondary status. Collapsing the panel preserves its link and in-flight operation. Opening a link and entering fullscreen still require your explicit gestures.
+- **Score details** shows the full existing host scoreboard. Compact totals and detailed totals use the same server projection; host totals include saved judgments before contestant result reveal.
+- **Game options** contains the session identity, confirmed **End game** and **Release host control**. End remains blocked during unresolved attempts. Completed games show final totals and confirmed **New game** in the main console.
+
+The action area stays reachable while scrolling on sufficiently tall phone screens. Short screens, enlarged text and constrained browser viewports use normal document scrolling. Controls remain keyboard accessible; when a phase change removes the focused action, focus returns to the new phase heading. **Menu** navigation retains **Stay / Pause and leave**, and returning to Play never resumes automatically. The shell's **Server reachable** indicator is a health observation, not a substitute for the console's live connection/readiness status.
+
+For device acceptance, use a configured LAN origin on your phone (see the LAN guidance below), with the laptop running the local server and a separate contestant tab. Verify setup through End/New, full details and all supporting sections, keyboard/safe-area behavior, Pause-and-leave/return, and connection/pending-command recovery. Automated viewport checks do not certify your phone's browser chrome or keyboard; record actual device/browser results separately.
+
+### Create and prepare a session
+
 1. Open Play. The view claims host control or restores this tab's current control. Opening it does not create or start a game. Another controlling host produces a busy message rather than a takeover.
 2. Choose **1 — Solo** or **2 — Head-to-head**, enter distinct names (1–60 Unicode characters), choose the starting contestant and select **Create session**. The setup is persisted. You can edit it with **Save setup** or explicitly **Discard setup** before starting. Unsaved setup edits disable Start; save them first. In-progress local form edits are not themselves persisted.
 3. Select **Start game**. At least one currently eligible match is required. The roster is fixed after Start. A capacity warning does not enforce equal turns or a fixed number of rounds.
