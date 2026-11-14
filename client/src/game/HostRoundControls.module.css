@@ -1,0 +1,16 @@
+.round { display: grid; gap: var(--space-3); min-width: 0; }
+.timer { display: grid; text-align: center; gap: var(--space-1); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); padding: var(--space-3); }
+.timer > span { font-size: 3.5rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--color-primary); }
+.timer small { color: var(--color-muted); }
+.actionArea { display: grid; gap: var(--space-2); position: sticky; bottom: 0; background: var(--color-panel-strong); border-radius: var(--radius-sm); padding: var(--space-2); padding-bottom: max(var(--space-2), env(safe-area-inset-bottom)); z-index: 1; min-width: 0; }
+.actionArea[data-flow='true'] { position: static; }
+.actionArea button { min-height: 50px; overflow-wrap: anywhere; }
+.judgments { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.judgments button:first-child { border-color: var(--color-success); color: var(--color-success); font-weight: 800; }
+.judgments button:last-child { border-color: var(--color-error); color: var(--color-error); font-weight: 800; }
+.options { border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); }
+.options summary { padding: var(--space-3); cursor: pointer; }
+.optionFields { display: grid; gap: var(--space-3); padding: var(--space-3); }
+.optionFields label { display: grid; gap: var(--space-2); }
+@media (min-width: 769px), (max-height: 600px) { .actionArea { position: static; } }
+@media (max-width: 340px) { .judgments { grid-template-columns: 1fr; } }

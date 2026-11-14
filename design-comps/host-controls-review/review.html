@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Name That Match — mobile host layout review</title>
+  <link rel="stylesheet" href="../../client/src/styles/tokens.css">
+  <link rel="stylesheet" href="review.css">
+</head>
+<body>
+  <main id="review">
+    <header class="review-heading">
+      <p class="eyebrow">Name That Match · design review</p>
+      <h1>Your phone is the control desk.</h1>
+      <p>Choose a sample phase and viewport. Expand the supporting sections inside the preview.<br>All names, times and counts are examples. This file never connects to a game.</p>
+    </header>
+    <div class="review-controls">
+      <label>Game state<select id="phase">
+        <option value="between">01 · Between rounds</option>
+        <option value="ready">02 · Ready to reveal</option>
+        <option value="guessing">03 · Guessing</option>
+        <option value="expired">04 · Time expired</option>
+        <option value="recovery">05 · Connection + pending request</option>
+        <option value="paused">06 · Paused</option>
+        <option value="saved">07 · Judgment saved</option>
+        <option value="revealed">08 · Result revealed</option>
+      </select></label>
+      <label>Preview size<select id="viewport">
+        <option value="390,844">Phone · 390 × 844</option>
+        <option value="320,568">Small phone · 320 × 568</option>
+        <option value="430,932">Large phone · 430 × 932</option>
+        <option value="844,390">Landscape · 844 × 390</option>
+        <option value="1280,800">Desktop · 1280 × 800</option>
+      </select></label>
+      <label class="check-label"><input id="large-text" type="checkbox"> Enlarge sample text</label>
+    </div>
+    <div class="review-workspace">
+      <div class="viewport-container"><iframe id="preview" title="Interactive host wireframe" src="review.html?frame=1&amp;phase=between"></iframe></div>
+      <aside class="review-notes">
+        <p class="eyebrow">What to review</p>
+        <h2 id="note-title">Choose, then prepare.</h2>
+        <p id="note-body">Contestant and tier choice lead. Display setup and score history no longer sit between you and Prepare.</p>
+        <ol>
+          <li><strong>Context first.</strong> Round owner, tier and compact scores stay easy to find.</li>
+          <li><strong>One action area.</strong> Correct / Incorrect / Pause appear together during guessing.</li>
+          <li><strong>Recovery beside actions.</strong> A ready display cannot hide a lost host connection or unresolved request.</li>
+          <li><strong>Details below.</strong> Links, QR, LAN settings and score history remain available when expanded.</li>
+        </ol>
+        <p>On desktop, supporting sections sit alongside the console. Short phone screens use normal scrolling. The sample timer is deliberately frozen.</p>
+        <p class="review-status" id="preview-feedback" role="status">Layout preview only · application unchanged</p>
+      </aside>
+    </div>
+  </main>
+  <div id="host-preview" hidden></div>
+  <script src="review.js"></script>
+</body>
+</html>

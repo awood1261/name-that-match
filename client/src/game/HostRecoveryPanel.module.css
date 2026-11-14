@@ -1,0 +1,6 @@
+.recovery { display: grid; gap: var(--space-2); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
+.recovery:empty { display: none; }
+.recovery p { margin: 0; }
+.warning { color: var(--color-warn); }
+.error { color: var(--color-error); }
+.notice { color: var(--color-success); }

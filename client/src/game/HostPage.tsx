@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GAME_TIERS, GAME_TIER_DETAILS, type GameTier } from '../../../shared/src/classification';
 import { clientId } from '../ids';
 import { useGameHost } from './useGameHost';
 import { HostSetup } from './HostSetup';
 import { HostDisplayPanel } from './HostDisplayPanel';
-import { HostRoundControls } from './HostRoundControls';
+import { HostActionArea, HostRoundControls } from './HostRoundControls';
 import { GameScoreboard } from './GameScoreboard';
 import { stageAnswer } from './stageText';
+import { HostRecoveryPanel } from './HostRecoveryPanel';
 import { HostLeaveDialog } from './HostLeaveDialog';
 import type { NavigationGuard } from '../library/useMatchWorkspace';
 import styles from './HostPage.module.css';
@@ -45,42 +46,49 @@ export function HostPage({ registerNavigationGuard }: { registerNavigationGuard?
   }
   const stateLabel = !session ? 'No session' : session.status === 'completed' ? 'Game complete' : session.status === 'setup' ? 'Setup' : round?.phase === 'preparing' ? 'Preparing screenshot'
     : round?.phase === 'ready' ? 'Screenshot ready · hidden' : session.status === 'active' && !round ? 'Between rounds' : round?.phase.split('_').join(' ') ?? session.status;
+  const consoleRef = useRef<HTMLDivElement>(null);
+  const phaseHeading = useRef<HTMLHeadingElement>(null);
+  const focusedControl = useRef<HTMLElement | null>(null);
+  const displayDetails = useRef<HTMLDetailsElement>(null);
+  useLayoutEffect(() => {
+    if (focusedControl.current && !focusedControl.current.isConnected) { phaseHeading.current?.focus(); focusedControl.current = null; }
+  }, [round?.phase, session?.status]);
+  const recovery = <HostRecoveryPanel host={host}>
+    {host.status && session && !terminal && <>
+      <p id="game-display-required">{host.status.primaryDisplay.message}</p>
+      {!host.status.primaryDisplay.ready && <button type="button" onClick={() => { if (displayDetails.current) { displayDetails.current.open = true; displayDetails.current.querySelector<HTMLElement>('summary')?.focus(); displayDetails.current.scrollIntoView?.({ block: 'nearest' }); } }}>Open display connection</button>}
+    </>}
+    {round?.phase === 'ready' && !host.status?.candidateValid && <p className={styles.warning}>The prepared record changed or needs revalidation. Cancel and prepare again.</p>}
+    {host.status?.preparationError && <p role="alert" className={styles.error}>{host.status.preparationError}</p>}
+  </HostRecoveryPanel>;
   return <section className={styles.host} aria-labelledby="game-host-title">
-    <header className={styles.header}><div><p className={styles.kicker}>Play · host controls</p><h2 id="game-host-title">Game host</h2></div>
-      {host.credential && <button type="button" disabled={host.busy || host.pending} onClick={() => { void host.release(); }}>Release host control</button>}
-    </header>
-    <p className={styles.state} role="status">{host.loading ? 'Connecting to game server…' : host.busy ? 'Saving command…' : stateLabel}</p>
-    {host.error && <p role="alert" className={styles.error}>{host.error}</p>}
-    {host.notice && <p role="status" className={styles.success}>{host.notice}</p>}
+    <header className={styles.header}><h2 id="game-host-title">Game host</h2><p className={styles.connection}>{host.connected ? 'Host connected' : 'Host offline'}</p></header>
     {destination && <HostLeaveDialog busy={leaving} blocked={host.busy || host.pending || !host.connected || !host.credential} guessing={guessing}
       error={leaveError || host.error || ''} onStay={() => setDestination(null)} onLeave={() => { void leave(); }} />}
-    {host.pending && <div className={styles.card}>
-      <p>A previous command needs review. New commands are blocked until its outcome is resolved.</p>
-      <button type="button" disabled={host.busy || !host.credential} onClick={() => { void host.checkPending(); }}>Check command status</button>
-      {host.retryable && <button type="button" disabled={host.busy} onClick={host.retry}>Retry original request</button>}
-      <button type="button" disabled={host.busy || !host.reviewedPending} onClick={host.dismissPending}>Dismiss request after review</button>
-    </div>}
-    {!host.loading && !host.credential && <button type="button" className={styles.primary} onClick={() => { void host.connect(); }}>Take host control / reconnect</button>}
-    {host.credential && host.status && <>
-      {session && <HostDisplayPanel key={`${session.id}:${host.credential!.serverEpoch}`} credential={host.credential!} status={host.status} disabled={host.busy || host.pending || !host.connected} refresh={host.refresh} />}
-      {snapshot && session?.status !== 'discarded' && <GameScoreboard scores={snapshot.scores} activeContestantId={snapshot.session.activeContestantId}
-        turnsExposed={snapshot.session.nextTurnOrdinal - 1} currentTurn={round && 'turnOrdinal' in round ? { turnOrdinal: round.turnOrdinal, contestantId: round.contestantId } : null}
-        winnerIds={snapshot.winnerIds} privateView />}
-      {session?.status === 'active' && <section className={styles.card} aria-label="Game completion">
-        <button type="button" disabled={!can('END_GAME')} onClick={() => { if (window.confirm('End this game and show final totals? This cannot be undone. Your results and Image Library will be kept.')) host.command({ type: 'END_GAME' }); }}>End game</button>
-        <p>{can('END_GAME') ? 'End when you are ready. Final totals include every saved judgment, even if its result has not been revealed.' : unexposed ? 'Cancel preparation before ending the game.' : round && !['adjudicated', 'answer_revealed'].includes(round.phase) ? 'Resolve or void the current attempt before ending the game.' : 'Reconnect and resolve any pending request before ending the game.'}</p>
-      </section>}
+    <div className={styles.layout}>
+    <div ref={consoleRef} className={styles.console} aria-label="Host round console" onFocusCapture={(event) => { focusedControl.current = event.target as HTMLElement; }}
+      onBlurCapture={(event) => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) focusedControl.current = null; }}
+      onKeyDownCapture={(event) => { if (event.repeat && ['Enter', ' '].includes(event.key) && (event.target as HTMLElement).closest('[data-host-actions] button')) event.preventDefault(); }}>
+      <p className={styles.kicker}>Play · host controls</p>
+      <h3 ref={phaseHeading} tabIndex={-1} className={styles.state} aria-live="polite">{stateLabel}</h3>
+      {round && !terminal && <p className={styles.identity}>Assigned contestant: <strong>{roundOwner?.name}</strong><span>{GAME_TIER_DETAILS[round.requestedTier].label} · {GAME_TIER_DETAILS[round.requestedTier].points} {GAME_TIER_DETAILS[round.requestedTier].points === 1 ? 'point' : 'points'}</span></p>}
+      {snapshot && !terminal && <ul className={styles.scoreSummary} aria-label="Current host totals">{snapshot.scores.map((row) => <li key={row.contestantId}>{row.name} <strong>{row.total} {row.total === 1 ? 'point' : 'points'}</strong></li>)}</ul>}
+      {(!round || terminal || !host.credential || !host.status) && recovery}
+      {host.credential && host.status && <>
       {terminal && <section className={styles.card} aria-label="Completed game">
         <p>Session {session.id} · {session.status === 'completed' ? 'Final results are saved.' : 'Setup discarded.'}</p>
         <p>New game creates a separate setup with zero scores and no used matches. Contestant names are copied for review; starting the next game is a separate action.</p>
         <p>Existing contestant displays stay with this session. Create a fresh display link for the next game.</p>
         <button type="button" className={styles.primary} disabled={host.busy || host.pending || !host.connected} onClick={() => { if (window.confirm('Create a new game setup? This keeps the previous result and Image Library, with fresh scores and used-match history.')) { setTier('squash'); host.newGame(); } }}>New game</button>
       </section>}
-      <div className={styles.grid}>
-        {(!session || session.status === 'setup') && <HostSetup key={session ? `${session.id}:${session.stateVersion}` : 'new'} session={session} disabled={host.busy || host.pending} onSave={host.setup} onDirty={setSetupDirty} />}
-        {session && !terminal && <section className={styles.card} aria-labelledby="game-session-title">
-          <h3 id="game-session-title">Current session</h3><p className={styles.sessionId}>Session {session.id}</p>
-          <p><strong>Active contestant: {active?.name}</strong></p>
+
+      {terminal && snapshot && <GameScoreboard scores={snapshot.scores} activeContestantId={snapshot.session.activeContestantId}
+        turnsExposed={snapshot.session.nextTurnOrdinal - 1} currentTurn={round && 'turnOrdinal' in round ? { turnOrdinal: round.turnOrdinal, contestantId: round.contestantId } : null}
+        winnerIds={snapshot.winnerIds} privateView />}
+      {(!session || session.status === 'setup') && <HostSetup key={session ? `${session.id}:${session.stateVersion}` : 'new'} session={session} disabled={host.busy || host.pending} onSave={host.setup} onDirty={setSetupDirty} />}
+      {session && !terminal && !round && <section className={styles.session} aria-labelledby="game-session-title">
+        <h3 id="game-session-title" className={styles.visuallyHidden}>Current session</h3>
+        <p><strong>Active contestant: {active?.name}</strong></p>
           <label htmlFor="game-active-contestant">Switch contestant</label>
           <select id="game-active-contestant" value={session.activeContestantId} disabled={!can('SELECT_CONTESTANT')}
             onChange={(event) => host.command({ type: 'SELECT_CONTESTANT', contestantId: event.target.value })}>
@@ -94,42 +102,64 @@ export function HostPage({ registerNavigationGuard }: { registerNavigationGuard?
           {session.status === 'setup' && setupDirty && <p>Save setup before starting the game.</p>}
           {session.status === 'setup' && !host.status.availability.distinctMatches && <p>No eligible matches are available. Approve and classify screenshots in Image Library, then refresh availability.</p>}
           {host.status.availability.distinctMatches < session.contestants.length && host.status.availability.distinctMatches > 0 && <p className={styles.warning}>There are fewer distinct eligible matches than contestants. Equal turns are not guaranteed.</p>}
-        </section>}
-      </div>
-      {!terminal && <section className={styles.card} aria-labelledby="game-tier-title">
-        <div className={styles.header}><h3 id="game-tier-title">Choose a game tier</h3><button type="button" disabled={host.busy} onClick={() => { void host.refresh(); }}>Refresh availability</button></div>
+
+      </section>}
+      {!terminal && !round && <section className={styles.card} aria-labelledby="game-tier-title">
+        <h3 id="game-tier-title">Choose a game tier</h3>
         <fieldset className={styles.tiers} disabled={!can('PREPARE')}><legend>Requested tier</legend>
           {GAME_TIERS.map((value) => <label className={styles.tier} key={value}>
-            <input type="radio" name="game-tier" value={value} checked={(round?.requestedTier ?? tier) === value} onChange={() => setTier(value)} />
+            <input type="radio" name="game-tier" value={value} checked={tier === value} onChange={() => setTier(value)} />
             <strong>{GAME_TIER_DETAILS[value].label} — {GAME_TIER_DETAILS[value].points} {GAME_TIER_DETAILS[value].points === 1 ? 'point' : 'points'}</strong>
             <span>{host.status!.availability.tiers[value].screenshots} eligible {host.status!.availability.tiers[value].screenshots === 1 ? 'screenshot' : 'screenshots'} · {host.status!.availability.tiers[value].matches} distinct {host.status!.availability.tiers[value].matches === 1 ? 'match' : 'matches'}</span>
           </label>)}
         </fieldset>
-        <p>Available this game: approved screenshots with complete match details, both classifications and a valid image. Matches or identical images already shown in this game are excluded. Classified screenshots still pending review are not eligible.</p>
-        <p>Counts reflect the last server assessment. After library changes, use Refresh availability. Matches can appear in more than one tier; counts are not a guaranteed number of rounds.</p>
+        <details className={styles.explanation}><summary>Eligibility and count details</summary><p>Available this game: approved screenshots with complete match details, both classifications and a valid image. Matches or identical images already shown in this game are excluded. Classified screenshots still pending review are not eligible.</p>
+        <p>Counts reflect the last server assessment. After library changes, use Refresh availability. Matches can appear in more than one tier; counts are not a guaranteed number of rounds.</p></details>
         {session?.status === 'active' && !round && host.status.availability.tiers[tier].screenshots === 0 && <p className={styles.warning}>No eligible unseen screenshots in this tier. Choose another tier or review the library.</p>}
-        <button className={styles.primary} type="button" disabled={!can('PREPARE') || !host.status.availability.tiers[tier].screenshots}
-          onClick={() => host.command({ type: 'PREPARE', roundId: clientId(), tier })}>Prepare screenshot</button>
+        <HostActionArea><button className={styles.primary} type="button" disabled={!can('PREPARE') || !host.status.availability.tiers[tier].screenshots}
+          onClick={() => host.command({ type: 'PREPARE', roundId: clientId(), tier })}>Prepare screenshot</button><button type="button" disabled={host.busy} onClick={() => { void host.refresh(); }}>Refresh availability</button></HostActionArea>
       </section>}
-      {round && !terminal && <section className={styles.card} aria-labelledby="game-round-title">
-        <h3 id="game-round-title">{round.phase === 'preparing' ? 'Preparing a verified screenshot…' : unexposed ? 'Prepared round' : 'Current round'}</h3>
-        <p>Assigned contestant: <strong>{roundOwner?.name}</strong> · {GAME_TIER_DETAILS[round.requestedTier].label}</p>
-        <p>{unexposed ? 'The screenshot remains hidden. Preparation does not start the countdown or consume a match.' : 'This exposed round retains its history and contestant. The server controls its time and outcome.'}</p>
-        {round.phase === 'ready' && <><p className={styles.cover}>Screenshot stays hidden until Reveal</p>
-          {!host.status.candidateValid && <p className={styles.warning}>The prepared record changed or needs revalidation. Cancel and prepare again.</p>}
-        </>}
-        {answer && preview && <details><summary>Private host answer</summary><p>{answer.participantDescription} · {answer.promotion} · {answer.event}</p>
-          {answer.matchDate && <p>{answer.matchDate}</p>}{answer.stipulation && <p>Stipulation: {answer.stipulation}</p>}{answer.championshipInfo && <p>Championship: {answer.championshipInfo}</p>}
-          <section aria-label="Filming answer text preview"><h4>Filming answer text preview</h4><p>Long text is shortened with an ellipsis on the contestant display. The saved answer above stays unchanged.</p>
-            <p>{preview.participantDescription}</p><p>{preview.promotion} · {preview.event}</p>
-            {answer.matchDate && <p>{answer.matchDate}</p>}
-            {answer.stipulation && <p>Stipulation: {preview.stipulation}</p>}
-            {answer.championshipInfo && <p>Championship: {preview.championshipInfo}</p>}
-          </section></details>}
-        {unexposed && <button type="button" disabled={!can('CANCEL_UNEXPOSED')} onClick={() => host.command({ type: 'CANCEL_UNEXPOSED' })}>Cancel preparation</button>}
-        <HostRoundControls status={host.status} can={can} command={host.command} />
-      </section>}
-      {host.status.preparationError && <p role="alert" className={styles.error}>{host.status.preparationError}</p>}
-    </>}
+
+      {round && !terminal && <HostRoundControls status={host.status} can={can} command={host.command}>
+        {answer && preview && <section className={styles.privateAnswer} aria-label="Private host answer">
+          <h4>Private host answer</h4><p className={styles.answerSummary}>{answer.participantDescription}</p><p className={styles.answerSummary}>{answer.promotion} · {answer.event}</p>
+          <details><summary>Full match details / filming preview</summary><div className={styles.detailContent}>
+            <p>{answer.participantDescription} · {answer.promotion} · {answer.event}</p>
+            {answer.matchDate && <p>{answer.matchDate}</p>}{answer.stipulation && <p>Stipulation: {answer.stipulation}</p>}{answer.championshipInfo && <p>Championship: {answer.championshipInfo}</p>}
+            <section aria-label="Filming answer text preview"><h4>Filming answer text preview</h4><p>Long text is shortened with an ellipsis on the contestant display. The saved answer above stays unchanged.</p>
+              <p>{preview.participantDescription}</p><p>{preview.promotion} · {preview.event}</p>{answer.matchDate && <p>{answer.matchDate}</p>}
+              {answer.stipulation && <p>Stipulation: {preview.stipulation}</p>}{answer.championshipInfo && <p>Championship: {preview.championshipInfo}</p>}
+            </section>
+          </div></details>
+        </section>}
+        {recovery}
+      </HostRoundControls>}
+      </>}
+    </div>
+    {host.credential && host.status && <aside className={styles.support} aria-label="Supporting game controls">
+      {session && <details ref={displayDetails} className={styles.disclosure}>
+        <summary>Display connection · {host.status.primaryDisplay.ready ? 'Primary ready' : 'Needs attention'}{!host.connected ? ' · Host offline' : ''}</summary>
+        <HostDisplayPanel key={`${session.id}:${host.credential.serverEpoch}`} credential={host.credential} status={host.status} disabled={host.busy || host.pending || !host.connected} refresh={host.refresh} />
+      </details>}
+      {snapshot && !terminal && <details className={styles.disclosure}><summary>Score details</summary><GameScoreboard scores={snapshot.scores} activeContestantId={snapshot.session.activeContestantId}
+        turnsExposed={snapshot.session.nextTurnOrdinal - 1} currentTurn={round && 'turnOrdinal' in round ? { turnOrdinal: round.turnOrdinal, contestantId: round.contestantId } : null}
+        winnerIds={snapshot.winnerIds} privateView /></details>}
+      <details className={styles.disclosure}><summary>Game options</summary><div className={styles.detailContent}>
+        {session && <p className={styles.sessionId}>Session {session.id}</p>}
+        {session && round && !terminal && <div className={styles.session}>          <label htmlFor="game-active-contestant">Switch contestant</label>
+          <select id="game-active-contestant" value={session.activeContestantId} disabled={!can('SELECT_CONTESTANT')}
+            onChange={(event) => host.command({ type: 'SELECT_CONTESTANT', contestantId: event.target.value })}>
+            {session.contestants.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <p>{session.status === 'setup' ? 'Choose the starting contestant in setup.' : round ? unexposed ? 'Cancel the unexposed preparation before changing contestants.' : 'This round keeps its original contestant. Switching is available between rounds.' : 'The selected contestant stays active until you change this selection.'}</p>
+</div>}
+        {session?.status === 'active' && <section aria-label="Game completion" className={styles.session}>
+          <button type="button" disabled={!can('END_GAME')} onClick={() => { if (window.confirm('End this game and show final totals? This cannot be undone. Your results and Image Library will be kept.')) host.command({ type: 'END_GAME' }); }}>End game</button>
+          <p>{can('END_GAME') ? 'End when you are ready. Final totals include every saved judgment, even if its result has not been revealed.' : unexposed ? 'Cancel preparation before ending the game.' : round && !['adjudicated', 'answer_revealed'].includes(round.phase) ? 'Resolve or void the current attempt before ending the game.' : 'Reconnect and resolve any pending request before ending the game.'}</p>
+        </section>}
+        <button type="button" disabled={host.busy || host.pending} onClick={() => { void host.release(); }}>Release host control</button>
+      </div></details>
+    </aside>}
+    </div>
   </section>;
 }

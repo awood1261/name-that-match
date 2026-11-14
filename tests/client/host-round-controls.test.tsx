@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { HostRoundControls } from '../../client/src/game/HostRoundControls';
+import { HostActionArea, HostRoundControls } from '../../client/src/game/HostRoundControls';
 import { hostSnapshot } from '../../shared/src/game/projections';
 import type { HostStatus } from '../../shared/src/game/host';
 import type { HostIntent, Round } from '../../shared/src/game/contracts';
@@ -18,6 +18,21 @@ function status(phase: Round['phase']): HostStatus {
     allowedActions: [], candidateValid: true, primaryDisplay: { ready: true, message: 'Primary ready.' }, preparationError: null, timing: { serverMonoMs: 0, remainingMs: 5000 } };
 }
 describe('host live round intents', () => {
+  it('returns actions to normal flow after enlarged text or a shortened viewport and cleans up observation', () => {
+    let resize!: () => void; const observe = vi.fn(); const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback; } observe = observe; disconnect = disconnect; });
+    const previousHeight = window.innerHeight;
+    try {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+      const view = render(<HostActionArea><button>Reveal</button></HostActionArea>);
+      const area = screen.getByRole('button').parentElement!;
+      expect(observe).toHaveBeenCalledWith(document.documentElement);
+      act(() => { area.style.fontSize = '32px'; resize(); }); expect(area).toHaveAttribute('data-flow', 'true');
+      act(() => { area.style.fontSize = '16px'; resize(); }); expect(area).toHaveAttribute('data-flow', 'false');
+      act(() => { Object.defineProperty(window, 'innerHeight', { configurable: true, value: 390 }); window.dispatchEvent(new Event('resize')); });
+      expect(area).toHaveAttribute('data-flow', 'true'); view.unmount(); expect(disconnect).toHaveBeenCalledOnce();
+    } finally { vi.unstubAllGlobals(); Object.defineProperty(window, 'innerHeight', { configurable: true, value: previousHeight }); }
+  });
   it.each([
     ['ready', 'Reveal & start', 'REVEAL_AND_START'], ['guessing', 'Correct', 'CORRECT'], ['guessing', 'Incorrect', 'INCORRECT'], ['guessing', 'Pause', 'PAUSE'],
     ['paused', 'Resume', 'RESUME'], ['awaiting_judgment', 'Correct before buzzer — I confirm a timely answer', 'CORRECT_BEFORE_BUZZER'],
@@ -35,6 +50,7 @@ describe('host live round intents', () => {
   });
   it('uses one explicit void intent with the chosen reason', () => {
     const command = vi.fn<(intent: HostIntent) => void>(); render(<HostRoundControls status={status('guessing')} can={() => true} command={command} />);
+    fireEvent.click(screen.getByText('Round options · Skip / Void'));
     fireEvent.change(screen.getByLabelText('Skip / Void reason'), { target: { value: 'void' } }); fireEvent.click(screen.getByRole('button', { name: 'Skip / Void · zero points' }));
     expect(command).toHaveBeenCalledOnce(); expect(command).toHaveBeenCalledWith({ type: 'VOID_EXPOSED', reason: 'void' });
   });

@@ -18,6 +18,7 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('System');
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const registerNavigationGuard = useCallback((guard: NavigationGuard | null) => { navigationGuard.current = guard; }, []);
 
@@ -46,7 +47,7 @@ function App() {
   }, []);
 
   return (
-    <main className={styles.appShell}>
+    <main className={styles.appShell} data-host-view={view === 'Play'}>
       <header className={styles.topBar}>
         <div className={styles.brandBlock}>
           <h1 className={styles.brand}>
@@ -54,13 +55,15 @@ function App() {
           </h1>
         </div>
 
-        <nav className={styles.nav} aria-label="Primary navigation">
+        <button type="button" className={styles.hostMenu} aria-expanded={navigationOpen} aria-controls="application-navigation" onClick={() => setNavigationOpen((open) => !open)}>Menu</button>
+        <nav id="application-navigation" className={styles.nav} data-open={navigationOpen} aria-label="Primary navigation">
           {navItems.map((item) => (
             <button key={item} type="button" className={styles.navButton}
               disabled={item === 'Game Settings'}
               aria-current={view === item ? 'page' : undefined} onClick={() => {
-                if (item !== view && navigationGuard.current) navigationGuard.current(() => setView(item));
-                else setView(item);
+                const navigate = () => { setView(item); setNavigationOpen(false); };
+                if (item !== view && navigationGuard.current) navigationGuard.current(navigate);
+                else navigate();
               }}>
               {item}
             </button>
@@ -69,7 +72,7 @@ function App() {
 
         <div className={styles.statusBadge} aria-live="polite">
           <span className={connected ? styles.statusDotOnline : styles.statusDotOffline} aria-hidden="true" />
-          <span>{connected ? 'Local ready' : 'Offline'}</span>
+          <span>{view === 'Play' ? connected ? 'Server reachable' : 'Server unavailable' : connected ? 'Local ready' : 'Offline'}</span>
         </div>
       </header>
 

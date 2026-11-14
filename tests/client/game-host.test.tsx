@@ -11,6 +11,7 @@ import type { HostStatus } from '../../shared/src/game/host';
 import { context, NOW, setup, pureGame, envelope } from '../game/fixtures';
 import { randomUUID } from 'node:crypto';
 import { mockGameLive } from './mock-game-live';
+import { openGameLive } from '../../client/src/game/live';
 
 let state: GameState | null; let sequence: number;
 const credential = { token: 'a'.repeat(64), serverEpoch: randomUUID(), generation: 1 };
@@ -57,7 +58,7 @@ describe('host setup and preparation UI', () => {
     candidate.answer.participantDescription = 'W'.repeat(1000); candidate.answer.promotion = 'P'.repeat(500);
     candidate.answer.stipulation = 'S'.repeat(500); candidate.answer.championshipInfo = 'C'.repeat(500);
     game.step({ type: 'START' }); game.step({ type: 'PREPARE', roundId: randomUUID(), tier: 'squash' }); game.step({ type: 'PREPARE_SUCCEEDED', context: candidate }); state = game.state;
-    render(<HostPage />); const summary = await screen.findByText('Private host answer'); fireEvent.click(summary);
+    render(<HostPage />); await screen.findByRole('region', { name: 'Private host answer' }); const summary = screen.getByText('Full match details / filming preview'); fireEvent.click(summary);
     const preview = screen.getByRole('region', { name: 'Filming answer text preview' });
     expect(within(preview).getByText('W'.repeat(119) + '…')).toBeInTheDocument(); expect(preview).toHaveTextContent('S'.repeat(79) + '…');
     expect(summary.closest('details')).toHaveTextContent('W'.repeat(1000)); expect(summary.closest('details')).toHaveTextContent('C'.repeat(500));
@@ -159,7 +160,7 @@ describe('host setup and preparation UI', () => {
     state = transition(state, { type: 'PREPARE', roundId: randomUUID(), tier: 'deathmatch' }, env());
     state = transition(state, { type: 'PREPARE_SUCCEEDED', context: { ...context(), obscurity: 'high', difficulty: 'hard' } }, env());
     render(<HostPage />); await screen.findByText('Screenshot ready · hidden');
-    expect(screen.getByRole('radio', { name: /Hard/ })).toBeChecked(); expect(screen.getByRole('radio', { name: /Easy/ })).not.toBeChecked();
+    expect(screen.getByText('Hard · 3 points')).toBeInTheDocument(); expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
   it('restores existing sessions and ignores late responses after leaving the view', async () => {
     state = createState(setup(1), NOW); state.contestants[0].name = 'Restored'; sessionStorage.setItem('ntm.game.controller', JSON.stringify(credential));
@@ -242,7 +243,7 @@ describe('explicit round progression', () => {
     vi.mocked(gameApi.command).mockImplementationOnce(async (_owner, input) => { receipt = apply(input); throw new TypeError('Response lost'); });
     vi.spyOn(gameApi, 'receipt').mockImplementation(async () => ({ ...receipt!, status: status() }));
     render(<HostPage />); fireEvent.click(await screen.findByRole('button', { name: 'Advance' }));
-    await screen.findByText(/The request outcome is unknown/); expect(screen.getByLabelText('Switch contestant')).toBeDisabled(); expect(screen.getByRole('button', { name: 'Prepare screenshot' })).toBeDisabled();
+    await screen.findByText(/The request outcome is unknown/); await screen.findByText('Between rounds'); expect(screen.getByLabelText('Switch contestant')).toBeDisabled(); expect(screen.getByRole('button', { name: 'Prepare screenshot' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await screen.findByText('The previous command was accepted. Current state restored.');
     expect(screen.getByLabelText('Switch contestant')).toBeEnabled(); expect(gameApi.command).toHaveBeenCalledTimes(1); expect(state!.awards).toHaveLength(1);
   });
@@ -403,5 +404,78 @@ describe('guarded host navigation and recovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check command status' })); await waitFor(() => expect(finish).toBeTypeOf('function')); const pending = sessionStorage.getItem('ntm.game.pending');
     nav.view.unmount(); await act(async () => { finish({ receipt: { commandId: 'irrelevant', sessionId: state!.id, roundId: null, acceptedVersion: 1 }, status: status() }); });
     expect(sessionStorage.getItem('ntm.game.pending')).toBe(pending);
+  });
+});
+
+describe('portrait host console', () => {
+  it('does not suppress ordinary repeated input while editing contestant names', async () => {
+    await openSetup(); const input = screen.getByLabelText('Contestant 1 name');
+    const event = new KeyboardEvent('keydown', { key: ' ', repeat: true, bubbles: true, cancelable: true });
+    input.dispatchEvent(event); expect(event.defaultPrevented).toBe(false);
+  });
+  it('places a single round console before supporting sections and shows private projected totals', async () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.step({ type: 'CORRECT' }); state = game.state;
+    render(<HostPage />); await screen.findByRole('button', { name: 'Reveal Result' });
+    const console = screen.getByLabelText('Host round console'); const support = screen.getByRole('complementary', { name: 'Supporting game controls' });
+    expect(console.compareDocumentPosition(support) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(console).getByLabelText('Current host totals')).toHaveTextContent('Contestant 1 1 point');
+    expect(within(console).getByRole('region', { name: 'Private host answer' })).toBeVisible();
+    expect(screen.getAllByRole('button', { name: 'Reveal Result' })).toHaveLength(1);
+    expect(screen.getByText('Score details').closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByText('Game options').closest('details')).not.toHaveAttribute('open');
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
+
+  it('keeps display registration alive and its exact link/QR mounted across disclosure toggles', async () => {
+    state = createState(setup(1), NOW);
+    let finish!: (value: Awaited<ReturnType<typeof gameApi.registerDisplay>>) => void;
+    const register = vi.spyOn(gameApi, 'registerDisplay').mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    vi.spyOn(gameApi, 'displayOrigin').mockResolvedValue({ ready: true, origin: 'http://192.0.2.10:5173', source: 'detected', message: 'LAN origin is configured.' });
+    render(<HostPage />); const summary = await screen.findByText(/Display connection · Needs attention/);
+    fireEvent.click(summary); fireEvent.click(screen.getByRole('button', { name: 'Create contestant display link' }));
+    const signal = register.mock.calls[0][3]; fireEvent.click(summary); expect(signal.aborted).toBe(false);
+    const viewer = { token: 'b'.repeat(64), displayId: randomUUID(), serverEpoch: credential.serverEpoch };
+    await act(async () => { finish(viewer); }); fireEvent.click(summary);
+    const qr = await screen.findByRole('img', { name: 'QR code for the contestant display link' });
+    const link = screen.getByLabelText('Contestant display link'); const value = (link as HTMLInputElement).value;
+    expect(value).toContain(viewer.token); expect(value).not.toContain(credential.token);
+    fireEvent.click(summary); fireEvent.click(summary);
+    expect(screen.getByLabelText('Contestant display link')).toBe(link); expect(link).toHaveValue(value);
+    expect(screen.getByRole('img', { name: 'QR code for the contestant display link' })).toBe(qr);
+    expect(register).toHaveBeenCalledOnce(); expect(gameApi.command).not.toHaveBeenCalled();
+  });
+
+  it('shows host loss and pending review beside Reveal even with a ready primary', async () => {
+    const game = pureGame(); game.ready(); state = game.state;
+    sessionStorage.setItem('ntm.game.pending', JSON.stringify({ kind: 'command', input: envelope(state, { type: 'CANCEL_UNEXPOSED' }) }));
+    vi.mocked(gameApi.current).mockImplementation(async () => ({ ...status(), primaryDisplay: { ready: true, message: 'Primary display decoded and synchronized. Ready for host action.' }, allowedActions: ['REVEAL_AND_START', 'CANCEL_UNEXPOSED'] }));
+    render(<HostPage />); const reveal = await screen.findByRole('button', { name: 'Reveal & start' });
+    await waitFor(() => expect(openGameLive).toHaveBeenCalled());
+    act(() => vi.mocked(openGameLive).mock.calls.at(-1)![1].unavailable(new Error('Live connection lost.'), false));
+    const blockers = document.getElementById(reveal.getAttribute('aria-describedby')!)!;
+    expect(blockers).toHaveTextContent('Host live connection lost'); expect(blockers).toHaveTextContent('Primary display decoded and synchronized');
+    expect(blockers).toHaveTextContent('A previous command needs review'); expect(reveal).toBeDisabled();
+    expect(within(blockers).getByRole('button', { name: 'Check command status' })).toBeEnabled();
+    expect(within(blockers).getByRole('button', { name: 'Take host control / reconnect' })).toBeEnabled();
+    fireEvent.click(reveal); expect(gameApi.command).not.toHaveBeenCalled();
+  });
+
+  it('opens display details explicitly without issuing a command or bypassing preparation restrictions', async () => {
+    const game = pureGame(); game.ready(); state = game.state;
+    render(<HostPage />); const open = await screen.findByRole('button', { name: 'Open display connection' }); fireEvent.click(open);
+    const details = screen.getByText(/Display connection · Needs attention/).closest('details');
+    expect(details).toHaveAttribute('open'); expect(details!.querySelector('summary')).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Create contestant display link' })).toBeDisabled();
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
+
+  it('moves focus to the new phase heading after Advance and does not activate Prepare on a repeated key', async () => {
+    const game = pureGame(); game.ready(); game.step({ type: 'REVEAL_AND_START' }); game.step({ type: 'CORRECT' }); game.step({ type: 'REVEAL_ANSWER' }); state = game.state;
+    render(<HostPage />); const advance = await screen.findByRole('button', { name: 'Advance' }); advance.focus(); fireEvent.click(advance);
+    const heading = await screen.findByText('Between rounds'); expect(heading).toHaveFocus();
+    const prepare = screen.getByRole('button', { name: 'Prepare screenshot' });
+    const event = new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true });
+    prepare.dispatchEvent(event); expect(event.defaultPrevented).toBe(true); expect(gameApi.command).toHaveBeenCalledOnce();
+    prepare.focus(); await waitFor(() => expect(gameApi.current).toHaveBeenCalledTimes(2)); expect(prepare).toHaveFocus();
   });
 });
