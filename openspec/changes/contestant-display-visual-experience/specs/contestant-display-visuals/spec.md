@@ -1,6 +1,6 @@
 ## Purpose
 
-Provide a comp-faithful, offline wrestling game-show presentation for contestant tier choice, concealed selection and screenshot/countdown without changing authoritative game behavior.
+Provide a comp-faithful, offline wrestling game-show presentation for contestant tier choice, concealed selection and screenshot/countdown and revealed-result feedback without changing authoritative game behavior.
 
 ## ADDED Requirements
 
@@ -120,7 +120,7 @@ The three new presentations SHALL use local Barlow Condensed: 900 italic major h
 - **THEN** fallback text remains readable, no gameplay transition or countdown waits on the font, and the layout preserves its essential content without clipping or disruptive shifts
 
 ### Requirement: CV-12 Held clue and comp-referenced revealed feedback
-Awaiting judgment and concealed adjudication SHALL retain the exposed screenshot scene with its authoritative frozen remainder or zero, and an honest unknown-time fallback for legacy data. No outcome color, icon, answer or award SHALL appear before Reveal Result. Revealed correct SHALL follow 1C862D7C-A93D-41FE-89BA-3C38E2742F70.png with green frame/check/CORRECT! and actual +1/+2/+3 points. Incorrect and timeout SHALL follow 785D5517-AC79-448A-A1D8-578ABFB078BF.png with red frame/cross and INCORRECT!/TIME UP respectively, retaining zero awards; void SHALL stay distinct. Compose independent semantic dynamic components over the actual dimmed contained screenshot, not flattened comp backgrounds. Frozen answer details and score information SHALL remain accessible. Existing local typography/tokens, landscape/compact geometry, reduced motion, stale covers and explicit host pacing SHALL remain.
+Awaiting judgment and concealed adjudication SHALL retain the exposed screenshot scene with its authoritative frozen remainder or zero, and an honest unknown-time fallback for legacy data. No outcome color, icon, answer or award SHALL appear before Reveal Result. Revealed correct SHALL retain green frame/check/CORRECT! and actual +1/+2/+3 points; the implemented baseline follows 1C862D7C-A93D-41FE-89BA-3C38E2742F70.png, while proposed CV-13–15 explicitly replace only its composition after owner specification approval. Incorrect and timeout SHALL follow 785D5517-AC79-448A-A1D8-578ABFB078BF.png with red frame/cross and INCORRECT!/TIME UP respectively, retaining zero awards; void SHALL stay distinct. Compose independent semantic dynamic components over the actual dimmed contained screenshot, not flattened comp backgrounds. Frozen answer details and score information SHALL remain accessible. Existing local typography/tokens, landscape/compact geometry, reduced motion, stale covers and explicit host pacing SHALL remain.
 
 #### Scenario: Screenshot remains until result reveal
 - **WHEN** the host judges or time expires
@@ -131,3 +131,55 @@ Awaiting judgment and concealed adjudication SHALL retain the exposed screenshot
 - **WHEN** a result is revealed or restored on refresh
 - **THEN** the actual clue and committed outcome/points/answer are rendered without reference-image sample metadata or hard-coded +2
 - **AND** missing image produces an explicit fallback, and restored/reduced-motion feedback does not replay a mandatory entrance
+
+
+### Requirement: CV-13 Proposed Correct Match visual hierarchy and authoritative data
+Following owner specification approval, correct `answer_revealed` presentation SHALL use the approved visual reference `/Users/alexwood/Dev/name-that-match/design-comps/reveal-improvements/Correct Match_ Dusty Rhodes vs. Honky Tonk Man.png`. It SHALL show a large CORRECT! headline with green check/underline/frame styling over the retained dimmed actual wrestling screenshot, followed by a prominent contrasting match-identification panel with wrestler/team description, promotion, event and known year, a high-contrast committed points-earned banner and a compact round-owner/total-score strip. All text, images and values SHALL be dynamic independent semantic content, not the flattened comp or its example data. Existing reveal permissions, scoring, held/frozen clue timing, readonly contestant roles and game state SHALL remain authoritative. Other outcomes and completed-game layouts SHALL retain their existing behavior and presentation.
+
+#### Scenario: Correct result revealed for each award
+- **WHEN** the host explicitly reveals a committed correct result worth 1, 2 or 3 points
+- **THEN** the display follows the referenced hierarchy using the frozen match identity and actual award with correct singular/plural text
+- **AND** the strip identifies the round owner and their projected committed total without adding the award again, using comp sample values or substituting a later active contestant
+- **AND** other contestants' existing projected score information remains available without displacing the primary match panel
+
+#### Scenario: Concealed judgment and restored result
+- **WHEN** a correct judgment has been saved but not revealed
+- **THEN** the exposed clue/frozen timer remains without outcome, answer or award disclosure
+- **WHEN** an already revealed result is refreshed or reconnected
+- **THEN** the committed result is restored without re-awarding points, replaying a mandatory entrance, resetting time or advancing the game
+
+#### Scenario: Missing optional date or image
+- **WHEN** the frozen answer lacks a known year or the actual screenshot cannot be displayed
+- **THEN** the layout omits unknown year rather than inventing one, preserves known date precision in details and keeps result/identity/points/totals readable
+- **AND** unavailable imagery has an explicit fallback rather than using the reference comp's photographed match
+
+### Requirement: CV-14 Readable long and multi-person match identification
+The correct-result panel SHALL wrap long wrestler/team descriptions and promotion/event lines before reducing type, keeping all identifying participants distinguishable. It SHALL NOT use the existing 120-character excerpt as an automatic universal limit, clip names, animate name rotation or shrink primary identification to unreadable text. Routine long and four-/six-person acceptance fixtures SHALL show full identifying names in the panel. When maximum supported metadata cannot fit the fixed filmed stage at readable sizing, an explicitly abbreviated panel SHALL provide a visible **Full match details** local disclosure outside the scaled stage with the complete already-revealed frozen answer in readable normal flow. This disclosure SHALL be keyboard/touch accessible, require no hover, mutate no stored data and submit no game command.
+
+#### Scenario: Long singles, teams and multi-person matches
+- **WHEN** a correct result includes long singles/team names or four-/six-person participant descriptions beyond 120 characters
+- **THEN** the panel wraps full identifying names across stable lines without covering the outcome, points or score strip
+- **AND** the phone reference viewport retains readable primary name text, targeting at least 14 CSS pixels at 375 × 667
+
+#### Scenario: Maximum-length metadata
+- **WHEN** supported 1000-character participants or 500-character promotion/event/optional fields cannot fit the fixed stage readably
+- **THEN** a clearly abbreviated summary and visible Full match details disclosure preserve access to every frozen field without horizontal overflow or an ARIA-only hidden-text substitute
+- **AND** expanding it changes only local presentation, reveals nothing before the host's result gate and does not affect countdown, scoring, readiness or progression
+
+### Requirement: CV-15 Responsive offline result composition and utility controls
+The proposed correct-result design SHALL adapt to laptop, television, Android tablet and phone-sized viewing using the existing uniformly scaled landscape/compact geometry and guide limitations. Narrow/portrait layouts SHALL prioritize readable outcome, multiline identity, points and round-owner total over decorative space. The actual screenshot SHALL remain contained without distortion. Fullscreen/safe-area controls SHALL be compact, unobtrusive utilities outside the scaled filmed composition, with accessible names, visible focus, at least 44 × 44 CSS-pixel targets and existing explicit fullscreen/guide behavior. Existing local fonts/assets, semantic CSS Modules and centralized contestant tokens SHALL support offline operation; no new runtime dependency or remote service SHALL be introduced. Reduced motion and image/font failures SHALL preserve readable information and existing recovery semantics.
+
+#### Scenario: Landscape and portrait device layouts
+- **WHEN** the result is viewed at laptop/TV/Android landscape or portrait tablet/phone reference dimensions, including rotation and 200-percent text/zoom
+- **THEN** the hierarchy is retained through wrapping/reflow without clipped banners, overlapping text/controls or horizontal page overflow
+- **AND** the optional centered guide defaults off and does not imply that a center crop preserves the whole screenshot or all result content
+
+#### Scenario: Unobtrusive controls and offline fallback
+- **WHEN** a keyboard or touch operator uses compact fullscreen/guide controls with external runtime requests unavailable
+- **THEN** controls retain accessible targets, labels, focus/pressed feedback and explicit user gestures without changing game state
+- **AND** locally available typography/assets or their offline fallbacks preserve the result, while reduced-motion/restored views require no entrance completion
+
+#### Scenario: Truthful device acceptance
+- **WHEN** the refined correct result is submitted for acceptance
+- **THEN** browser viewport comparisons are recorded separately from actual laptop/fullscreen, TV viewing-distance, Android touch/performance, phone, local Wi-Fi/offline and filming tests
+- **AND** unperformed physical checks and previous closeout gates remain open

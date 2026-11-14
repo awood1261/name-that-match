@@ -28,7 +28,9 @@ Only `public/images/name-that-match-horizontal-logo.png` and `public/favicon.ico
 
 **Goals:** faithful comp hierarchy across the three specified phases; spoiler-free bounded anticipation; dominant unmodified clue; exact existing timer semantics; clear component/style boundaries; offline assets; measurable responsive/accessibility acceptance.
 
-**Non-Goals:** any server/shared domain/live-contract/persistence change, game rule or selection change, new package dependency/animation library, host control or pending-command redesign, scoreboard feature, correct/incorrect result redesign, sound, random library previews, asset extraction from full-screen comps or automatic reveal/progression. Archive is a later explicit action after acceptance.
+The later owner-approved held-clue section records the implemented result baseline. Proposed D9 below explicitly refines correct-result composition only and is pending specification approval; original baseline observations and verification remain historical.
+
+**Non-Goals:** any server/shared domain/live-contract/persistence change, game rule or selection change, new package dependency/animation library, host control or pending-command redesign, scoreboard feature, incorrect/timeout/void or final-game redesign, sound, random library previews, asset extraction from full-screen comps or automatic reveal/progression. Archive is a later explicit action after acceptance.
 
 ## Decisions
 
@@ -162,3 +164,49 @@ Use 1C862D7C-A93D-41FE-89BA-3C38E2742F70.png for correct feedback and 785D5517-A
 ## Owner-approved tier names — 2026-11-13
 
 Choose cards and screenshot strips use the shared labels Easy / Medium / Hard. Preserve the reviewed SVG illustrations byte-for-byte, their existing filenames, colors/data-tier hooks and 1/2/3 points. Original comps remain visual references; their old tier words are historical and superseded. No layout/animation/classification change. Existing component and host/library tests must verify the new accessible labels; physical acceptance/closeout gates remain open.
+
+
+## D9 — Proposed Correct Match result-screen refinement — 2026-11-14
+
+### Scope and exact visual reference
+
+`/Users/alexwood/Dev/name-that-match/design-comps/reveal-improvements/Correct Match_ Dusty Rhodes vs. Honky Tonk Man.png`
+
+The PNG was opened and visually inspected on 2026-11-14. It is a 16:9 flattened visual reference, not a runtime asset or a functional rule source. The active change already includes held-clue/green-red result presentation under CV-12 and completed tasks 9.1–9.3. This explicit proposed scope update adds CV-13–15 and tasks 11.1–11.7 for revealed correct results. The comp is owner-approved; specification/implementation approval for this refinement is still pending. No new change is created while this active result-capable change exists.
+
+For correct results, D9 supersedes the older `1C862D7C-A93D-41FE-89BA-3C38E2742F70.png` composition and the earlier D2/D6 instruction to leave result visuals unchanged, only once the owner approves this proposal. It does not replace CV-12's held-clue rules, red/void treatments, D6's existing landscape/compact geometry and crop limitations, or any completed/final screen. Do not alter previous evidence to suggest the new design was already implemented or tested.
+
+### Observed hierarchy and data binding
+
+| Priority / region | Observed design and intended dynamic presentation |
+| --- | --- |
+| Brand / utility chrome | Local horizontal logo above the main frame; restrained fullscreen and guide icons at the upper right. Controls are operator utilities outside the scaled filmed content. |
+| Primary outcome | Oversized white condensed italic **CORRECT!**, green circular check, brush underline and green/white success frame/glow. Text and check convey success independently of color. |
+| Match identity | Large dark, yellow-bordered angled panel over the lower image region. THE MATCH WAS is secondary green text; wrestler/team description is dominant white; promotion/event/known year form a distinct supporting line. |
+| Earned points | High-contrast green banner with dark text, e.g. +1 POINT EARNED. Use the committed `award`, singular/plural and actual 1/2/3-point values. |
+| Contestant and total | Compact yellow-bordered bottom strip: round owner's name, purple separator and that contestant's committed total. The comp's STRIPES / 10 POINTS are examples. |
+| Background | The actual revealed wrestling image remains recognizable behind the outcome and identification panel, dimmed enough to support contrast. Preserve source ratio/containment; do not crop it to reproduce the photographed comp. |
+
+Use only the already revealed public snapshot: `answer`, `contestantId`, contestants/scores and committed `award`. The owner/total comes from the round's contestant identity, not a possibly different future active contestant. A two-contestant session retains access to both existing projected totals in a subordinate compact row or existing read-only score details; this is not a new score ledger/history feature. Date presentation derives the known year from the frozen partial date; omit unknown year and preserve full known precision in details. Do not infer a date/promotion/event from the reference filename, screenshot or source video. Optional stipulation/championship remain available without competing with the core identity.
+
+### Component and styling responsibilities
+
+- `ResultPresentation.tsx` / `ResultPresentation.module.css`: scope the new arrangement to `outcome === 'correct'`; compose real image, semantic success headline/check, identification panel, earned banner and compact round-owner strip. Reuse the existing local logo, Barlow faces, SVG/CSS motifs and image-error fallback. Keep final/incorrect/timeout/void presentation and private/public score rules intact.
+- `ContestantDisplay.tsx` / its CSS Module: retain the existing reveal/staleness/credential gate and public observation adapter; compose optional local full-match details outside the filmed stage if needed. No extra public phase, mutation, subscription, visibility/readiness owner or countdown.
+- `DisplayControls.tsx` / its CSS Module: a correct-result-specific compact visual variant for local fullscreen/guide utilities. Small icons retain accessible names, visible focus, pressed state and at least 44 × 44 CSS-pixel targets outside stage scaling. Preserve explicit fullscreen gestures, Escape and refusal messages; no automatic fullscreen or hidden controls on focus.
+- `ContestantStage` remains geometry-only with the existing one-scale landscape/compact variants and centered guide; no device-specific renderer or second text scale. Add only reusable contestant-scoped tokens to `tokens.css`; no global host/admin overrides, Tailwind, inline styling system or new dependency.
+- `stageAnswer` currently truncates participants to 120 characters. Do not silently apply that old limit to the new primary correct-result panel or change the shared helper for other scenes. Use a correct-result-specific presentation policy that preserves full frozen data and the full-detail fallback described below.
+
+### Responsive and long-content policy
+
+Use the existing 1920 × 1080 landscape and 1080 × 1440 compact compositions, uniformly fitted from available dimensions; keep the 1080 × 960 guide optional/default-off. On laptops/TVs/landscape Android, preserve the image-backed outcome → identification → points → score hierarchy. In portrait Android/phone layouts, reduce decorative check/logo/headline space first, allocate more height to the multiline identity, then stack promotion/event/year and contestant/total rows as necessary. No clipped banners, overlapping chrome, hidden names or horizontal page overflow. Image stays contained in its available background region. A central recording crop still cannot promise the complete screenshot or every identity panel survives; document actual filming checks.
+
+Wrap at natural spaces/team separators, keep all competitors distinguishable and allow a multiline participant panel before reducing type. Test long singles names, team names and four-/six-person descriptions beyond the current 120-character excerpt, plus long promotions/events. At phone reference sizes, primary identification must remain readable (target at least 14 CSS pixels for names at 375 × 667), not shrink until it technically fits. Do not automatically scroll, rotate or animate names, or rely on hover/title/ARIA-only hidden text.
+
+For the maximum supported metadata (1000-character participants; 500-character promotion/event and optional fields), a fixed non-scrolling filmed stage cannot guarantee full readable prose. Use an explicitly marked bounded summary only when wrapping/readable sizing cannot fit, with a visible, keyboard/touch-accessible **Full match details** disclosure outside the scaled filmed stage. It exposes the complete already-revealed frozen answer as readable normal-flow text. This local disclosure sends no game command, changes no timing/score, remains available on narrow screens and does not alter unrevealed privacy. Routine long/multi-person acceptance fixtures must show their full identifying names in the main panel; the maximum-length fallback cannot be a substitute for that requirement. Confirm the exact density breakpoints/line budget against rendered fixtures during implementation.
+
+### Invariants and acceptance
+
+No green outcome, answer identity, earned award or changed score appears before the existing host **Reveal Result** (`answer_revealed`). Ordinary adjudication/expiry continues to hold the clue and frozen/zero countdown without result disclosure. Render stored score totals; never add the award locally or recalculate scores from the comp. Refresh/reconnect restores committed data without scoring, replaying a required entrance, auto-advancing or resuming. Reduced motion is static; image/font failure keeps readable result information and an explicit image fallback. Use local assets/fonts and no runtime internet.
+
+Browser comparison matrix: 1920 × 1080 TV-sized viewport, 1366 × 768 laptop, 1024 × 768 and 1024 × 600 Android-sized landscape, 768 × 1024 portrait tablet, and 375 × 667 plus 390 × 844 phone-sized viewports. Include solo/head-to-head, awards 1/2/3, long names/multi-person/maximum fields, partial/missing dates, failed image/fonts, reduced motion, 200-percent text/zoom, guides/fullscreen and restoration. Measure actual name legibility/overflow/control targets, not just DOM presence. Run the existing npm test/typecheck/lint/build and strict change/upstream/whole-project validation. Separate physical laptop/TV viewing distance/Android touch/phone/Wi-Fi/offline/filming outcomes from local viewport evidence in still-open 7.2/7.3 and new task 11.7. No implementation or physical check is marked passed by this planning update.
