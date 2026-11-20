@@ -7,6 +7,15 @@ import { stageAnswer } from '../../client/src/game/stageText';
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Studio presentation controls', () => {
+  it('keeps compact result icons named, keyboard reachable and gesture controlled', async () => {
+    const enter = vi.fn().mockRejectedValue(new Error('refused')); const guides = vi.fn();
+    Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: enter });
+    render(<DisplayControls compact guides={false} onGuides={guides} />);
+    const fullscreen = screen.getByRole('button', { name: 'Enter fullscreen' }); fullscreen.focus(); expect(fullscreen).toHaveFocus();
+    expect(fullscreen.querySelector('svg')).toHaveAttribute('aria-hidden', 'true'); expect(enter).not.toHaveBeenCalled();
+    fireEvent.click(fullscreen); await screen.findByText(/Fullscreen is unavailable or was refused/); expect(fullscreen).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Safe-area guides', pressed: false })); expect(guides).toHaveBeenCalledWith(true);
+  });
   it('requests fullscreen only from a gesture, tracks browser exit and toggles optional guides', async () => {
     const enter = vi.fn().mockResolvedValue(undefined); const exit = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: enter });

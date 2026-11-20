@@ -10,7 +10,7 @@ The functional Game Experience MVP still presents generic covered panels and a b
 - Give guessing a dominant contained screenshot, yellow frame and compact actual-round/tier/MM:SS strip with non-flashing urgency.
 - Use the owner-selected 16:9 landscape stage with the centered 1080 × 960 guide; adapt narrow screens without promising a center crop retains the complete screenshot. This explicitly replaces the earlier full-containment crop guarantee for these three screens only.
 - Plan faithful local SVG recreations of the three comp illustrations, reviewed before integration; self-host Barlow Condensed WOFF2 (900 italic headings, 800 italic card/strip labels, 900 upright countdown, 700 upright supporting labels), retaining the font license and offline fallbacks. No package dependency or runtime font CDN is proposed.
-- Preserve read-only roles, existing cover/error/reconnect behavior, result/final game behavior and fullscreen gestures; the proposed Correct Match composition below is an explicit presentation exception, preserving scoring, selection, exposure tracking, network contracts and persistence.
+- Preserve read-only roles, existing cover/error/reconnect behavior, result/final game behavior and fullscreen gestures; the approved Correct Match composition below is an explicit presentation exception, preserving scoring, selection, exposure tracking, network contracts and persistence.
 
 ## Capabilities
 
@@ -24,7 +24,7 @@ None of the currently materialized capabilities under `openspec/specs/` changes.
 
 ## Impact
 
-Client presentation, contestant-only tokens, reviewed local SVG assets, focused component/browser tests and current operation documentation. Existing `ContestantDisplay`, `ContestantStage`, `Countdown`, display controls and their CSS boundaries are reused; small choose/selecting/clue components are justified. No server/shared domain or transport change, migration, library change, host-control cleanup, external imagery, audio or new package. The proposed Correct Match result composition below is a scoped presentation addition; incorrect/timeout/void and completed-game layouts are excluded from that addition. Planning artifacts require explicit owner approval before implementation; illustration review is a further integration gate. Physical device, offline and filming acceptance must be recorded as actually performed or still open.
+Client presentation, contestant-only tokens, reviewed local SVG assets, focused component/browser tests and current operation documentation. Existing `ContestantDisplay`, `ContestantStage`, `Countdown`, display controls and their CSS boundaries are reused; small choose/selecting/clue components are justified. No server/shared domain or transport change, migration, library change, host-control cleanup, external imagery, audio or new package. The approved Correct Match result composition below is a scoped presentation addition; void and completed-game layouts remain excluded; the owner-approved follow-up below extends it to incorrect/timeout. Planning artifacts require explicit owner approval before implementation; illustration review is a further integration gate. Physical device, offline and filming acceptance must be recorded as actually performed or still open.
 
 ## Implementation approval and refinements
 
@@ -39,12 +39,21 @@ Extend the implemented visuals with held-clue/frozen-time presentation and dynam
 Use Easy / Medium / Hard in all contestant tier text instead of the match-type-sounding names. Existing 1/2/3 points, illustrations, colors and behavior remain. Original comp text is superseded by the owner-approved name mapping; upstream GD-08 provides the shared mapping.
 
 
-## Proposed scope update — Correct Match result composition — 2026-11-14
+## Approved scope update — Correct Match result composition — 2026-11-14
 
-**Approval boundary:** the owner identifies the design comp as approved and authorizes these planning updates. This section proposes extending the active change's existing result-feedback scope; it does not authorize implementing this layout. Obtain explicit approval of CV-13–15/design D9 and tasks 11.1–11.7 before application changes. Existing completed tasks and remaining physical/closeout gates are preserved.
+**Approval:** the owner approved CV-13–15/design D9 and authorized implementation with “spec looks good and you can proceed” on 2026-11-14. This explicitly extends the active change's result-feedback scope; physical checks still require actual evidence. Existing completed tasks and remaining physical/closeout gates are preserved.
 
 Exact approved visual reference: `/Users/alexwood/Dev/name-that-match/design-comps/reveal-improvements/Correct Match_ Dusty Rhodes vs. Honky Tonk Man.png`.
 
 Refine only revealed **correct** results: large white italic CORRECT! with green check/underline/glow, prominent yellow-bordered match-identification panel (wrestlers, promotion, event and known year), high-contrast green earned-points banner, compact contestant/total-score strip and unobtrusive local fullscreen/safe-area controls. Retain the actual wrestling screenshot behind independent semantic content; never ship the flattened comp as the result background or hardcode its example names, +1 or 10-point total.
 
-Add laptop/TV/Android/phone acceptance, multiline long/multi-person identification and a readable full-details fallback for metadata that exceeds the fixed stage. Preserve frozen answer data, round-owner scoring, committed totals, explicit Reveal Result, read-only roles, countdown/phase/recovery behavior, offline assets and CSS Modules. This supersedes the earlier correct-result visual reference/layout only after specification approval; other outcome and final screens retain their current treatment. CV-13–15 are additive requirements in the existing `contestant-display-visuals` delta, not a duplicate capability or another game-state specification.
+Add laptop/TV/Android/phone acceptance, multiline long/multi-person identification and a readable full-details fallback for metadata that exceeds the fixed stage. Preserve frozen answer data, round-owner scoring, committed totals, explicit Reveal Result, read-only roles, countdown/phase/recovery behavior, offline assets and CSS Modules. This supersedes the earlier correct-result visual reference/layout under the recorded owner approval; other outcome and final screens retain their current treatment. CV-13–15 are additive requirements in the existing `contestant-display-visuals` delta, not a duplicate capability or another game-state specification.
+
+
+## Owner-requested championship line — 2026-11-18
+
+The owner requested displaying a known championship underneath the show/year in the correct-result identity panel. Use the frozen `championshipInfo` only; omit missing/blank values and preserve full text in Full match details when the existing measured-overflow summary is needed. This is a presentation-only refinement of the approved scope, with no scoring/reveal or other-outcome change.
+
+## Owner-approved incorrect and expired result extension — 2026-11-18
+
+The owner requested the same treatment on incorrect and time-expired screens. Extend the approved Correct Match hierarchy, optional championship row, responsive full-details fallback and compact utilities to revealed incorrect/timeout results. Use red cross/underline/glow with distinct INCORRECT! and TIME UP headlines and the committed zero-point award. Supersedes the earlier correct-only exclusion for these two outcomes; void/final layouts and all authoritative behavior remain unchanged.

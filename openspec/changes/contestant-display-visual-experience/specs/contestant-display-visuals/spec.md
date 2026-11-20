@@ -120,7 +120,7 @@ The three new presentations SHALL use local Barlow Condensed: 900 italic major h
 - **THEN** fallback text remains readable, no gameplay transition or countdown waits on the font, and the layout preserves its essential content without clipping or disruptive shifts
 
 ### Requirement: CV-12 Held clue and comp-referenced revealed feedback
-Awaiting judgment and concealed adjudication SHALL retain the exposed screenshot scene with its authoritative frozen remainder or zero, and an honest unknown-time fallback for legacy data. No outcome color, icon, answer or award SHALL appear before Reveal Result. Revealed correct SHALL retain green frame/check/CORRECT! and actual +1/+2/+3 points; the implemented baseline follows 1C862D7C-A93D-41FE-89BA-3C38E2742F70.png, while proposed CV-13–15 explicitly replace only its composition after owner specification approval. Incorrect and timeout SHALL follow 785D5517-AC79-448A-A1D8-578ABFB078BF.png with red frame/cross and INCORRECT!/TIME UP respectively, retaining zero awards; void SHALL stay distinct. Compose independent semantic dynamic components over the actual dimmed contained screenshot, not flattened comp backgrounds. Frozen answer details and score information SHALL remain accessible. Existing local typography/tokens, landscape/compact geometry, reduced motion, stale covers and explicit host pacing SHALL remain.
+Awaiting judgment and concealed adjudication SHALL retain the exposed screenshot scene with its authoritative frozen remainder or zero, and an honest unknown-time fallback for legacy data. No outcome color, icon, answer or award SHALL appear before Reveal Result. Revealed correct SHALL retain green frame/check/CORRECT! and actual +1/+2/+3 points; the implemented baseline follows 1C862D7C-A93D-41FE-89BA-3C38E2742F70.png, while owner-approved CV-13–15 explicitly replace only its composition. Incorrect and timeout SHALL follow 785D5517-AC79-448A-A1D8-578ABFB078BF.png with red frame/cross and INCORRECT!/TIME UP respectively, retaining zero awards; void SHALL stay distinct. Compose independent semantic dynamic components over the actual dimmed contained screenshot, not flattened comp backgrounds. Frozen answer details and score information SHALL remain accessible. Existing local typography/tokens, landscape/compact geometry, reduced motion, stale covers and explicit host pacing SHALL remain.
 
 #### Scenario: Screenshot remains until result reveal
 - **WHEN** the host judges or time expires
@@ -133,8 +133,8 @@ Awaiting judgment and concealed adjudication SHALL retain the exposed screenshot
 - **AND** missing image produces an explicit fallback, and restored/reduced-motion feedback does not replay a mandatory entrance
 
 
-### Requirement: CV-13 Proposed Correct Match visual hierarchy and authoritative data
-Following owner specification approval, correct `answer_revealed` presentation SHALL use the approved visual reference `/Users/alexwood/Dev/name-that-match/design-comps/reveal-improvements/Correct Match_ Dusty Rhodes vs. Honky Tonk Man.png`. It SHALL show a large CORRECT! headline with green check/underline/frame styling over the retained dimmed actual wrestling screenshot, followed by a prominent contrasting match-identification panel with wrestler/team description, promotion, event and known year, a high-contrast committed points-earned banner and a compact round-owner/total-score strip. All text, images and values SHALL be dynamic independent semantic content, not the flattened comp or its example data. Existing reveal permissions, scoring, held/frozen clue timing, readonly contestant roles and game state SHALL remain authoritative. Other outcomes and completed-game layouts SHALL retain their existing behavior and presentation.
+### Requirement: CV-13 Correct Match visual hierarchy and authoritative data
+Following owner specification approval, correct `answer_revealed` presentation SHALL use the approved visual reference `/Users/alexwood/Dev/name-that-match/design-comps/reveal-improvements/Correct Match_ Dusty Rhodes vs. Honky Tonk Man.png`. It SHALL show a large CORRECT! headline with green check/underline/frame styling over the retained dimmed actual wrestling screenshot, followed by a prominent contrasting match-identification panel with wrestler/team description, promotion, event and known year, an optional championship line directly beneath promotion/event/year, a high-contrast committed points-earned banner and a compact round-owner/total-score strip. All text, images and values SHALL be dynamic independent semantic content, not the flattened comp or its example data. Existing reveal permissions, scoring, held/frozen clue timing, readonly contestant roles and game state SHALL remain authoritative. Other outcomes and completed-game layouts SHALL retain their existing behavior and presentation.
 
 #### Scenario: Correct result revealed for each award
 - **WHEN** the host explicitly reveals a committed correct result worth 1, 2 or 3 points
@@ -153,6 +153,11 @@ Following owner specification approval, correct `answer_revealed` presentation S
 - **THEN** the layout omits unknown year rather than inventing one, preserves known date precision in details and keeps result/identity/points/totals readable
 - **AND** unavailable imagery has an explicit fallback rather than using the reference comp's photographed match
 
+#### Scenario: Known championship under the show and year
+- **WHEN** the revealed correct answer has nonblank frozen championship information
+- **THEN** it appears directly below the promotion/event/year line, wrapping or using the existing explicitly labeled overflow summary while the full text remains available in Full match details
+- **AND** missing or blank championship values create no placeholder or extra line, and no title is inferred or stored value modified
+
 ### Requirement: CV-14 Readable long and multi-person match identification
 The correct-result panel SHALL wrap long wrestler/team descriptions and promotion/event lines before reducing type, keeping all identifying participants distinguishable. It SHALL NOT use the existing 120-character excerpt as an automatic universal limit, clip names, animate name rotation or shrink primary identification to unreadable text. Routine long and four-/six-person acceptance fixtures SHALL show full identifying names in the panel. When maximum supported metadata cannot fit the fixed filmed stage at readable sizing, an explicitly abbreviated panel SHALL provide a visible **Full match details** local disclosure outside the scaled stage with the complete already-revealed frozen answer in readable normal flow. This disclosure SHALL be keyboard/touch accessible, require no hover, mutate no stored data and submit no game command.
 
@@ -167,7 +172,7 @@ The correct-result panel SHALL wrap long wrestler/team descriptions and promotio
 - **AND** expanding it changes only local presentation, reveals nothing before the host's result gate and does not affect countdown, scoring, readiness or progression
 
 ### Requirement: CV-15 Responsive offline result composition and utility controls
-The proposed correct-result design SHALL adapt to laptop, television, Android tablet and phone-sized viewing using the existing uniformly scaled landscape/compact geometry and guide limitations. Narrow/portrait layouts SHALL prioritize readable outcome, multiline identity, points and round-owner total over decorative space. The actual screenshot SHALL remain contained without distortion. Fullscreen/safe-area controls SHALL be compact, unobtrusive utilities outside the scaled filmed composition, with accessible names, visible focus, at least 44 × 44 CSS-pixel targets and existing explicit fullscreen/guide behavior. Existing local fonts/assets, semantic CSS Modules and centralized contestant tokens SHALL support offline operation; no new runtime dependency or remote service SHALL be introduced. Reduced motion and image/font failures SHALL preserve readable information and existing recovery semantics.
+The approved correct-result design SHALL adapt to laptop, television, Android tablet and phone-sized viewing using the existing uniformly scaled landscape/compact geometry and guide limitations. Narrow/portrait layouts SHALL prioritize readable outcome, multiline identity, points and round-owner total over decorative space. The actual screenshot SHALL remain contained without distortion. Fullscreen/safe-area controls SHALL be compact, unobtrusive utilities outside the scaled filmed composition, with accessible names, visible focus, at least 44 × 44 CSS-pixel targets and existing explicit fullscreen/guide behavior. Existing local fonts/assets, semantic CSS Modules and centralized contestant tokens SHALL support offline operation; no new runtime dependency or remote service SHALL be introduced. Reduced motion and image/font failures SHALL preserve readable information and existing recovery semantics.
 
 #### Scenario: Landscape and portrait device layouts
 - **WHEN** the result is viewed at laptop/TV/Android landscape or portrait tablet/phone reference dimensions, including rotation and 200-percent text/zoom
@@ -183,3 +188,23 @@ The proposed correct-result design SHALL adapt to laptop, television, Android ta
 - **WHEN** the refined correct result is submitted for acceptance
 - **THEN** browser viewport comparisons are recorded separately from actual laptop/fullscreen, TV viewing-distance, Android touch/performance, phone, local Wi-Fi/offline and filming tests
 - **AND** unperformed physical checks and previous closeout gates remain open
+
+### Requirement: CV-16 Consistent incorrect and expired match reveals
+After explicit host result reveal, incorrect and timeout results SHALL use CV-13’s approved identity/points/owner hierarchy, optional championship line beneath show/year, and CV-14/15’s long-content, full-details, responsive and offline control treatment. Incorrect SHALL show INCORRECT! and timeout SHALL show TIME UP with red cross/underline/frame styling and the committed zero-point award. This explicitly supersedes CV-13’s other-outcome presentation exclusion only for incorrect/timeout; void/final and authoritative behavior SHALL remain unchanged.
+
+#### Scenario: Incorrect answer revealed
+- **WHEN** the host saves an incorrect judgment
+- **THEN** the clue and stopped timer remain without outcome or answer disclosure until explicit Reveal Result
+- **WHEN** the result is revealed
+- **THEN** INCORRECT!, 0 POINTS EARNED, frozen match identity and optional championship are shown with the correct round owner and unchanged committed total
+
+#### Scenario: Time expires before result reveal
+- **WHEN** the answer window expires
+- **THEN** the clue remains at zero without revealing identity or award
+- **WHEN** the host confirms timeout and explicitly reveals the result
+- **THEN** TIME UP and 0 POINTS EARNED use the same identity/championship/score layout and accessible full details as correct results
+
+#### Scenario: Red result restoration and long content
+- **WHEN** a revealed incorrect or expired result is refreshed/reconnected or has long/missing metadata
+- **THEN** it retains its distinct outcome, original frozen fields and projected totals without re-awarding or replaying a mandatory entrance
+- **AND** CV-14/15 wrapping, measured summary, offline image/font fallback, compact accessible utilities and truthful physical acceptance requirements apply

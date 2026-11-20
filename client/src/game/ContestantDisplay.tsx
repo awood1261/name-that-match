@@ -15,6 +15,7 @@ import styles from './ContestantDisplay.module.css';
 
 export function ContestantDisplay({ sessionId }: { sessionId: string }) {
   const [guides, setGuides] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [credential, setCredential] = useState(() => readDisplayJoin(sessionId));
   useEffect(() => {
     const join = () => { if (new URLSearchParams(location.hash.slice(1)).has('token')) setCredential(readDisplayJoin(sessionId)); };
@@ -58,8 +59,10 @@ export function ContestantDisplay({ sessionId }: { sessionId: string }) {
   const visual = !covered && credential && snapshot && (!display.error || untimedScene || snapshot.phase === 'answer_revealed') ? snapshot.phase === 'setup' || snapshot.phase === 'between_rounds' ? <ChooseMatch />
     : snapshot.phase === 'preparing' || snapshot.phase === 'ready' ? <SelectingMatch key={snapshot.roundId} intro={selectionIntro} />
     : ['guessing', 'awaiting_judgment', 'adjudicated'].includes(snapshot.phase) && 'turnOrdinal' in snapshot && snapshot.turnOrdinal !== null && 'remainingMs' in snapshot && display.imageUrl ? <ScreenshotRound imageUrl={display.imageUrl} turnOrdinal={snapshot.turnOrdinal} tier={snapshot.requestedTier} remaining={snapshot.remainingMs === null ? null : display.remaining} running={snapshot.phase === 'guessing'} onImageError={display.retry} /> : snapshot.phase === 'answer_revealed' ? <ResultPresentation result={snapshot} animate={animateResult} imageUrl={display.imageUrl} onImageError={display.retry} /> : null : null;
-  return <main className={styles.display}>
-    <DisplayControls guides={guides} onGuides={setGuides} />
+  const matchResult = !!visual && snapshot?.phase === 'answer_revealed' && snapshot.outcome !== 'void' ? snapshot : null;
+  useEffect(() => { setDetailsOpen(false); }, [matchResult?.roundId]);
+  return <main className={styles.display} data-match-result={!!matchResult} data-details-open={detailsOpen}>
+    <DisplayControls guides={guides} onGuides={setGuides} compact={!!matchResult} />
     <ContestantStage guides={guides} visual={!!visual}>{visual ?? <div className={styles.composition} data-phase={display.stale ? 'connecting' : phase}>
       <img className={styles.logo} src="/images/name-that-match-horizontal-logo.png" alt="Name That Match" />
       <header className={styles.heading} hidden={!contestant && !tier}>{snapshot && 'turnOrdinal' in snapshot && snapshot.turnOrdinal !== null && <p>Turn {snapshot.turnOrdinal}</p>}{contestant && <p>{contestant}</p>}{tier && <p className={styles.tier}>{tier}</p>}</header>
@@ -74,5 +77,16 @@ export function ContestantDisplay({ sessionId }: { sessionId: string }) {
         stage currentTurn={snapshot.turnOrdinal !== null ? { turnOrdinal: snapshot.turnOrdinal, contestantId: snapshot.contestantId } : null} compact />}
       {display.error && credential && <button className={styles.retry} onClick={display.retry}>Retry display connection</button>}
     </div>}</ContestantStage>
+    {matchResult && <details key={matchResult.roundId} className={styles.matchDetails} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
+      <summary>Full match details</summary>
+      {detailsOpen && <dl>
+        <div><dt>Wrestlers / teams</dt><dd>{matchResult.answer.participantDescription}</dd></div>
+        <div><dt>Promotion</dt><dd>{matchResult.answer.promotion}</dd></div>
+        <div><dt>Event</dt><dd>{matchResult.answer.event}</dd></div>
+        {matchResult.answer.matchDate && <div><dt>Date</dt><dd><time dateTime={matchResult.answer.matchDate}>{matchResult.answer.matchDate}</time></dd></div>}
+        {matchResult.answer.stipulation && <div><dt>Stipulation</dt><dd>{matchResult.answer.stipulation}</dd></div>}
+        {matchResult.answer.championshipInfo && <div><dt>Championship</dt><dd>{matchResult.answer.championshipInfo}</dd></div>}
+      </dl>}
+    </details>}
   </main>;
 }

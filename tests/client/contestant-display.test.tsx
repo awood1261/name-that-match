@@ -179,20 +179,20 @@ describe('isolated contestant stage and image lifecycle', () => {
     expect(screen.queryByText('CORRECT!')).not.toBeInTheDocument(); expect(document.body.innerHTML).not.toContain('Alpha');
     phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer };
     await screen.findByRole('heading', { name: 'CORRECT!' }); expect(screen.getByText('+3 POINTS EARNED')).toBeInTheDocument(); expect(screen.getByText('Alpha vs Beta')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'true');
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'true'));
     await waitFor(() => expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false'));
     expect(gameApi.command).not.toHaveBeenCalled();
   });
-  it('restores an already revealed result statically after refresh and reconnect', async () => {
-    phase = { ...round, phase: 'answer_revealed', outcome: 'incorrect', award: 0, answer };
-    const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'INCORRECT!' });
+  it.each([['incorrect', 'INCORRECT!'], ['timeout', 'TIME UP']] as const)('restores an already revealed %s result statically after refresh and reconnect', async (outcome, heading) => {
+    phase = { ...round, phase: 'answer_revealed', outcome, award: 0, answer };
+    const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: heading });
     expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false');
-    view.unmount(); render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'INCORRECT!' });
-    expect(screen.getByText('0 POINTS EARNED')).toBeInTheDocument(); expect(screen.getByText('2024-08')).toBeInTheDocument();
+    view.unmount(); render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: heading });
+    expect(screen.getByText('0 POINTS EARNED')).toBeInTheDocument(); expect(screen.getByText('2024', { selector: 'time' })).toHaveAttribute('datetime', '2024-08');
     expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false');
     vi.mocked(displayApi.status).mockRejectedValueOnce(new TypeError('connection lost'));
     await screen.findByRole('heading', { name: 'Display unavailable' }); expect(screen.queryByText('Alpha vs Beta')).not.toBeInTheDocument();
-    await screen.findByRole('heading', { name: 'INCORRECT!' }); expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false');
+    await screen.findByRole('heading', { name: heading }); expect(screen.getByRole('region', { name: 'Revealed result and match' })).toHaveAttribute('data-animate', 'false');
     expect(gameApi.command).not.toHaveBeenCalled();
   });
   it('animates a connected reveal even when observations skip the brief adjudicated snapshot', async () => {
@@ -261,8 +261,21 @@ describe('contestant scoreboard visibility and recovery', () => {
     await screen.findByRole('heading', { name: 'Waiting for the host' }); expect(screen.queryByRole('region', { name: 'Scoreboard' })).not.toBeInTheDocument(); expect(document.body.textContent).not.toContain('Correct');
     phase = { ...round, stateVersion: 4, phase: 'answer_revealed', outcome: 'correct', award: 3, answer, turnsExposed: 1,
       scores: [{ contestantId, name: 'Contestant One', total: 3, lastOutcome: { outcome: 'correct', award: 3, turnOrdinal: 1 } }] };
-    const board = await screen.findByRole('region', { name: 'Scoreboard' }); expect(within(board).getByRole('listitem')).toHaveTextContent('3 points'); expect(within(board).getByText('Turn 1: Correct · 3 points')).toBeInTheDocument();
+    const board = await screen.findByRole('region', { name: 'Scoreboard' }); expect(board).toHaveTextContent('Contestant One'); expect(within(board).getByText('3 POINTS')).toBeInTheDocument();
     expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it.each(['correct', 'incorrect', 'timeout'] as const)('exposes complete frozen metadata only through a local revealed-%s details disclosure', async (outcome) => {
+    const full = { ...answer, participantDescription: 'W'.repeat(1000), promotion: 'P'.repeat(500), event: 'E'.repeat(500), stipulation: 'S'.repeat(500), championshipInfo: 'C'.repeat(500) };
+    phase = { ...round, phase: 'adjudicated', remainingMs: 0 };
+    render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'Waiting for the host' });
+    expect(screen.queryByText('Full match details')).not.toBeInTheDocument(); expect(document.body.textContent).not.toContain(full.participantDescription);
+    phase = { ...round, stateVersion: 3, phase: 'answer_revealed', outcome, award: outcome === 'correct' ? 3 : 0, answer: full };
+    const summary = await screen.findByText('Full match details'); fireEvent.click(summary);
+    const details = summary.closest('details')!; await waitFor(() => expect(details).toHaveTextContent(full.participantDescription));
+    expect(details).toHaveTextContent(full.event); expect(details).toHaveTextContent(full.stipulation); expect(details.querySelector('time')).toHaveTextContent('2024-08');
+    expect(details.closest('[data-contestant-stage]')).toBeNull(); expect(gameApi.command).not.toHaveBeenCalled();
+    phase = { ...base, stateVersion: 4, phase: 'between_rounds' }; await screen.findByRole('heading', { name: 'CHOOSE YOUR MATCH' });
+    expect(screen.queryByText('Full match details')).not.toBeInTheDocument(); expect(document.body.textContent).not.toContain(full.participantDescription);
   });
   it('restores final ties without showing an active player, missing winner or reset controls', async () => {
     const b = randomUUID(); phase = { ...base, phase: 'completed', turnsExposed: 8, contestants: [{ id: contestantId, name: 'Alex' }, { id: b, name: 'Jordan' }],

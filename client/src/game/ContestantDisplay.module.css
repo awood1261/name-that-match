@@ -1,4 +1,11 @@
 .display { height: 100vh; height: 100svh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--color-bg-black); }
+.display[data-match-result='true'] { grid-template-rows: auto minmax(0, 1fr) auto; }
+.display[data-match-result='true'][data-details-open='true'] { height: auto; min-height: 100dvh; grid-template-rows: auto minmax(24rem, 75dvh) auto; }
+.matchDetails { width: min(1100px, calc(100% - 1rem)); justify-self: center; margin: var(--space-2); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); color: var(--color-text); }
+.matchDetails summary { min-height: 44px; padding: var(--space-3); cursor: pointer; }
+.matchDetails dl { display: grid; gap: var(--space-4); margin: 0; padding: var(--space-4); overflow-wrap: anywhere; }
+.matchDetails dt { color: var(--color-muted); }
+.matchDetails dd { margin: var(--space-1) 0 0; }
 .composition { width: 100%; height: 100%; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 28px; border: var(--game-stage-outline) solid var(--color-accent); }
 .logo { flex: 0 0 72px; width: 560px; height: 72px; object-fit: contain; }
 .heading { flex: 0 0 auto; width: 100%; display: flex; justify-content: center; align-items: center; gap: 24px; font-size: 28px; line-height: 1.15; }

@@ -2,6 +2,16 @@
 
 Studio uses a laptop host and a separate contestant browser window on a TV or monitor. Both observe the same local Node game service and SQLite session. The contestant has read-only game access; its fullscreen and guide controls affect presentation only. Studio and Road now share the WebSocket observation/readiness/clock adapter, with commands and receipts on HTTP. See [real-time operation, recovery and Road acceptance](road-mode.md). Physical certification remains separately recorded.
 
+## Match result presentation
+
+After a committed correct judgment, **Reveal Result** displays the retained clue behind the green CORRECT! treatment, a prominent match-identification panel, the actual earned points and a compact strip for the round's contestant and their committed total. In head-to-head play, the other contestant's total remains below the strip. Incorrect and confirmed-timeout reveals use the same identity panel, championship row and score strip, with red INCORRECT! or TIME UP feedback and 0 POINTS EARNED. Expiry stays on the clue at zero until the host confirms and reveals the result. Saving a judgment alone still keeps the result concealed; this layout does not award points again or advance the game.
+
+Names and team descriptions wrap in the panel. A known championship appears directly beneath the show and year; missing championships add no placeholder. When maximum-length metadata cannot fit the fixed filming stage, the panel explicitly labels its shortened summary. **Full match details**, below the stage, exposes the complete frozen participants, promotion/event, exact known date and optional fields as readable local text. It is available only after the result is revealed. Opening it changes presentation only and permits normal page scrolling; close it for the clean composition.
+
+Correct, incorrect and expired results use compact fullscreen and safe-area icon buttons at the top right. Their accessible names, keyboard focus, 44px touch targets, explicit fullscreen gesture/Escape and guide default-off behavior remain. Void/final screens and their controls retain their previous presentation. The screenshot remains contained; the centered guide is a framing aid and cannot guarantee a complete center crop of the screenshot or identity panel.
+
+For manual acceptance, compare a normal singles result and a four-/six-person result, then maximum-length fields with Full match details. Check 1/2/3-point awards, solo/head-to-head totals and immutable round ownership, unknown versus partial dates, portrait/landscape, reduced motion, fullscreen/guides, refresh/reconnect, image/font fallback and the actual viewing distance. Record physical laptop/TV/Android/phone, Wi-Fi/offline and filming outcomes separately from browser viewport checks. See the active visual change's `correct-result-verification.md` for executed evidence and remaining device checks.
+
 ## Start the installed production app
 
 From the repository root, with dependencies already installed:

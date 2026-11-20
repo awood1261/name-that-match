@@ -3,4 +3,8 @@
 .controls button[aria-pressed='true'] { border-color: var(--color-primary); color: var(--color-primary); }
 .controls button:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
 .controls button:disabled { cursor: wait; opacity: 0.6; }
+.controls[data-compact='true'] { justify-content: flex-end; }
+.controls[data-compact='true'] button { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: var(--space-2); }
+.controls svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2px; }
+.controls .visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .controls p { flex-basis: 100%; text-align: center; font-size: var(--font-size-sm); margin: 0; }
