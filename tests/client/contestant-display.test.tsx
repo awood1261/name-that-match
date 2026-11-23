@@ -37,6 +37,51 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); history.replaceState(null, '', '/'); });
 
 describe('isolated contestant stage and image lifecycle', () => {
+  it('keeps one pair of compact controls from setup through results, final totals and recovery', async () => {
+    let callbacks!: LiveCallbacks;
+    vi.mocked(openGameLive).mockImplementation((_join, value) => {
+      callbacks = value;
+      return { ready: vi.fn(), close: vi.fn() };
+    });
+    render(<ContestantDisplay sessionId={sessionId} />);
+    const controls = screen.getByRole('complementary', { name: 'Display presentation controls' });
+    const fullscreen = within(controls).getByRole('button', { name: 'Enter fullscreen' });
+    const guides = within(controls).getByRole('button', { name: 'Safe-area guides', pressed: false });
+    expect(controls.closest('[data-contestant-stage]')).toBeNull();
+    expect(fullscreen.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(guides.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    fireEvent.click(guides);
+    guides.focus();
+    const scenes: DisplaySnapshot[] = [
+      { ...base, phase: 'setup' },
+      { ...round, phase: 'preparing' },
+      { ...round, phase: 'ready', imageKey: roundId },
+      { ...round, phase: 'guessing', imageKey: roundId, remainingMs: 5000 },
+      { ...round, phase: 'paused', remainingMs: 4000 },
+      { ...round, phase: 'awaiting_judgment', remainingMs: 0 },
+      { ...round, phase: 'adjudicated', remainingMs: 0 },
+      { ...round, phase: 'answer_revealed', outcome: 'correct', award: 3, answer },
+      { ...round, phase: 'answer_revealed', outcome: 'void', award: 0, answer },
+      { ...base, phase: 'completed', winnerIds: [contestantId] },
+    ];
+    for (const [index, snapshot] of scenes.entries()) {
+      phase = { ...snapshot, stateVersion: base.stateVersion + index };
+      const next = observation();
+      await act(async () => callbacks.snapshot({
+        type: 'snapshot', role: 'display', protocolVersion: 1, serverEpoch: credential.serverEpoch,
+        connectionSequence: 1, sequence: next.sequence, sessionId, stateVersion: phase.stateVersion,
+        serverMonoMs: performance.now(), state: { snapshot: phase, asset: next.asset },
+      }, { synchronized: true, serverNow: performance.now() }));
+      expect(within(controls).getByRole('button', { name: 'Enter fullscreen' })).toBe(fullscreen);
+      expect(within(controls).getByRole('button', { name: 'Safe-area guides', pressed: true })).toBe(guides);
+      expect(guides).toHaveFocus();
+      expect(document.querySelector('[data-contestant-stage]')).toHaveAttribute('data-guides', 'true');
+    }
+    await act(async () => callbacks.unavailable(new Error('Connection lost'), false));
+    expect(screen.getByRole('heading', { name: 'Display unavailable' })).toBeInTheDocument();
+    expect(within(controls).getByRole('button', { name: 'Safe-area guides', pressed: true })).toBe(guides);
+    expect(gameApi.command).not.toHaveBeenCalled();
+  });
   it('keeps untimed choice/selection visible during clock synchronization without bypassing clue or recovery gates', async () => {
     let callbacks!: LiveCallbacks; let finishDecode!: () => void;
     const ready = vi.fn(); const close = vi.fn();

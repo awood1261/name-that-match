@@ -93,3 +93,9 @@ Task 11.8 evidence: championship follow-up in [correct-result-verification.md](c
 - [x] 12.3 Cover incorrect/timeout layout, championship presence/absence/long content, immutable scores, disclosure/privacy/restoration and responsive browser checks; run tests/typecheck/lint/build and strict change/upstream/whole-project validation. Record evidence and extend still-open 11.7 physical checks without claiming them passed.
 
 Tasks 12.1–12.3 evidence: [incorrect-result-verification.md](incorrect-result-verification.md). 778 tests/49 files, typecheck/lint/build and strict validation passed; 63 browser observations include a real timeout. Physical/closeout tasks remain open.
+
+## 13. Owner-requested compact controls across contestant scenes
+
+- [x] 13.1 Make the shared compact top-right fullscreen and safe-area controls apply throughout contestant display, including connection/recovery, void and final results. Verify stable icon controls, accessible names, focus, guide state, and fullscreen handling across phases. Update current Studio guidance and record automated and viewport evidence separately from physical checks (CV-17, D11).
+
+Task 13.1 evidence. The contestant integration test exercised transitions from setup through guessing, pause, judgment, correct and void reveals, final totals and recovery with one control pair and retained guide state and focus. Studio tests covered fullscreen entry, exit and refusal. Headless Chrome measured both controls at 44 × 44 CSS pixels, 8 pixels from the top and with the right button 8 pixels from the right edge above the stage. The missing-link screen check passed at 1920 × 1080, 1024 × 768 and 375 × 667 with no horizontal overflow. All 786 tests in 49 files, typecheck, lint, build and strict OpenSpec validation passed. Physical device checks remain open.

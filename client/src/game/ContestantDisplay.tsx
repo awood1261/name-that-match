@@ -62,7 +62,7 @@ export function ContestantDisplay({ sessionId }: { sessionId: string }) {
   const matchResult = !!visual && snapshot?.phase === 'answer_revealed' && snapshot.outcome !== 'void' ? snapshot : null;
   useEffect(() => { setDetailsOpen(false); }, [matchResult?.roundId]);
   return <main className={styles.display} data-match-result={!!matchResult} data-details-open={detailsOpen}>
-    <DisplayControls guides={guides} onGuides={setGuides} compact={!!matchResult} />
+    <DisplayControls guides={guides} onGuides={setGuides} />
     <ContestantStage guides={guides} visual={!!visual}>{visual ?? <div className={styles.composition} data-phase={display.stale ? 'connecting' : phase}>
       <img className={styles.logo} src="/images/name-that-match-horizontal-logo.png" alt="Name That Match" />
       <header className={styles.heading} hidden={!contestant && !tier}>{snapshot && 'turnOrdinal' in snapshot && snapshot.turnOrdinal !== null && <p>Turn {snapshot.turnOrdinal}</p>}{contestant && <p>{contestant}</p>}{tier && <p className={styles.tier}>{tier}</p>}</header>

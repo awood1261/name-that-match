@@ -208,3 +208,15 @@ After explicit host result reveal, incorrect and timeout results SHALL use CV-13
 - **WHEN** a revealed incorrect or expired result is refreshed/reconnected or has long/missing metadata
 - **THEN** it retains its distinct outcome, original frozen fields and projected totals without re-awarding or replaying a mandatory entrance
 - **AND** CV-14/15 wrapping, measured summary, offline image/font fallback, compact accessible utilities and truthful physical acceptance requirements apply
+
+### Requirement: CV-17 Compact controls throughout the contestant view
+The contestant view SHALL present the fullscreen and safe-area guide controls as compact top-right icon buttons in every phase and in missing-link, connection and recovery states. The controls SHALL remain outside the scaled stage with accessible names, visible focus and at least 44 × 44 CSS-pixel targets. Fullscreen SHALL remain optional and require an explicit local gesture. Guides SHALL default off and keep their pressed state and local setting across scene changes.
+
+#### Scenario: Shared controls across scene changes
+- **WHEN** the contestant view opens, changes round or result scenes, shows final results, or enters recovery
+- **THEN** the same named fullscreen and guide icon buttons remain at the top right without losing the local guide setting
+- **AND** the controls do not overlap the filmed stage or submit gameplay commands
+
+#### Scenario: Fullscreen changes or is refused
+- **WHEN** fullscreen is entered, exited by the operator or browser, or refused
+- **THEN** the fullscreen control reports its current action and refusal, when applicable, leaves both controls usable

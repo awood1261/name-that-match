@@ -57,3 +57,7 @@ The owner requested displaying a known championship underneath the show/year in 
 ## Owner-approved incorrect and expired result extension — 2026-11-18
 
 The owner requested the same treatment on incorrect and time-expired screens. Extend the approved Correct Match hierarchy, optional championship row, responsive full-details fallback and compact utilities to revealed incorrect/timeout results. Use red cross/underline/glow with distinct INCORRECT! and TIME UP headlines and the committed zero-point award. Supersedes the earlier correct-only exclusion for these two outcomes; void/final layouts and all authoritative behavior remain unchanged.
+
+## Owner-requested compact contestant controls — 2026-11-23
+
+Use the existing compact fullscreen and safe-area guide icons at the top right throughout the contestant view, including connection and recovery screens, all round phases, and final results. Keep the controls outside the scaled stage, with their existing accessibility and local fullscreen and guide behavior.
