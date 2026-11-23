@@ -2,13 +2,24 @@ import type { Difficulty, ReviewStatus } from '../../../shared/src/library';
 import type { LibraryStatistics } from '../../../shared/src/classification';
 import { useEffect, useRef, useState } from 'react';
 import type { ApiFailure, ScreenshotSummary } from '../../../shared/src/imports';
-import type { MatchSummary, MatchUpdate } from '../../../shared/src/matches';
+import type { MatchSummary, MatchUpdate, ReviewQueueSummary } from '../../../shared/src/matches';
 import { LibraryApiError, libraryApi, matchApi, reviewApi, screenshotFilterQuery } from './api';
 import { draftChanged, draftFor, matchPayload, type MatchDraft } from './match-draft';
 
 type Scope = 'all' | 'match' | 'assignment' | 'screenshot';
 export type NavigationGuard = (action: () => void) => void;
 export interface MatchEditor { base: MatchSummary | null; draft: MatchDraft; errors: Record<string, string>; error: string; current?: MatchSummary }
+function screenshotDraft(record: ScreenshotSummary) {
+  return { base: record, difficulty: record.difficulty ?? '', notes: record.notes ?? '', error: '', errors: {} };
+}
+
+function nextPending(records: ScreenshotSummary[], reviewed: ScreenshotSummary) {
+  const pending = records.filter(record => record.id !== reviewed.id && record.reviewStatus === 'pending');
+  const capturedAt = reviewed.provenance.capture.capturedAt;
+  return pending.find(record => record.provenance.capture.capturedAt > capturedAt
+    || (record.provenance.capture.capturedAt === capturedAt && record.id > reviewed.id)) ?? pending[0];
+}
+
 export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null) => void) {
   const [showScreenshot, setShowScreenshot] = useState(false);
   const [screenshotEditor, setScreenshotEditor] = useState<{ base: ScreenshotSummary; difficulty: string; notes: string; error: string; errors: Record<string, string>; current?: ScreenshotSummary } | null>(null);
@@ -17,8 +28,13 @@ export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null
   const [unassignedFilters, setUnassignedFilters] = useState('');
   const [filters, setFilters] = useState('');
   const screenshotDirty = Boolean(screenshotEditor && (screenshotEditor.difficulty !== (screenshotEditor.base.difficulty ?? '') || screenshotEditor.notes !== (screenshotEditor.base.notes ?? '')));
-  const [view, setView] = useState<'matches' | 'unassigned'>('matches');
+  const [view, setView] = useState<'review' | 'matches' | 'overview'>('review');
+  const [intake, setIntake] = useState(false);
+  const [queue, setQueue] = useState<ReviewQueueSummary | null>(null);
+  const [queueError, setQueueError] = useState('');
+  const [showCompleted, setShowCompleted] = useState(false);
   const [matches, setMatches] = useState<MatchSummary[]>([]);
+  const [assignmentMatches, setAssignmentMatches] = useState<MatchSummary[]>([]);
   const [browsedMatch, setBrowsedMatch] = useState<MatchSummary | null>(null);
   const browseMatchId = browsedMatch?.id ?? null;
   const [records, setRecords] = useState<ScreenshotSummary[]>([]);
@@ -28,33 +44,88 @@ export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null
   const [assignmentCurrent, setAssignmentCurrent] = useState<{ records: ScreenshotSummary[]; matches: MatchSummary[] } | null>(null);
   const [assignmentError, setAssignmentError] = useState('');
   const [error, setError] = useState(''); const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true); const [reload, setReload] = useState(0);
+  const [saving, setBusy] = useState(false); const [loading, setLoading] = useState(true); const [reload, setReload] = useState(0);
+  const [advancing, setAdvancing] = useState(false);
+  const reviewedScreenshot = useRef<ScreenshotSummary | null>(null);
+  const busy = saving || advancing;
   const [pending, setPending] = useState<{ action: () => void; scope: Scope; error: string } | null>(null);
   const controller = useRef(new AbortController());
   const matchDirty = Boolean(editor && draftChanged(editor.draft, editor.base));
   const assignmentDirty = Boolean(target && selected.some((record) => record.matchId !== (target === 'unassigned' ? null : target.id)));
   useEffect(() => { const current = controller.current = new AbortController(); return () => current.abort(); }, []);
   useEffect(() => {
-    const request = new AbortController(); setLoading(true); setError('');
-    const query = view === 'unassigned' ? libraryApi.unassigned(request.signal, unassignedFilters) : browseMatchId
-      ? matchApi.screenshots(browseMatchId, request.signal, screenshotFilterQuery(filters)) : Promise.resolve({ screenshots: [] as ScreenshotSummary[] });
-    void Promise.all([matchApi.list(request.signal, view === 'matches' ? filters : ''), query]).then(async ([result, images]) => {
-      let parent = browseMatchId ? result.matches.find((match) => match.id === browseMatchId) : undefined;
-      if (browseMatchId && !parent && !request.signal.aborted) parent = (await matchApi.list(request.signal)).matches.find((match) => match.id === browseMatchId);
-      if (!request.signal.aborted) { setMatches(result.matches); setRecords(images.screenshots);
+    if (view !== 'review') return;
+    const request = new AbortController();
+    setQueueError('');
+    void reviewApi.queue(request.signal).then((data) => {
+      if (request.signal.aborted) return;
+      setQueue(data);
+      setBrowsedMatch(current => current ? data.groups.find(group => group.id === current.id) ?? current : current);
+    }).catch((error: unknown) => {
+      if (!request.signal.aborted) setQueueError(error instanceof LibraryApiError ? error.detail.message : 'Cannot load the review queue. Check the local server and reload.');
+    });
+    return () => request.abort();
+  }, [view, reload]);
+  useEffect(() => {
+    const request = new AbortController();
+    setError('');
+    if (view === 'overview' || (view === 'review' && !intake && !browseMatchId)) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const query = intake ? libraryApi.unassigned(request.signal, unassignedFilters) : browseMatchId
+      ? matchApi.screenshots(browseMatchId, request.signal, view === 'matches' ? screenshotFilterQuery(filters) : '')
+      : Promise.resolve({ screenshots: [] as ScreenshotSummary[] });
+    const matchQuery = view === 'matches' ? matchApi.list(request.signal, filters) : Promise.resolve(null);
+    void Promise.all([matchQuery, query]).then(async ([result, images]) => {
+      const targets = result && filters && browseMatchId && !request.signal.aborted
+        ? (await matchApi.list(request.signal)).matches : result?.matches;
+      if (request.signal.aborted) return;
+      if (result && targets) {
+        const parent = browseMatchId ? targets.find((match) => match.id === browseMatchId) : undefined;
+        setMatches(result.matches);
+        setAssignmentMatches(targets);
         setBrowsedMatch((current) => current?.id === browseMatchId ? parent ?? current : current);
-        setScreenshotEditor((state) => {
-          const fresh = images.screenshots.find((record) => record.id === state?.base.id) ?? images.screenshots[0];
-          if (!state || state.difficulty !== (state.base.difficulty ?? '') || state.notes !== (state.base.notes ?? '')) return state;
-          if (!fresh) return null;
-          return { base: fresh, difficulty: fresh.difficulty ?? '', notes: fresh.notes ?? '', error: '', errors: {} };
-        }); }
-    }).catch(() => { if (!request.signal.aborted) setError('Cannot load the library. Check the local server and reload.'); })
-      .finally(() => { if (!request.signal.aborted) setLoading(false); });
-    void reviewApi.statistics(request.signal).then((data) => { if (!request.signal.aborted) { setStatistics(data); setStatisticsError(''); } })
+      }
+      setRecords(images.screenshots);
+      const reviewed = reviewedScreenshot.current;
+      if (reviewed) {
+        reviewedScreenshot.current = null;
+        const next = nextPending(images.screenshots, reviewed);
+        if (next) {
+          setScreenshotEditor(screenshotDraft(next));
+          setNotice(`Screenshot marked ${reviewed.reviewStatus}. Now reviewing screenshot ${images.screenshots.indexOf(next) + 1} of ${images.screenshots.length}.`);
+          return;
+        }
+        if (!intake) {
+          setScreenshotEditor(screenshotDraft(images.screenshots.find(record => record.id === reviewed.id) ?? reviewed));
+          setNotice(`Screenshot marked ${reviewed.reviewStatus}. No pending screenshots remain in this match.`);
+          return;
+        }
+      }
+      setScreenshotEditor((state) => {
+        const fresh = images.screenshots.find((record) => record.id === state?.base.id);
+        if (state && (state.difficulty !== (state.base.difficulty ?? '') || state.notes !== (state.base.notes ?? '') || state.current)) return state;
+        const initial = view === 'review' && !intake ? images.screenshots.find(record => record.reviewStatus === 'pending') ?? images.screenshots[0] : undefined;
+        const record = fresh ?? (state ? images.screenshots[0] : initial);
+        return record ? screenshotDraft(record) : null;
+      });
+    }).catch(() => {
+      if (!request.signal.aborted) setError('Cannot load the library. Check the local server and reload.');
+    }).finally(() => {
+      if (!request.signal.aborted) { setLoading(false); setAdvancing(false); }
+    });
+    return () => request.abort();
+  }, [view, intake, browseMatchId, reload, filters, unassignedFilters]);
+  useEffect(() => {
+    if (view !== 'overview') return;
+    const request = new AbortController();
+    setStatisticsError('');
+    void reviewApi.statistics(request.signal).then((data) => { if (!request.signal.aborted) setStatistics(data); })
       .catch(() => { if (!request.signal.aborted) { setStatistics(null); setStatisticsError('Statistics unavailable. Reload to retry.'); } });
     return () => request.abort();
-  }, [view, browseMatchId, reload, filters, unassignedFilters]);
+  }, [view, reload]);
   useEffect(() => {
     if (!matchDirty && !assignmentDirty && !screenshotDirty) return;
     const unload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
@@ -80,6 +151,7 @@ export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null
       setEditor({ base: result.match, draft: draftFor(result.match), errors: {}, error: '' });
       setBrowsedMatch((current) => current?.id === result.match.id ? result.match : current);
       setMatches((items) => [result.match, ...items.filter((item) => item.id !== result.match.id)].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)));
+      setAssignmentMatches((items) => [result.match, ...items.filter((item) => item.id !== result.match.id)]);
       setNotice(`Match saved.${selected.length ? ` ${selected.length} screenshots remain selected; assignment is a separate save.` : ''}`); refresh(); return result;
     } catch (value) {
       if (controller.current.signal.aborted) return null;
@@ -138,21 +210,35 @@ export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null
     setPending(null); pending.action();
   }
   function clearWorkspace() {
-    setBrowsedMatch(null); setRecords([]); setEditor(null); setScreenshotEditor(null); setShowScreenshot(false);
+    reviewedScreenshot.current = null;
+    setIntake(false); setBrowsedMatch(null); setRecords([]); setEditor(null); setScreenshotEditor(null); setShowScreenshot(false);
     setSelected([]); setTarget(null); setAssignmentCurrent(null); setAssignmentError(''); setNotice('');
   }
   function switchView(next: typeof view) {
+    if (next === view && !intake && !browseMatchId) return;
     navigate(() => { clearWorkspace(); setView(next); });
+  }
+  function openIntake() {
+    if (intake) return;
+    navigate(() => { clearWorkspace(); setView('review'); setIntake(true); setLoading(true); });
   }
   function changeFilters(value: string) {
     if (value === (view === 'matches' ? filters : unassignedFilters)) return;
     navigate(() => {
-      setLoading(true); clearWorkspace();
-      if (view === 'matches') setFilters(value); else setUnassignedFilters(value);
+      setLoading(true);
+      clearWorkspace();
+      if (view === 'matches') setFilters(value);
+      else { setIntake(true); setUnassignedFilters(value); }
     });
   }
   function openMatch(match: MatchSummary) {
-    navigate(() => { setLoading(true); clearWorkspace(); setView('matches'); setBrowsedMatch(match); });
+    if (match.id === browseMatchId) return;
+    navigate(() => {
+      setLoading(true);
+      clearWorkspace();
+      setBrowsedMatch(match);
+      if (view === 'review') setShowScreenshot(true);
+    });
   }
   function editBrowsedMatch() {
     if (!browsedMatch) return;
@@ -173,7 +259,11 @@ export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null
     const match = target && target !== 'unassigned' ? assignmentCurrent.matches.find((match) => match.id === target.id) : null;
     if (current.some((item) => !item) || (target && target !== 'unassigned' && !match)) { setAssignmentError('A selected record no longer exists. Keep this draft or explicitly discard the unavailable selection.'); return; }
     setSelected(current as ScreenshotSummary[]); if (match) setTarget({ id: match.id, revision: match.revision });
-    setMatches(assignmentCurrent.matches); setAssignmentCurrent(null); setAssignmentError('');
+    setAssignmentMatches(assignmentCurrent.matches);
+    setQueue(data => data && { ...data, groups: assignmentCurrent.matches.map(match => ({
+      ...match, thumbnailUrl: data.groups.find(group => group.id === match.id)?.thumbnailUrl ?? null,
+    })) });
+    setAssignmentCurrent(null); setAssignmentError('');
   }
   async function saveScreenshot(reviewStatus?: ReviewStatus, ownMatchUpdate?: MatchUpdate | null): Promise<ScreenshotSummary | null> {
     if (!screenshotEditor) return null;
@@ -187,8 +277,12 @@ export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null
       const record = reviewStatus ? await reviewApi.review(base, reviewStatus, controller.current.signal)
         : await reviewApi.edit(base, { difficulty: (screenshotEditor.difficulty || null) as Difficulty | null, notes: screenshotEditor.notes || null }, controller.current.signal);
       if (controller.current.signal.aborted) return null;
-      setScreenshotEditor({ base: record, difficulty: record.difficulty ?? '', notes: record.notes ?? '', error: '', errors: {} });
+      setScreenshotEditor(screenshotDraft(record));
       setSelected((items) => items.map((item) => item.id === record.id ? record : item));
+      if (view === 'review' && (reviewStatus === 'approved' || reviewStatus === 'rejected') && record.reviewStatus !== base.reviewStatus) {
+        reviewedScreenshot.current = record;
+        setAdvancing(true);
+      }
       setNotice(reviewStatus ? `Screenshot marked ${reviewStatus}.` : 'Screenshot saved.'); refresh(); return record;
     } catch (value) {
       const detail = failure(value); let current: ScreenshotSummary | undefined;
@@ -199,14 +293,20 @@ export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null
       return null;
     } finally { if (!controller.current.signal.aborted) setBusy(false); }
   }
-  return { hasScreenshotFilters: Boolean(screenshotFilterQuery(filters)), showScreenshot, revealScreenshot: () => setShowScreenshot(true), screenshotEditor, screenshotDirty, statistics, statisticsError, filters: view === 'matches' ? filters : unassignedFilters,
-    changeFilters, browsedMatch, editBrowsedMatch, backToResults: () => navigate(() => { setLoading(true); clearWorkspace(); }),
-    openScreenshot: (record: ScreenshotSummary) => navigate(() => { setShowScreenshot(true); setScreenshotEditor({ base: record, difficulty: record.difficulty ?? '', notes: record.notes ?? '', error: '', errors: {} }); }, 'screenshot'),
+  const targets = assignmentCurrent?.matches ?? (view === 'review' ? queue?.groups ?? [] : assignmentMatches);
+  const savedMatch = editor?.base;
+  const targetRow = targets.find(match => match.id === savedMatch?.id);
+  const availableTargets = savedMatch && (!targetRow || savedMatch.revision > targetRow.revision)
+    ? [savedMatch, ...targets.filter(match => match.id !== savedMatch.id)] : targets;
+
+  return { intake, queue, queueError, showCompleted, setShowCompleted, openIntake, hasScreenshotFilters: Boolean(screenshotFilterQuery(filters)), showScreenshot, revealScreenshot: () => setShowScreenshot(true), screenshotEditor, screenshotDirty, statistics, statisticsError, filters: view === 'matches' ? filters : unassignedFilters,
+    changeFilters, browsedMatch, editBrowsedMatch, backToResults: () => navigate(() => { if (view === 'matches') setLoading(true); clearWorkspace(); }),
+    openScreenshot: (record: ScreenshotSummary) => navigate(() => { setShowScreenshot(true); setScreenshotEditor(screenshotDraft(record)); }, 'screenshot'),
     closeScreenshot: () => navigate(() => setScreenshotEditor(null), 'screenshot'),
     changeScreenshot: (field: 'difficulty' | 'notes', value: string) => setScreenshotEditor((state) => state && { ...state, [field]: value }),
     cancelScreenshot: () => setScreenshotEditor((state) => state && { base: state.current ?? state.base, difficulty: (state.current ?? state.base).difficulty ?? '', notes: (state.current ?? state.base).notes ?? '', error: '', errors: {} }),
     reloadScreenshot: (keepDraft: boolean) => setScreenshotEditor((state) => state?.current ? { base: state.current, difficulty: keepDraft ? state.difficulty : state.current.difficulty ?? '', notes: keepDraft ? state.notes : state.current.notes ?? '', error: '', errors: {} } : state),
-    saveScreenshot, view, matches, browseMatchId, records, editor, selected, target, assignmentCurrent, assignmentError, error, notice, busy, loading, pending, matchDirty, assignmentDirty,
+    saveScreenshot, view, matches, assignmentMatches: availableTargets, browseMatchId, records, editor, selected, target, assignmentCurrent, assignmentError, error, notice, busy, loading, pending, matchDirty, assignmentDirty,
     refresh, switchView, openMatch, toggle, saveMatch, saveAssignment, saveAndLeave, discardAndLeave, reviewAssignment,
     stay: () => setPending(null),
     newMatch: () => navigate(() => { setShowScreenshot(false); setEditor({ base: null, draft: draftFor(), errors: {}, error: '' }); }, 'match'),
@@ -215,7 +315,7 @@ export function useMatchWorkspace(registerGuard?: (guard: NavigationGuard | null
     changeMatch: (field: keyof MatchDraft, value: string) => setEditor((state) => state && { ...state, draft: { ...state.draft, [field]: value } }),
     reloadMatch: (keepDraft: boolean) => setEditor((state) => state?.current ? { base: state.current, draft: keepDraft ? state.draft : draftFor(state.current), errors: {}, error: '' } : state),
     reloadConflict: async () => { if (!editor?.base) return; try { const current = (await matchApi.list(controller.current.signal)).matches.find((match) => match.id === editor.base!.id); setEditor((state) => state && { ...state, current }); } catch { /* Existing error and draft remain. */ } },
-    chooseTarget: (id: string) => { const match = matches.find((match) => match.id === id); setTarget(id === 'unassigned' ? 'unassigned' : match ? { id: match.id, revision: match.revision } : null); setAssignmentError(''); setAssignmentCurrent(null); },
+    chooseTarget: (id: string) => { const match = availableTargets.find((match) => match.id === id); setTarget(id === 'unassigned' ? 'unassigned' : match ? { id: match.id, revision: match.revision } : null); setAssignmentError(''); setAssignmentCurrent(null); },
     selectAll: () => navigate(() => { if (records.length > 256) { setAssignmentError('Select at most 256 screenshots.'); return; } setSelected(records); setTarget(null); }, 'assignment'),
     clearSelection: () => navigate(() => { setSelected([]); setTarget(null); setAssignmentError(''); setAssignmentCurrent(null); }, 'assignment'),
   };

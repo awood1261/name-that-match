@@ -13,6 +13,7 @@ export function MatchInspector({ workspace: w }: { workspace: MatchWorkspace }) 
     <div className={styles.heading}><h2 ref={heading} tabIndex={-1} id="match-editor-title">{editor.base ? 'Edit match' : 'Create match'}</h2><button disabled={w.busy} onClick={w.closeEditor}>Back to screenshots</button></div>
     {editor.base && <p className={styles.kicker}>Editing match: {editor.base.participantDescription ?? 'Untitled match'}</p>}
     <p>Participants, promotion and event identify a complete match. Missing values can be saved as an incomplete draft.</p>
+    {Boolean(editor.base?.approvedCount) && <p>Changing answer details returns this match’s approved screenshots to pending review.</p>}
     {w.selected.length > 0 && <p>{w.selected.length} screenshots remain selected. Save the match, then explicitly assign them.</p>}
     {editor.error && <p role="alert" className={styles.error}>{editor.error}</p>}
     {editor.current && <section className={styles.conflict} aria-label="Current server match">

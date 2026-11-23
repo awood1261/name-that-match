@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../client/src/App';
-import { libraryApi, matchApi } from '../../client/src/library/api';
+import { reviewApi } from '../../client/src/library/api';
 
 describe('application shell', () => {
   beforeEach(() => {
@@ -31,11 +31,10 @@ describe('application shell', () => {
     expect(await screen.findByText(/connected/i)).toBeInTheDocument();
   });
   it('opens Image Library and returns to System without exposing later workflows', async () => {
-    vi.spyOn(libraryApi, 'unassigned').mockResolvedValue({ screenshots: [], matchedCount: 0, asOf: '' });
-    vi.spyOn(matchApi, 'list').mockResolvedValue({ matches: [], matchedCount: 0, asOf: '' });
+    vi.spyOn(reviewApi, 'queue').mockResolvedValue({ groups: [], intake: { screenshotCount: 0, pendingCount: 0 }, statistics: { totalMatches: 0, totalScreenshots: 0, fullyClassifiedScreenshots: 0, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 0, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 0, competitive: 0, deathmatch: 0 }, asOf: '' } });
     render(<App />); await screen.findByText(/connected/i);
     fireEvent.click(screen.getByRole('button', { name: 'Image Library' }));
-    expect(await screen.findByRole('heading', { name: 'Matches' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Review Queue' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Image Library' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'System' }));

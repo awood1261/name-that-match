@@ -21,7 +21,7 @@ export const libraryApi = {
   unassigned: (signal: AbortSignal, query = '') => request<ScreenshotList>(`/api/screenshots?matchId=unassigned${query ? `&${query}` : ''}`, signal),
 };
 
-import type { MatchInput, MatchList, MatchSummary, MatchUpdate } from '../../../shared/src/matches';
+import type { MatchInput, MatchList, MatchSummary, MatchUpdate, ReviewQueueSummary } from '../../../shared/src/matches';
 import type { ScreenshotSummary } from '../../../shared/src/imports';
 export const matchApi = {
   list: (signal: AbortSignal, query = '') => request<MatchList>(`/api/matches${query ? `?${query}` : ''}`, signal),
@@ -36,6 +36,7 @@ export const matchApi = {
 import type { Difficulty, ReviewStatus } from '../../../shared/src/library';
 import type { LibraryStatistics } from '../../../shared/src/classification';
 export const reviewApi = {
+  queue: (signal: AbortSignal) => request<ReviewQueueSummary>('/api/library/review-queue', signal),
   statistics: (signal: AbortSignal) => request<LibraryStatistics>('/api/library/statistics', signal),
   edit: (record: ScreenshotSummary, changes: { difficulty: Difficulty | null; notes: string | null }, signal: AbortSignal) =>
     request<ScreenshotSummary>(`/api/screenshots/${record.id}`, signal, 'PATCH', { expectedRevision: record.revision, changes }),

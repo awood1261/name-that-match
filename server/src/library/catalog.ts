@@ -1,7 +1,7 @@
 import type { Match } from '../../../shared/src/library.js';
 import { setImmediate as yieldToIo } from 'node:timers/promises';
 import { OBSCURITIES, DIFFICULTIES, REVIEW_STATUSES } from '../../../shared/src/library.js';
-import type { MatchSummary } from '../../../shared/src/matches.js';
+import type { MatchSummary, ReviewQueueSummary } from '../../../shared/src/matches.js';
 import type { ScreenshotSummary } from '../../../shared/src/imports.js';
 import type { LibraryStatistics } from '../../../shared/src/classification.js';
 import type { StorageSession } from '../storage.js';
@@ -26,7 +26,11 @@ export function catalog(storage: StorageSession) {
 }
 
 /** Game refreshes release the SQLite snapshot before expensive file validation. */
-export async function catalogAsync(storage: StorageSession, cancelled: () => boolean) {
+export async function catalogAsync(storage: StorageSession, cancelled: () => boolean, unavailableCode = 'GAME_UNAVAILABLE') {
+  const ensureActive = () => {
+    if (cancelled() || !storage.db.open) throw new HttpError(503, unavailableCode, 'Library assessment stopped.');
+  };
+  ensureActive();
   const { matches, records } = storage.db.transaction(() => {
     const repo = createLibraryRepository(storage.db);
     const matches = (storage.db.prepare('SELECT id FROM matches ORDER BY created_at DESC,id ASC').all() as Array<{ id: string }>).map(({ id }) => repo.getMatch(id));
@@ -37,7 +41,7 @@ export async function catalogAsync(storage: StorageSession, cancelled: () => boo
   const screenshots: ScreenshotSummary[] = [];
   for (const record of records) {
     await yieldToIo();
-    if (cancelled() || !storage.db.open) throw new HttpError(503, 'GAME_UNAVAILABLE', 'Library assessment stopped.');
+    ensureActive();
     const asset = assessAsset(storage, record);
     screenshots.push(publicScreenshot(storage, record, record.matchId ? parents.get(record.matchId) ?? null : null, asset.status));
   }
@@ -50,6 +54,8 @@ export function matchSummary(match: Match, screenshots: ScreenshotSummary[]): Ma
   const awaitingClassificationCount = screenshots.filter((record) => !record.classification.complete).length;
   return { ...match, complete: !missingFields.length, missingFields, screenshotCount: screenshots.length, matchingScreenshotCount: screenshots.length,
     approvedCount: screenshots.filter((record) => record.reviewStatus === 'approved').length,
+    pendingCount: screenshots.filter((record) => record.reviewStatus === 'pending').length,
+    assetIssueCount: screenshots.filter((record) => record.assetStatus !== 'available').length,
     eligibleCount: screenshots.filter((record) => record.eligibility.eligible).length, awaitingClassificationCount,
     classificationIncomplete: match.obscurity === null || !screenshots.length || awaitingClassificationCount > 0 };
 }
@@ -87,8 +93,8 @@ function filteredMatches(storage: StorageSession, query: URLSearchParams) {
     && (!hasScreenshotFilter || match.matchingScreenshotCount > 0));
   return { matches, matchedCount: matches.length, asOf: data.asOf };
 }
-export function statistics(storage: StorageSession): LibraryStatistics {
-  const data = catalog(storage); const classifiedByTier = { squash: 0, competitive: 0, deathmatch: 0 }; const eligibleByTier = { ...classifiedByTier };
+function summarizeStatistics(data: ReturnType<typeof catalog>): LibraryStatistics {
+  const classifiedByTier = { squash: 0, competitive: 0, deathmatch: 0 }; const eligibleByTier = { ...classifiedByTier };
   let fullyClassifiedScreenshots = 0;
   for (const record of data.screenshots) if (record.classification.tier) {
     fullyClassifiedScreenshots++; classifiedByTier[record.classification.tier]++;
@@ -96,6 +102,30 @@ export function statistics(storage: StorageSession): LibraryStatistics {
   }
   return { totalMatches: data.matches.length, totalScreenshots: data.screenshots.length, fullyClassifiedScreenshots,
     awaitingClassificationScreenshots: data.screenshots.length - fullyClassifiedScreenshots, classifiedByTier, eligibleByTier, asOf: data.asOf };
+}
+
+export function statistics(storage: StorageSession): LibraryStatistics {
+  return summarizeStatistics(catalog(storage));
+}
+
+export async function reviewQueue(storage: StorageSession, cancelled: () => boolean): Promise<ReviewQueueSummary> {
+  if (cancelled() || !storage.db.open) throw new HttpError(503, 'STORAGE_UNAVAILABLE', 'Library assessment stopped.');
+  const revisions = storage.db.prepare("SELECT 'm' AS kind,id,revision FROM matches UNION ALL SELECT 's',id,revision FROM screenshots ORDER BY kind,id");
+  const before = JSON.stringify(revisions.all());
+  const data = await catalogAsync(storage, cancelled, 'STORAGE_UNAVAILABLE');
+  if (cancelled() || !storage.db.open) throw new HttpError(503, 'STORAGE_UNAVAILABLE', 'Library assessment stopped.');
+  if (JSON.stringify(revisions.all()) !== before) throw new HttpError(409, 'LIBRARY_CHANGED', 'Library changed during assessment. Reload screenshots to retry.');
+  const thumbnails = new Map<string, string>();
+  const intake = { screenshotCount: 0, pendingCount: 0 };
+  for (const shot of data.screenshots) {
+    if (!shot.matchId) {
+      intake.screenshotCount++;
+      if (shot.reviewStatus === 'pending') intake.pendingCount++;
+    } else if (shot.assetStatus === 'available' && !thumbnails.has(shot.matchId)) {
+      thumbnails.set(shot.matchId, shot.image.url);
+    }
+  }
+  return { groups: data.matches.map((match) => ({ ...match, thumbnailUrl: thumbnails.get(match.id) ?? null })), intake, statistics: summarizeStatistics(data) };
 }
 
 export function matchList(storage: StorageSession, query: URLSearchParams) {

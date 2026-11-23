@@ -6,7 +6,7 @@ import { getImportEngine } from '../imports/engine.js';
 import { knownFields, object, requireId, requireRevision } from '../validation.js';
 import { imageBytes, listScreenshots } from '../assets.js';
 import { body, chunks, errorResponse, HttpError, json, media, mutationPolicy } from './protocol.js';
-import { statistics } from '../catalog.js';
+import { reviewQueue, statistics } from '../catalog.js';
 import { matchRoutes } from './matches.js';
 
 export function createLibraryHttp(storage: StorageSession, origins: Set<string>) {
@@ -45,7 +45,8 @@ export function createLibraryHttp(storage: StorageSession, origins: Set<string>)
         const screenshotEdit = !assignmentRoute && /^\/api\/screenshots\/[^/]+$/.test(path);
         const methods = path === '/api/imports' ? ['GET', 'POST'] : batchRoute ? batchRoute[2] ? ['POST'] : ['GET']
           : uploadRoute ? ['PUT'] : imageRoute ? ['GET', 'HEAD'] : path === '/api/screenshots' ? ['GET']
-          : path === '/api/library/statistics' ? ['GET'] : path === '/api/matches' ? ['GET', 'POST'] : matchRoute || screenshotEdit ? ['PATCH'] : assignmentRoute ? ['POST'] : [];
+          : path === '/api/library/statistics' || path === '/api/library/review-queue' ? ['GET']
+          : path === '/api/matches' ? ['GET', 'POST'] : matchRoute || screenshotEdit ? ['PATCH'] : assignmentRoute ? ['POST'] : [];
         if (req.method === 'OPTIONS') mutationPolicy(req, origins);
         if (!methods.length) throw new HttpError(404, 'NOT_FOUND', 'Library route not found.');
         if (!methods.includes(req.method ?? '')) throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed.', methods.join(', '));
@@ -55,6 +56,9 @@ export function createLibraryHttp(storage: StorageSession, origins: Set<string>)
           await matchRoutes(req, res, url, storage, engine.limits.jsonBytes);
         } else if (path === '/api/library/statistics') {
           json(res, 200, { data: statistics(storage) });
+        } else if (path === '/api/library/review-queue') {
+          const data = await reviewQueue(storage, () => shutdown.signal.aborted || res.destroyed);
+          if (!res.destroyed) json(res, 200, { data });
         } else if (path === '/api/imports') {
           if (req.method === 'POST') {
             const batch = engine.createBatch(await body(req, engine.limits.jsonBytes)); json(res, 201, { data: projectBatch(batch.id) });
@@ -84,6 +88,7 @@ export function createLibraryHttp(storage: StorageSession, origins: Set<string>)
           res.end(req.method === 'HEAD' ? undefined : bytes);
         } else json(res, 200, { data: listScreenshots(storage, url.searchParams) });
       } catch (error) {
+        if (res.destroyed) return;
         // Keep an oversized/failed request from being reused; do not buffer the remaining body.
         if (!req.complete) { res.setHeader('Connection', 'close'); req.resume(); }
         errorResponse(res, error);

@@ -34,7 +34,7 @@ describe('SQLite library constraints', () => {
     for (const obscurity of ['low', 'medium', 'high', null]) session.db.prepare('UPDATE matches SET obscurity=? WHERE id=?').run(obscurity, match.id);
     expect(() => session.db.prepare("UPDATE screenshots SET review_status='approved' WHERE id=?").run(record.id)).toThrow();
     repo.updateScreenshot(record.id, 1, { matchId: match.id }, 1);
-    expect(() => session.db.prepare("UPDATE screenshots SET review_status='approved' WHERE id=?").run(record.id)).toThrow();
+    session.db.prepare("UPDATE screenshots SET review_status='approved' WHERE id=?").run(record.id);
     for (const difficulty of ['easy', 'medium', 'hard', null]) session.db.prepare('UPDATE screenshots SET difficulty=? WHERE id=?').run(difficulty, record.id);
     for (const status of ['pending', 'rejected']) session.db.prepare('UPDATE screenshots SET review_status=? WHERE id=?').run(status, record.id);
     session.db.prepare("UPDATE screenshots SET difficulty='easy', review_status='approved' WHERE id=?").run(record.id);

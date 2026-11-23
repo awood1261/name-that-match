@@ -9,7 +9,7 @@ import App from '../../client/src/App';
 const matchId = '00000000-0000-4000-8000-000000000010';
 function match(fields: Partial<MatchSummary> = {}): MatchSummary {
   return { id: matchId, participantDescription: 'A vs B', promotion: 'Promotion', event: 'Event', matchDate: null, obscurity: null, stipulation: null, championshipInfo: null, notes: null,
-    createdAt: '2026-11-06T00:00:00Z', updatedAt: '2026-11-06T00:00:00Z', revision: 1, matchingScreenshotCount: 0, screenshotCount: 0, approvedCount: 0, eligibleCount: 0, awaitingClassificationCount: 0, classificationIncomplete: true, complete: true, missingFields: [], ...fields };
+    createdAt: '2026-11-06T00:00:00Z', updatedAt: '2026-11-06T00:00:00Z', revision: 1, matchingScreenshotCount: 0, screenshotCount: 0, approvedCount: 0, eligibleCount: 0, pendingCount: 0, assetIssueCount: 0, awaitingClassificationCount: 0, classificationIncomplete: true, complete: true, missingFields: [], ...fields };
 }
 function image(id: string): ScreenshotSummary {
   return { id, matchId: null, provenance: { schemaVersion: 1, captureId: id, source: { platform: 'youtube', videoId: 'abcdefghijk', canonicalUrl: 'https://www.youtube.com/watch?v=abcdefghijk' }, capture: { playbackSeconds: 42, capturedAt: '2026-11-06T00:00:00Z', method: 'video-frame-capture' }, image: { filename: `${id}.png`, width: 2, height: 1, format: 'png' } },
@@ -26,6 +26,16 @@ let matches: MatchSummary[]; let images: ScreenshotSummary[];
 beforeEach(() => {
   vi.spyOn(reviewApi, 'statistics').mockResolvedValue({ totalMatches: 1, totalScreenshots: 2, fullyClassifiedScreenshots: 0, awaitingClassificationScreenshots: 2, classifiedByTier: { squash: 0, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 0, competitive: 0, deathmatch: 0 }, asOf: '' });
   matches = [match()]; images = [image('first'), image('second')];
+  vi.spyOn(reviewApi, 'queue').mockImplementation(async () => {
+    const intake = images.filter(record => !record.matchId);
+    const groups = matches.map((row) => {
+      const shots = images.filter(record => record.matchId === row.id);
+      return { ...row, screenshotCount: shots.length, pendingCount: shots.filter(record => record.reviewStatus === 'pending').length,
+        eligibleCount: shots.filter(record => record.eligibility.eligible).length, thumbnailUrl: shots[0]?.image.url ?? null };
+    }).sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
+    return { groups, intake: { screenshotCount: intake.length, pendingCount: intake.filter(record => record.reviewStatus === 'pending').length },
+      statistics: await reviewApi.statistics(new AbortController().signal) };
+  });
   vi.spyOn(matchApi, 'list').mockImplementation(async (_signal, query = '') => ({ matches: matches.map((match) => ({ ...match, matchingScreenshotCount: filteredImages(images.filter((record) => record.matchId === match.id), query).length, screenshotCount: images.filter((record) => record.matchId === match.id).length })), matchedCount: matches.length, asOf: '' }));
   vi.spyOn(libraryApi, 'unassigned').mockImplementation(async () => ({ screenshots: images.filter((record) => !record.matchId), matchedCount: images.filter((record) => !record.matchId).length, asOf: '' }));
   vi.spyOn(matchApi, 'screenshots').mockImplementation(async (id, _signal, query = '') => ({ screenshots: filteredImages(id ? images.filter((record) => record.matchId === id) : images, query), matchedCount: images.length, asOf: '' }));
@@ -43,22 +53,35 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function queue() {
-  fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' })); await screen.findByText('2 unassigned screenshots');
+  fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ })); await screen.findByText('2 unassigned screenshots');
 }
+function matchesTab() { fireEvent.click(screen.getByRole('button', { name: 'Matches' })); }
 async function openExisting() { fireEvent.click(await screen.findByRole('button', { name: /^A vs B/ })); fireEvent.click(await screen.findByRole('button', { name: 'Edit match details' })); await screen.findByRole('heading', { name: 'Edit match' }); }
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label, { exact: true }), { target: { value } });
 const save = () => fireEvent.click(screen.getByRole('button', { name: 'Save match' }));
 
 describe('match management workspace', () => {
-  it('starts in Matches, creates an incomplete draft and keeps unknown fields unset', async () => {
-    render(<MatchLibraryPage />); expect(screen.getByRole('heading', { name: 'Matches' })).toBeInTheDocument();
+  it('groups intake by source without assigning captures and retains grouping through reload', async () => {
+    images[0].provenance.source.title = 'Source recording';
+    render(<MatchLibraryPage />);
+    await queue();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Group by source video/ }));
+    expect(screen.getByRole('heading', { name: 'Source video: Source recording' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reload screenshots' }));
+    expect(await screen.findByRole('heading', { name: 'Source video: Source recording' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Group by source video/ })).toBeChecked();
+    expect(matchApi.assign).not.toHaveBeenCalled();
+  });
+  it('starts in Review Queue, creates an incomplete draft and keeps unknown fields unset', async () => {
+    render(<MatchLibraryPage />); expect(screen.getByRole('heading', { name: 'Review Queue' })).toBeInTheDocument();
+    matchesTab();
     fireEvent.click(screen.getByRole('button', { name: 'Create match' })); save();
     await waitFor(() => expect(matchApi.create).toHaveBeenCalledOnce());
     expect(vi.mocked(matchApi.create).mock.calls[0][0]).toEqual({ participantDescription: null, promotion: null, event: null, matchDate: null, obscurity: null, stipulation: null, championshipInfo: null, notes: null });
     expect(await screen.findByText(/Incomplete: Participants, Promotion, Event/)).toBeInTheDocument();
   });
   it.each(['low', 'medium', 'high'])('edits partial dates, flexible participants, editorial fields and %s obscurity without screenshot edits', async (obscurity) => {
-    render(<MatchLibraryPage />); await openExisting();
+    render(<MatchLibraryPage />); matchesTab(); await openExisting();
     change('Participants', 'Team A & Team B vs Team C'); change('Date / year', '1997-03'); change('Match obscurity', obscurity); change('Stipulation', 'Tag team'); change('Championship information', 'Tag titles'); change('Match notes', 'Editorial notes'); save();
     await waitFor(() => expect(matchApi.update).toHaveBeenCalledOnce());
     expect(vi.mocked(matchApi.update).mock.calls[0][1]).toMatchObject({ participantDescription: 'Team A & Team B vs Team C', matchDate: '1997-03', obscurity, stipulation: 'Tag team', championshipInfo: 'Tag titles', notes: 'Editorial notes' });
@@ -84,7 +107,7 @@ describe('match management workspace', () => {
   });
   it('assigns to an existing match and offers individual unassignment and reassignment', async () => {
     images[0].matchId = matchId; matches.push(match({ id: 'other', participantDescription: 'Other match' }));
-    render(<MatchLibraryPage />); await openExisting();
+    render(<MatchLibraryPage />); matchesTab(); await openExisting();
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Select first' })); change('Target match', 'other');
     fireEvent.click(screen.getByRole('button', { name: 'Save assignment' })); await waitFor(() => expect(images[0].matchId).toBe('other'));
     fireEvent.click(screen.getByRole('button', { name: 'Back to match results' }));
@@ -94,7 +117,7 @@ describe('match management workspace', () => {
   });
   it('retains drafts and associates server field validation with its control', async () => {
     vi.mocked(matchApi.update).mockRejectedValueOnce(new LibraryApiError({ code: 'INVALID_REQUEST', message: 'Invalid library data', fieldErrors: { matchDate: 'Invalid partial date' } }, 422));
-    render(<MatchLibraryPage />); await openExisting(); change('Date / year', 'bad date'); save();
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); change('Date / year', 'bad date'); save();
     expect(await screen.findByText('Invalid partial date')).toBeInTheDocument();
     expect(screen.getByLabelText('Date / year')).toHaveValue('bad date'); expect(screen.getByLabelText('Date / year')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Date / year')).toHaveAccessibleDescription('Invalid partial date');
@@ -109,15 +132,15 @@ describe('match management workspace', () => {
     expect(images[0].matchId).toBe(matchId);
   });
   it('offers Save/Discard/Stay for view changes and cancels without writing', async () => {
-    render(<MatchLibraryPage />); await openExisting(); change('Event', 'Unsaved event');
-    fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); change('Event', 'Unsaved event');
+    fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ }));
     let dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' }); expect(within(dialog).getByRole('button', { name: 'Stay' })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: 'Escape' }); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(screen.getByLabelText('Event')).toHaveValue('Unsaved event');
-    fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' })); dialog = await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ })); dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Discard and continue' })); await screen.findByText('2 unassigned screenshots'); expect(matchApi.update).not.toHaveBeenCalled();
   });
   it('saves affected drafts before navigating and stays when a save fails', async () => {
-    render(<MatchLibraryPage />); await openExisting(); change('Event', 'Save before leaving');
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); change('Event', 'Save before leaving');
     vi.mocked(matchApi.update).mockRejectedValueOnce(new Error('offline'));
     fireEvent.click(screen.getByRole('button', { name: 'Back to screenshots' })); fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Save and continue' }));
     expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent('Match save failed');
@@ -127,7 +150,7 @@ describe('match management workspace', () => {
     expect(matchApi.update).toHaveBeenCalledTimes(2);
   });
   it('loads competing match values and requires deliberate comparison before retry with the current revision', async () => {
-    render(<MatchLibraryPage />); await openExisting(); change('Event', 'My event');
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); change('Event', 'My event');
     matches = [match({ event: 'Other editor event', revision: 2 })];
     vi.mocked(matchApi.update).mockRejectedValueOnce(new LibraryApiError({ code: 'REVISION_CONFLICT', message: 'Conflict', currentRevision: 2 }, 409)); save();
     expect(await screen.findByRole('region', { name: 'Current server match' })).toHaveTextContent('Other editor event');
@@ -150,7 +173,7 @@ describe('match management workspace', () => {
   });
   it('guards in-app System navigation and enables the supported browser unload prompt for dirty work', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'ok', service: 'name-that-match-server', timestamp: '2026-11-06T00:00:00Z' }) }));
-    render(<App />); fireEvent.click(screen.getByRole('button', { name: 'Image Library' })); await openExisting(); change('Event', 'Keep me');
+    render(<App />); fireEvent.click(screen.getByRole('button', { name: 'Image Library' })); matchesTab(); await openExisting(); change('Event', 'Keep me');
     const event = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); expect(event.defaultPrevented).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'System' })); fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Stay' }));
     expect(screen.getByLabelText('Event')).toHaveValue('Keep me');
@@ -166,14 +189,14 @@ describe('match management workspace', () => {
   });
   it('saves both affected drafts before a guarded view change', async () => {
     images[0].matchId = matchId; matches.push(match({ id: 'other', participantDescription: 'Other target' }));
-    render(<MatchLibraryPage />); await openExisting(); fireEvent.click(await screen.findByRole('checkbox', { name: 'Select first' }));
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); fireEvent.click(await screen.findByRole('checkbox', { name: 'Select first' }));
     change('Target match', 'other'); change('Event', 'Match draft');
-    fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
+    fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Save and continue' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(matchApi.update).toHaveBeenCalledOnce(); expect(matchApi.assign).toHaveBeenCalledOnce();
     expect(matches.find((item) => item.id === matchId)?.event).toBe('Match draft'); expect(images[0].matchId).toBe('other');
-    expect(screen.getByRole('heading', { name: 'Unassigned screenshots' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Unassigned Intake/ })).toBeInTheDocument();
   });
   it('guards changes to an assignment selection without discarding an independent match draft', async () => {
     render(<MatchLibraryPage />); await queue(); fireEvent.click(screen.getByRole('button', { name: 'Select all screenshots' })); change('Target match', matchId);
@@ -189,13 +212,13 @@ describe('match management workspace', () => {
   });
   it('saves only the match draft when closing its inspector, retaining the assignment draft', async () => {
     images[0].matchId = matchId; matches.push(match({ id: 'other', participantDescription: 'Other target' }));
-    render(<MatchLibraryPage />); await openExisting(); fireEvent.click(await screen.findByRole('checkbox', { name: 'Select first' })); change('Target match', 'other'); change('Event', 'Changed');
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); fireEvent.click(await screen.findByRole('checkbox', { name: 'Select first' })); change('Target match', 'other'); change('Event', 'Changed');
     fireEvent.click(screen.getByRole('button', { name: 'Back to screenshots' })); fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Save and continue' }));
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit match' })).not.toBeInTheDocument());
     expect(matchApi.update).toHaveBeenCalledOnce(); expect(matchApi.assign).not.toHaveBeenCalled(); expect(screen.getByLabelText('Target match')).toHaveValue('other');
   });
   it('can explicitly discard a stale match draft by reloading server values without saving', async () => {
-    render(<MatchLibraryPage />); await openExisting(); change('Event', 'My unsaved event');
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); change('Event', 'My unsaved event');
     matches = [match({ event: 'Current server event', revision: 2 })]; vi.mocked(matchApi.update).mockRejectedValueOnce(new LibraryApiError({ code: 'REVISION_CONFLICT', message: 'Conflict' }, 409)); save();
     fireEvent.click(await screen.findByRole('button', { name: 'Reload server values' }));
     expect(screen.getByLabelText('Event')).toHaveValue('Current server event'); expect(matchApi.update).toHaveBeenCalledOnce();
@@ -205,11 +228,12 @@ describe('match management workspace', () => {
     render(<MatchLibraryPage />); await queue(); fireEvent.click(screen.getByRole('button', { name: 'Select all screenshots' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create match for selection' })); change('Participants', 'New target'); save();
     fireEvent.click(await screen.findByRole('button', { name: 'Use this match for selected screenshots' })); change('Event', 'Save this target edit too');
-    fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
+    matchesTab();
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Save and continue' }));
     await waitFor(() => expect(matchApi.assign).toHaveBeenCalledOnce());
     expect(vi.mocked(matchApi.assign).mock.calls[0][1]).toMatchObject({ id: 'created', revision: 2 });
-    expect(vi.mocked(matchApi.assign).mock.calls[0][0]).toHaveLength(2); await screen.findByText('0 unassigned screenshots');
+    expect(vi.mocked(matchApi.assign).mock.calls[0][0]).toHaveLength(2);
+    await screen.findByRole('table', { name: 'Matches' });
   });
 });
 
@@ -220,21 +244,99 @@ describe('individual screenshot classification and review', () => {
     const project = (record: ScreenshotSummary): ScreenshotSummary => {
       const parent = matches.find((item) => item.id === record.matchId);
       const classification = classify(parent?.obscurity ?? null, record.difficulty);
-      const reasons = [...(!parent ? ['unassigned'] : parent.obscurity === null ? ['obscurity_unset'] : []), ...(record.difficulty === null ? ['unrated'] : []), ...(record.reviewStatus !== 'approved' ? [`${record.reviewStatus}_review`] : [])];
+      const reasons = [...(record.assetStatus === 'available' ? [] : [`image_${record.assetStatus}`]), ...(!parent ? ['unassigned'] : parent.obscurity === null ? ['obscurity_unset'] : []), ...(parent?.missingFields.map(field => `missing_${field}`) ?? []), ...(record.difficulty === null ? ['unrated'] : []), ...(record.reviewStatus !== 'approved' ? [`${record.reviewStatus}_review`] : [])];
       return { ...record, matchRevision: parent?.revision ?? null, classification: { ...classification, complete: classification.tier !== null }, eligibility: { eligible: !reasons.length, reasons } };
     };
-    vi.mocked(matchApi.screenshots).mockImplementation(async (_id, _signal, query = '') => ({ screenshots: filteredImages(images.map(project), query), matchedCount: images.length, asOf: '' }));
+    vi.mocked(matchApi.screenshots).mockImplementation(async (id, _signal, query = '') => ({ screenshots: filteredImages(images.filter(record => id === null || record.matchId === id).map(project), query), matchedCount: images.length, asOf: '' }));
     vi.spyOn(reviewApi, 'edit').mockImplementation(async (base, changes) => {
-      const record = project({ ...base, ...changes, revision: base.revision + 1, reviewStatus: changes.difficulty !== base.difficulty && base.reviewStatus === 'approved' ? 'pending' : base.reviewStatus });
+      const record = project({ ...base, ...changes, revision: base.revision + 1, reviewStatus: base.reviewStatus });
       images = images.map((item) => item.id === record.id ? record : item); return record;
     });
     vi.spyOn(reviewApi, 'review').mockImplementation(async (base, reviewStatus) => {
       const record = project({ ...base, reviewStatus, revision: base.revision + 1 }); images = images.map((item) => item.id === record.id ? record : item); return record;
     });
   });
+  it('pins intake, prioritizes pending groups by creation time, and keeps completed groups accessible', async () => {
+    matches = [
+      match({ obscurity: 'low' }),
+      match({ id: 'newer', participantDescription: 'Newer pending match', createdAt: '2026-11-20', obscurity: 'low' }),
+      match({ id: 'complete', participantDescription: 'Completed match', obscurity: 'low', classificationIncomplete: false }),
+    ];
+    images = [
+      { ...images[0], difficulty: 'easy' },
+      { ...images[1], matchId: 'newer', difficulty: 'easy' },
+      { ...image('done'), matchId: 'complete', difficulty: 'easy', reviewStatus: 'approved', eligibility: { eligible: true, reasons: [] } },
+      image('intake'),
+    ];
+    render(<MatchLibraryPage />);
+    const queue = within(screen.getByRole('region', { name: 'Review Queue' }));
+    await queue.findByRole('button', { name: /Newer pending match/ });
+    const groups = queue.getAllByRole('button');
+    expect(groups[0]).toHaveAccessibleName(/Unassigned Intake/);
+    expect(groups[1]).toHaveAccessibleName(/Newer pending match/);
+    expect(groups[2]).toHaveAccessibleName(/A vs B/);
+    expect(queue.queryByRole('button', { name: /Completed match/ })).not.toBeInTheDocument();
+    expect(matchApi.screenshots).not.toHaveBeenCalled();
+    const counts = within(screen.getByLabelText('Review Queue summary'));
+    expect(counts.getByText('Screenshots to review in queue').nextElementSibling).toHaveTextContent('3');
+    fireEvent.click(queue.getByRole('checkbox', { name: /Show Completed/ }));
+    expect(await queue.findByRole('button', { name: /Completed match.*Gameplay ready/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    expect(await screen.findByRole('region', { name: 'Entire library statistics' })).toBeInTheDocument();
+  });
+
+  it('shows clear blockers and keeps classification and approval independent in the queue', async () => {
+    matches = [match({ obscurity: 'high', event: null, complete: false, missingFields: ['event'] })];
+    images[0] = { ...images[0], difficulty: 'easy' };
+    images[1] = { ...images[1], assetStatus: 'missing' };
+    render(<MatchLibraryPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /A vs B/ }));
+    await screen.findByRole('img', { name: 'Selected capture first' });
+    expect(screen.getByText('Medium · 2 points')).toBeInTheDocument();
+    expect(screen.getByText(/Add the event/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Approve & Next' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('radio', { name: 'Hard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save classification' }));
+    expect(await screen.findByText('Hard · 3 points')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Selected capture first' })).toBeInTheDocument();
+    expect(reviewApi.review).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Next screenshot' }));
+    expect(screen.getByText(/Restore the missing image/)).toBeInTheDocument();
+  });
+
+  it('advances only after confirmed review and wraps within the current group', async () => {
+    matches.push(match({ id: 'other', participantDescription: 'Other match' }));
+    images = [
+      { ...images[0], difficulty: 'easy' },
+      { ...images[1], difficulty: 'hard' },
+      { ...image('outside'), matchId: 'other' },
+    ];
+    render(<MatchLibraryPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /A vs B/ }));
+    await screen.findByRole('img', { name: 'Selected capture first' });
+    fireEvent.click(screen.getByRole('button', { name: 'Next screenshot' }));
+    vi.mocked(reviewApi.review).mockRejectedValueOnce(new LibraryApiError({ code: 'REVISION_CONFLICT', message: 'Stale' }, 409));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve & Next' }));
+    await screen.findByText(/Screenshot or match changed elsewhere/);
+    expect(screen.getByRole('img', { name: 'Selected capture second' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reload screenshot values' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve & Next' }));
+    await screen.findByText(/Now reviewing screenshot 1 of 2/);
+    expect(screen.getByRole('heading', { name: 'Screenshots (2)' })).toHaveFocus();
+    expect(screen.getByRole('img', { name: 'Selected capture first' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open capture outside' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    await screen.findByText(/No pending screenshots remain in this match/);
+    expect(screen.getByRole('img', { name: 'Selected capture first' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark pending' }));
+    await screen.findByText('Review: Pending');
+    expect(screen.getByRole('img', { name: 'Selected capture first' })).toBeInTheDocument();
+  });
+
   const openReview = async () => { await openExisting(); fireEvent.click(await screen.findByRole('button', { name: 'Review capture first' })); await screen.findByRole('heading', { name: 'Review screenshot' }); };
   it('saves independent difficulty/notes with read-only tier, explicit review and separate match drafts', async () => {
-    render(<MatchLibraryPage />); await openExisting(); change('Match notes', 'Keep match draft');
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); change('Match notes', 'Keep match draft');
     fireEvent.click(await screen.findByRole('button', { name: 'Review capture first' }));
     expect(screen.getByRole('button', { name: 'Approve screenshot' })).toBeDisabled();
     change('Screenshot difficulty', 'hard'); change('Screenshot notes', 'Image clues');
@@ -248,7 +350,7 @@ describe('individual screenshot classification and review', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to collection' })); expect(screen.getByLabelText('Match notes')).toHaveValue('Keep match draft');
   });
   it('guards screenshot navigation and retains failed saves, then allows deliberate discard', async () => {
-    render(<MatchLibraryPage />); await openReview(); change('Screenshot notes', 'Unsaved');
+    render(<MatchLibraryPage />); matchesTab(); await openReview(); change('Screenshot notes', 'Unsaved');
     fireEvent.click(screen.getByRole('button', { name: 'Next screenshot' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument(); fireEvent.click(screen.getByRole('button', { name: 'Stay' }));
     expect(screen.getByLabelText('Screenshot notes')).toHaveValue('Unsaved');
@@ -259,7 +361,7 @@ describe('individual screenshot classification and review', () => {
     expect(await screen.findByAltText('Selected capture second')).toBeInTheDocument(); expect(screen.getByLabelText('Screenshot notes')).toHaveValue('');
   });
   it('keeps stale screenshot drafts and requires deliberate revision reconciliation', async () => {
-    render(<MatchLibraryPage />); await openReview(); change('Screenshot difficulty', 'easy');
+    render(<MatchLibraryPage />); matchesTab(); await openReview(); change('Screenshot difficulty', 'easy');
     images[0] = { ...images[0], revision: 2, notes: 'Other editor' };
     vi.mocked(reviewApi.edit).mockRejectedValueOnce(new LibraryApiError({ code: 'REVISION_CONFLICT', message: 'Stale', currentRevision: 2 }, 409));
     fireEvent.click(screen.getByRole('button', { name: 'Save screenshot' }));
@@ -271,7 +373,7 @@ describe('individual screenshot classification and review', () => {
   });
   it('refreshes saved projections after parent obscurity changes and supports cancel/review states without rating other screenshots', async () => {
     images[0] = { ...images[0], difficulty: 'hard' };
-    render(<MatchLibraryPage />); await openReview(); expect(screen.getByText('Medium · 2 points')).toBeInTheDocument();
+    render(<MatchLibraryPage />); matchesTab(); await openReview(); expect(screen.getByText('Medium · 2 points')).toBeInTheDocument();
     change('Screenshot difficulty', 'easy'); fireEvent.click(screen.getByRole('button', { name: 'Cancel screenshot changes' })); expect(screen.getByLabelText('Screenshot difficulty')).toHaveValue('hard');
     fireEvent.click(screen.getByRole('button', { name: 'Back to collection' })); change('Match obscurity', 'high'); save(); await waitFor(() => expect(matchApi.update).toHaveBeenCalledOnce());
     fireEvent.click(await screen.findByRole('button', { name: 'Review capture first' })); await screen.findByText('Hard · 3 points');
@@ -280,37 +382,39 @@ describe('individual screenshot classification and review', () => {
     expect(images[1].difficulty).toBeNull(); expect(reviewApi.edit).not.toHaveBeenCalled();
   });
   it('preserves screenshot drafts while creating/canceling a new match', async () => {
-    render(<MatchLibraryPage />); await openReview(); change('Screenshot notes', 'Keep screenshot draft');
+    render(<MatchLibraryPage />); matchesTab(); await openReview(); change('Screenshot notes', 'Keep screenshot draft');
     fireEvent.click(screen.getByRole('button', { name: 'Create match' }));
     expect(screen.getByRole('heading', { name: 'Create match' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel match changes' }));
     expect(screen.getByLabelText('Screenshot notes')).toHaveValue('Keep screenshot draft');
   });
   it('saves match, screenshot and assignment drafts deliberately before a view change', async () => {
-    render(<MatchLibraryPage />); await openExisting(); change('Match notes', 'Match draft');
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); change('Match notes', 'Match draft');
     fireEvent.click(await screen.findByLabelText('Select first')); change('Target match', 'unassigned');
     fireEvent.click(screen.getByRole('button', { name: 'Review capture first' })); change('Screenshot difficulty', 'easy');
-    fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' })); fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
-    await screen.findByRole('heading', { name: 'Unassigned screenshots' });
+    fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ })); fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await screen.findByRole('heading', { name: /Unassigned Intake/ });
     expect(matchApi.update).toHaveBeenCalledOnce(); expect(reviewApi.edit).toHaveBeenCalledOnce(); expect(matchApi.assign).toHaveBeenCalledOnce();
     expect(vi.mocked(matchApi.assign).mock.calls[0][0][0].revision).toBe(2);
     expect(images[0]).toMatchObject({ difficulty: 'easy', matchId: null });
   });
   it('keeps global statistics and view-specific filters separate', async () => {
     vi.mocked(reviewApi.statistics).mockResolvedValue({ totalMatches: 4, totalScreenshots: 24, fullyClassifiedScreenshots: 24, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 3, competitive: 7, deathmatch: 14 }, eligibleByTier: { squash: 3, competitive: 6, deathmatch: 0 }, asOf: '' });
-    render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ });
+    render(<MatchLibraryPage />); matchesTab(); await screen.findByRole('button', { name: /^A vs B/ });
     fireEvent.click(screen.getByText('Search and filters')); change('Search matches', '100%_');
     fireEvent.click(within(screen.getByRole('group', { name: 'Filter obscurity' })).getByLabelText('Low'));
     await waitFor(() => expect(matchApi.list).toHaveBeenLastCalledWith(expect.any(AbortSignal), 'q=100%25_&obscurity=low'));
-    fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' })); await waitFor(() => expect(libraryApi.unassigned).toHaveBeenLastCalledWith(expect.any(AbortSignal), ''));
+    fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ })); await waitFor(() => expect(libraryApi.unassigned).toHaveBeenLastCalledWith(expect.any(AbortSignal), ''));
     fireEvent.click(screen.getByRole('button', { name: 'Matches' })); await waitFor(() => expect(screen.getByLabelText('Search matches')).toHaveValue('100%_'));
-    expect(within(screen.getByRole('region', { name: 'Entire library statistics' })).getByText('Fully classified')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    await screen.findByText('Fully classified');
     const totals = within(screen.getByRole('region', { name: 'Entire library statistics' }));
     expect(totals.getByText('Screenshots').nextElementSibling).toHaveTextContent('24');
     expect(totals.getByText('Classified Hard').nextElementSibling).toHaveTextContent('14');
     expect(totals.getByText('Eligible Hard').nextElementSibling).toHaveTextContent('0');
     expect(totals.getByText(/Pending or rejected screenshots are excluded/)).toBeInTheDocument();
-    images = []; fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
+    images = []; fireEvent.click(screen.getByRole('button', { name: 'Review Queue' }));
+    fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ }));
     await screen.findByText('0 unassigned screenshots');
     expect(screen.getByText(/Assigned screenshots are available in Matches/)).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('group', { name: 'Filter review' })).getByLabelText('pending'));
@@ -320,13 +424,15 @@ describe('individual screenshot classification and review', () => {
   it('uses the same difficulty/review/tier subset for selection, thumbnails and navigation', async () => {
     images = [{ ...images[0], difficulty: 'easy', reviewStatus: 'approved' }, { ...images[1], difficulty: 'medium', reviewStatus: 'approved' }, { ...image('third'), matchId, difficulty: 'easy', matchRevision: 1 }];
     vi.mocked(reviewApi.statistics).mockResolvedValue({ totalMatches: 1, totalScreenshots: 3, fullyClassifiedScreenshots: 3, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 3, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 2, competitive: 0, deathmatch: 0 }, asOf: '' });
-    render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters'));
+    render(<MatchLibraryPage />); matchesTab(); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters'));
     for (const [group, label] of [['Filter visual difficulty', 'Easy'], ['Filter review', 'approved'], ['Filter game tier', 'Easy']]) fireEvent.click(within(screen.getByRole('group', { name: group })).getByLabelText(label));
     fireEvent.click(await screen.findByRole('button', { name: /^A vs B/ })); await screen.findByText('Showing 1 of 3 screenshots');
     expect(matchApi.screenshots).toHaveBeenCalledWith(matchId, expect.any(AbortSignal), 'difficulty=easy&review=approved&tier=squash');
     fireEvent.click(screen.getByRole('button', { name: 'Select all screenshots' })); expect(screen.getByRole('checkbox', { name: 'Select first' })).toBeChecked(); expect(screen.queryByRole('checkbox', { name: 'Select second' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Review capture first' }));
     expect(screen.getByRole('button', { name: 'Previous screenshot' })).toBeDisabled(); expect(screen.getByRole('button', { name: 'Next screenshot' })).toBeDisabled(); expect(within(screen.getByRole('navigation', { name: 'Screenshot thumbnails' })).getAllByRole('button')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    await screen.findByText('Fully classified');
     expect(within(screen.getByRole('region', { name: 'Entire library statistics' })).getByText('Screenshots').nextElementSibling).toHaveTextContent('3');
   });
   it('removes saved nonmatching images, preserves other drafts and shows empty results with current full counts', async () => {
@@ -335,7 +441,7 @@ describe('individual screenshot classification and review', () => {
       const result = matches.map((match) => ({ ...match, screenshotCount: images.filter((record) => record.matchId === match.id).length })).filter((match) => !query || filteredImages(images.filter((record) => record.matchId === match.id), query).length > 0);
       return { matches: result, matchedCount: result.length, asOf: '' };
     });
-    render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters')); fireEvent.click(within(screen.getByRole('group', { name: 'Filter game tier' })).getByLabelText('Easy'));
+    render(<MatchLibraryPage />); matchesTab(); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters')); fireEvent.click(within(screen.getByRole('group', { name: 'Filter game tier' })).getByLabelText('Easy'));
     fireEvent.click(await screen.findByRole('button', { name: /^A vs B/ })); await screen.findByText('Showing 1 of 2 screenshots'); fireEvent.click(screen.getByRole('button', { name: 'Edit match details' })); change('Match notes', 'Keep independent match draft');
     fireEvent.click(screen.getByRole('button', { name: 'Review capture first' })); change('Screenshot difficulty', 'hard'); fireEvent.click(screen.getByRole('button', { name: 'Save screenshot' }));
     await screen.findByText('No screenshots match the active filters. Change or clear the filters to see more screenshots.'); expect(screen.getByText('Showing 0 of 2 screenshots')).toBeInTheDocument();
@@ -351,7 +457,7 @@ describe('match result and editing context separation', () => {
   const lowCheckbox = () => within(screen.getByRole('group', { name: 'Filter obscurity' })).getByLabelText('Low');
   it('opens a named filtered collection separately from metadata editing and retains filters on Back', async () => {
     images = images.map((record, index) => ({ ...record, matchId, difficulty: index ? 'hard' : 'easy' }));
-    render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ }); filters(); filterLow();
+    render(<MatchLibraryPage />); matchesTab(); await screen.findByRole('button', { name: /^A vs B/ }); filters(); filterLow();
     fireEvent.click(within(screen.getByRole('group', { name: 'Filter visual difficulty' })).getByLabelText('Hard'));
     await waitFor(() => expect(matchApi.list).toHaveBeenLastCalledWith(expect.any(AbortSignal), 'obscurity=low&difficulty=hard'));
     fireEvent.click(await screen.findByRole('button', { name: /^A vs B/ }));
@@ -376,7 +482,7 @@ describe('match result and editing context separation', () => {
     });
     let resolveImages!: (result: { screenshots: ScreenshotSummary[]; matchedCount: number; asOf: string }) => void;
     vi.mocked(matchApi.screenshots).mockImplementationOnce(() => new Promise((resolve) => { resolveImages = resolve; }));
-    render(<MatchLibraryPage />); fireEvent.click(await screen.findByRole('button', { name: /^Other match/ }));
+    render(<MatchLibraryPage />); matchesTab(); fireEvent.click(await screen.findByRole('button', { name: /^Other match/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Edit match details' })); expect(screen.getByLabelText('Participants')).toHaveValue('Other match');
     filters(); filterLow();
     await screen.findByRole('button', { name: /^A vs B/ }); expect(screen.queryByLabelText('Participants')).not.toBeInTheDocument(); expect(screen.queryByRole('heading', { name: 'Other match' })).not.toBeInTheDocument();
@@ -386,7 +492,7 @@ describe('match result and editing context separation', () => {
   });
   it.each(['match', 'screenshot', 'assignment'] as const)('guards dirty %s work before filtering; Stay retains it and Discard clears the prior context', async (kind) => {
     images[0].matchId = matchId;
-    render(<MatchLibraryPage />); await openExisting();
+    render(<MatchLibraryPage />); matchesTab(); await openExisting();
     if (kind === 'match') change('Match notes', 'Keep this draft');
     if (kind === 'screenshot') { fireEvent.click(await screen.findByRole('button', { name: 'Review capture first' })); change('Screenshot notes', 'Keep this draft'); }
     if (kind === 'assignment') { fireEvent.click(await screen.findByRole('checkbox', { name: 'Select first' })); change('Target match', 'unassigned'); }
@@ -400,7 +506,7 @@ describe('match result and editing context separation', () => {
   });
   it('keeps search focus while clearing a clean screenshot selection and collection', async () => {
     images[0].matchId = matchId;
-    render(<MatchLibraryPage />); await openExisting();
+    render(<MatchLibraryPage />); matchesTab(); await openExisting();
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Select first' })); filters();
     const search = screen.getByLabelText('Search matches'); search.focus();
     fireEvent.change(search, { target: { value: 'A' } });
@@ -409,7 +515,7 @@ describe('match result and editing context separation', () => {
     expect(screen.queryByLabelText('Target match')).not.toBeInTheDocument(); expect(screen.queryByLabelText('Participants')).not.toBeInTheDocument();
   });
   it('does not apply a filter when saving fails, then applies it after an explicit successful save', async () => {
-    render(<MatchLibraryPage />); await openExisting(); change('Event', 'Saved before filtering'); filters();
+    render(<MatchLibraryPage />); matchesTab(); await openExisting(); change('Event', 'Saved before filtering'); filters();
     vi.mocked(matchApi.update).mockRejectedValueOnce(new Error('offline'));
     filterLow(); fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Save and continue' }));
     await screen.findByText('Match save failed. Stay to review the retained draft.'); expect(lowCheckbox()).not.toBeChecked(); expect(screen.getByLabelText('Event')).toHaveValue('Saved before filtering');
@@ -418,15 +524,48 @@ describe('match result and editing context separation', () => {
   });
 });
 
-it('shows matching screenshot counts on filtered cards and labels other counts as full-match totals', async () => {
+it('shows matching screenshot counts on filtered table rows alongside full-match totals', async () => {
   matches = [match({ obscurity: 'medium', approvedCount: 5, eligibleCount: 5 })];
   images = Array.from({ length: 5 }, (_, index) => ({ ...image(`capture-${index}`), matchId, difficulty: (index < 3 ? 'medium' : 'easy') as ScreenshotSummary['difficulty'], reviewStatus: 'approved' as const }));
-  render(<MatchLibraryPage />); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters'));
+  render(<MatchLibraryPage />); matchesTab(); await screen.findByRole('button', { name: /^A vs B/ }); fireEvent.click(screen.getByText('Search and filters'));
   fireEvent.click(within(screen.getByRole('group', { name: 'Filter visual difficulty' })).getByLabelText('Medium'));
-  const card = await screen.findByRole('button', { name: /3 matching screenshots of 5 total/ });
-  expect(within(card).getByText('Full match totals: 5 approved · 5 eligible · 0 awaiting classification')).toBeInTheDocument();
-  fireEvent.click(card); await screen.findByText('Showing 3 of 5 screenshots');
-  fireEvent.click(screen.getByRole('button', { name: 'Back to match results' })); await screen.findByRole('button', { name: /3 matching screenshots of 5 total/ });
+  const matching = await screen.findByText('3 matching screenshots of 5 total');
+  const row = within(matching.closest('tr')!);
+  expect(row.getByText('5 approved')).toBeInTheDocument();
+  expect(row.getByText('5 eligible')).toBeInTheDocument();
+  expect(row.getByText('0 awaiting classification')).toBeInTheDocument();
+  fireEvent.click(row.getByRole('button', { name: 'A vs B' }));
+  await screen.findByText('Showing 3 of 5 screenshots');
+  fireEvent.click(screen.getByRole('button', { name: 'Back to match results' }));
+  await screen.findByText('3 matching screenshots of 5 total');
   fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
-  const unfiltered = await screen.findByRole('button', { name: /^A vs B/ }); expect(within(unfiltered).getByText('5 screenshots')).toBeInTheDocument(); expect(within(unfiltered).queryByText(/matching screenshots/)).not.toBeInTheDocument();
+  expect(await screen.findByText('5 screenshots')).toBeInTheDocument();
+  expect(screen.queryByText(/matching screenshots/)).not.toBeInTheDocument();
+});
+
+it('sorts matches without changing the result scope or available assignment targets', async () => {
+  matches.push(match({ id: 'earlier', participantDescription: '0 vs Z' }));
+  images[0].matchId = matchId;
+  const list = vi.mocked(matchApi.list).getMockImplementation()!;
+  vi.mocked(matchApi.list).mockImplementation(async (signal, query) => {
+    const result = await list(signal, query);
+    return query?.includes('q=') ? { ...result, matches: result.matches.filter((item) => item.id === matchId) } : result;
+  });
+  render(<MatchLibraryPage />); matchesTab();
+  const table = await screen.findByRole('table', { name: 'Matches' });
+  const header = within(table).getByRole('columnheader', { name: 'Participants' });
+  const sort = within(header).getByRole('button');
+  fireEvent.click(sort);
+  expect(header).toHaveAttribute('aria-sort', 'ascending');
+  expect(within(table).getAllByRole('row')[1]).toHaveTextContent('0 vs Z');
+  fireEvent.click(sort);
+  expect(header).toHaveAttribute('aria-sort', 'descending');
+  expect(within(table).getAllByRole('row')[1]).toHaveTextContent('A vs B');
+  fireEvent.click(screen.getByText('Search and filters'));
+  change('Search matches', 'A vs B');
+  await screen.findByRole('button', { name: 'A vs B' });
+  expect(screen.queryByRole('button', { name: '0 vs Z' })).not.toBeInTheDocument();
+  await openExisting();
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'Select first' }));
+  expect(within(screen.getByLabelText('Target match')).getByRole('option', { name: /0 vs Z/ })).toBeInTheDocument();
 });

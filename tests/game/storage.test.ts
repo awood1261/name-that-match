@@ -7,7 +7,7 @@ import { initializeStorage } from '../../server/src/storage';
 import { applyLibraryMigrations, LIBRARY_SCHEMA_VERSION } from '../../server/src/library/migrations';
 import { GameRepository } from '../../server/src/game/repository';
 import { GameService } from '../../server/src/game/service';
-import { addGameSchema, extendGuessingWindow } from '../../server/src/game/migrations';
+import { addGameSchema, addStoppedTiming, extendGuessingWindow } from '../../server/src/game/migrations';
 import { createLibraryRepository } from '../../server/src/library/repository';
 import { createTestResources } from '../helpers/resources';
 import { screenshotInput } from '../library/fixtures';
@@ -18,7 +18,7 @@ const fixtures: ReturnType<typeof serviceFixture>[] = [];
 function fixture() { const f = serviceFixture(); fixtures.push(f); return f; }
 afterEach(async () => { vi.restoreAllMocks(); for (const f of fixtures.splice(0)) await f.cleanup(); });
 
-describe('global schema 5 game migration', () => {
+describe('game storage migrations', () => {
   let resources: ReturnType<typeof createTestResources>;
   let rawConnections: Database.Database[];
   beforeEach(() => { resources = createTestResources(); rawConnections = []; });
@@ -53,7 +53,7 @@ describe('global schema 5 game migration', () => {
   it('upgrades a populated v3 game without changing old pause, scores, receipts, library, indexes or triggers', () => {
     const f = legacyPausedGame(); const rows = f.rows(); const objects = f.objects();
     expect(f.db.prepare("SELECT sql FROM sqlite_master WHERE name='game_rounds'").get()).toMatchObject({ sql: expect.stringContaining('window_ms <= 10000') });
-    applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(5);
+    applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
     expect(f.rows()).toEqual(rows); expect(f.objects()).toEqual(objects); expect(f.db.pragma('foreign_key_check')).toEqual([]);
     expect(f.db.pragma('foreign_keys', { simple: true })).toBe(1);
     let now = 0; const service = new GameService(new GameRepository(f.db), { now: () => now, primaryReady: () => true, candidateCurrent: () => true });
@@ -74,7 +74,7 @@ describe('global schema 5 game migration', () => {
     expect(f.db.pragma('user_version', { simple: true })).toBe(3); expect(f.rows()).toEqual(rows); expect(f.objects()).toEqual(objects);
     expect(f.db.pragma('foreign_keys', { simple: true })).toBe(1); expect(f.db.pragma('foreign_key_check')).toEqual([]);
     expect(f.db.prepare("SELECT name FROM sqlite_master WHERE name='game_rounds_next'").get()).toBeUndefined();
-    vi.restoreAllMocks(); applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(5); expect(f.rows()).toEqual(rows);
+    vi.restoreAllMocks(); applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION); expect(f.rows()).toEqual(rows);
   });
   it('adds stopped timing to v4 transactionally, preserving unknown historical time and rolling back a failed ALTER', () => {
     const f = legacyPausedGame(); f.db.pragma('foreign_keys=OFF'); f.db.transaction(() => extendGuessingWindow(f.db))(); f.db.pragma('foreign_keys=ON'); f.db.pragma('user_version=4');
@@ -83,15 +83,64 @@ describe('global schema 5 game migration', () => {
     expect(() => applyLibraryMigrations(f.db)).toThrow(/injected stopped/);
     expect(f.db.pragma('user_version', { simple: true })).toBe(4); expect(f.rows()).toEqual(rows);
     expect(f.db.pragma('table_info(game_rounds)')).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'stopped_remaining_ms' })]));
-    vi.restoreAllMocks(); applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(5); expect(f.rows()).toEqual(rows);
+    vi.restoreAllMocks(); applyLibraryMigrations(f.db); expect(f.db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION); expect(f.rows()).toEqual(rows);
     expect(f.db.prepare('SELECT stopped_remaining_ms FROM game_rounds').all()).toEqual([{ stopped_remaining_ms: null }, { stopped_remaining_ms: null }]);
     const old = new GameRepository(f.db).load(f.sessionId).rounds[0]; expect(old).not.toHaveProperty('stoppedRemainingMs');
     expect(f.db.pragma('foreign_key_check')).toEqual([]);
   });
+  it('preserves screenshot links, reviews, indexes and bytes when upgrading schema 5', () => {
+    const f = legacyPausedGame();
+    f.db.pragma('foreign_keys=OFF');
+    f.db.transaction(() => { extendGuessingWindow(f.db); addStoppedTiming(f.db); })();
+    f.db.pragma('foreign_keys=ON');
+    f.db.pragma('user_version=5');
+    const shot = f.db.prepare('SELECT screenshot_id AS id FROM game_rounds ORDER BY ordinal LIMIT 1').get() as { id: string };
+    const imagePath = (f.db.prepare('SELECT image_path FROM screenshots WHERE id=?').get(shot.id) as { image_path: string }).image_path;
+    f.db.prepare("UPDATE screenshots SET review_status='approved' WHERE id=?").run(shot.id);
+    f.db.exec(`INSERT INTO import_batches(id,source_label,status,created_at,updated_at,confirmation_receipts_json) VALUES('batch','kept','completed','old','old','{"kept":true}')`);
+    f.db.prepare("INSERT INTO import_items(id,batch_id,ordinal,candidate_label,state,result_kind,result_screenshot_id,created_at,updated_at) VALUES('item','batch',0,'kept','committed','imported',?,'old','old')").run(shot.id);
+    const file = path.join(resources.root, imagePath);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const bytes = fs.readFileSync('tests/fixtures/captures/sample.png');
+    fs.writeFileSync(file, bytes);
+
+    const rows = f.rows();
+    const indexes = () => f.db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='screenshots' ORDER BY name").all();
+    const originalIndexes = indexes();
+    const exec = f.db.exec.bind(f.db);
+    vi.spyOn(f.db, 'exec').mockImplementation(sql => {
+      const result = exec(sql);
+      if (sql.startsWith('DROP TABLE screenshots;')) throw new Error('injected screenshot rebuild failure');
+      return result;
+    });
+    expect(() => applyLibraryMigrations(f.db)).toThrow(/injected screenshot rebuild/);
+    expect(f.db.pragma('user_version', { simple: true })).toBe(5);
+    expect(f.db.pragma('foreign_keys', { simple: true })).toBe(1);
+    expect(f.rows()).toEqual(rows);
+    expect(indexes()).toEqual(originalIndexes);
+    expect(() => f.db.prepare('UPDATE screenshots SET difficulty=NULL WHERE id=?').run(shot.id)).toThrow(/CHECK/);
+
+    vi.restoreAllMocks();
+    applyLibraryMigrations(f.db);
+    expect(f.rows()).toEqual(rows);
+    expect(indexes()).toEqual(originalIndexes);
+    expect(f.db.pragma('foreign_key_check')).toEqual([]);
+    f.db.close();
+    const reopened = open().db;
+    expect(reopened.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
+    reopened.prepare('UPDATE screenshots SET difficulty=NULL WHERE id=?').run(shot.id);
+    expect(reopened.prepare('SELECT review_status FROM screenshots WHERE id=?').get(shot.id)).toEqual({ review_status: 'approved' });
+    expect(() => reopened.prepare('UPDATE screenshots SET match_id=NULL WHERE id=?').run(shot.id)).toThrow(/CHECK/);
+    expect(reopened.prepare('SELECT result_screenshot_id FROM import_items').get()).toEqual({ result_screenshot_id: shot.id });
+    expect(reopened.prepare('SELECT screenshot_id FROM game_rounds ORDER BY ordinal LIMIT 1').get()).toEqual({ screenshot_id: shot.id });
+    expect(reopened.pragma('foreign_key_check')).toEqual([]);
+    expect(fs.readFileSync(file)).toEqual(bytes);
+  });
+
   it('creates exactly five STRICT game tables, stable indexes, pragmas and an empty session on fresh/repeated startup', () => {
     const first = open(); const tables = first.db.prepare("SELECT name,strict FROM pragma_table_list WHERE name LIKE 'game_%' ORDER BY name").all();
     expect(tables).toEqual(gameTables.map((name) => ({ name, strict: 1 })));
-    expect(first.db.pragma('user_version', { simple: true })).toBe(5);
+    expect(first.db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
     expect(first.db.pragma('foreign_keys', { simple: true })).toBe(1); expect(first.db.pragma('journal_mode', { simple: true })).toBe('wal');
     expect(first.db.pragma('synchronous', { simple: true })).toBe(1); expect(new GameRepository(first.db).current()).toBeNull();
     const schema = first.db.prepare("SELECT name,sql FROM sqlite_master WHERE name LIKE 'game_%' ORDER BY name").all(); first.db.close();
@@ -114,9 +163,9 @@ describe('global schema 5 game migration', () => {
     expect(fs.statSync(upgraded.dbPath).ino).toBe(inode); expect(fs.readFileSync(path.join(resources.root, 'screenshots', 'kept.txt'), 'utf8')).toBe('unchanged');
     expect(upgraded.db.pragma('foreign_key_check')).toEqual([]);
   });
-  it('retains the existing supported schema-1 mapping on the way to 4', () => {
+  it('retains the existing supported schema-1 mapping on the way to the current schema', () => {
     const db = legacy(1); db.exec("INSERT INTO matches(id,obscurity,created_at,updated_at) VALUES('legacy','iconic','old','old')"); db.close();
-    const storage = open(); expect(storage.db.pragma('user_version', { simple: true })).toBe(5);
+    const storage = open(); expect(storage.db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
     expect(storage.db.prepare("SELECT obscurity,revision FROM matches WHERE id='legacy'").get()).toEqual({ obscurity: 'low', revision: 2 });
   });
   it('rejects unsupported newer versions without mutation', () => {
@@ -131,7 +180,7 @@ describe('global schema 5 game migration', () => {
     expect(() => applyLibraryMigrations(db)).toThrow(/injected/); expect(db.pragma('user_version', { simple: true })).toBe(2);
     expect(db.prepare("SELECT obscurity,revision FROM matches WHERE id='kept'").get()).toEqual({ obscurity: 'high', revision: 1 });
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'game_%'").all()).toEqual([]); expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
-    vi.restoreAllMocks(); applyLibraryMigrations(db); expect(db.pragma('user_version', { simple: true })).toBe(5); db.close();
+    vi.restoreAllMocks(); applyLibraryMigrations(db); expect(db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION); db.close();
   });
 });
 

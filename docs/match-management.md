@@ -1,14 +1,14 @@
-# Match management (Milestone 4)
+# Match management
 
-The library opens in Matches. Match cards use explicit participant/promotion/event metadata, show unknown fields and incomplete status, and open a separately titled matching screenshot collection. Use Edit match details to open its metadata inspector; Back to match results retains filters. Changing search/filters protects dirty drafts before closing the previous match context. Unassigned screenshots remains available beside Matches. Import is unchanged; source videos and capture folders never become matches automatically.
+Image Library opens in **Review Queue**. Start with **Unassigned Intake**, then review match groups with pending screenshots. Use **Show Completed** to revisit earlier decisions. Use **Matches** to search and sort the compact table and open a match's screenshot results. **Edit match details** opens the metadata editor and **Back to match results** retains filters. Use **Overview** for whole-library statistics. Source videos and capture folders never become matches automatically.
 
 ## Select captures, create a match, and assign
 
-1. Open Unassigned screenshots. Select individual checkboxes or Select all screenshots (at most 256 per assignment).
+1. Open **Unassigned Intake**. Select individual checkboxes or Select all screenshots (at most 256 per assignment).
 2. Choose an existing Target match, or Create match for selection. Creating a match retains the selection and any independent assignment draft.
 3. Enter match details and Save match. Participants is free text for singles, teams or multi-person matches. Promotion and event complete the identifying metadata; missing fields are allowed in an incomplete draft. Date / year accepts `YYYY`, `YYYY-MM`, `YYYY-MM-DD`, or unset. Unknown components are never invented. Obscurity is unset, Low, Medium or High; its definitions are available beside the form. Changing it leaves screenshot difficulty and review intact while automatically changing derived tiers/points and eligibility.
 4. For a newly created match, choose Use this match for selected screenshots, then Back to screenshots. Review Target match and Save assignment. These are separate writes: creating/saving the match does not assign anything. The selection remains available after closing the clean inspector.
-5. Select the saved match in Matches to inspect its associated screenshots. Select one and choose another target to reassign, or Unassigned (remove association) to return it to the queue. Multi-assignment targets one existing match; bulk unassignment/review/rating/deletion is not offered.
+5. Select the saved match in Review Queue or Matches to inspect its associated screenshots. In Review Queue, open **Manage screenshot assignments** to change associations. Select one and choose another target to reassign, or Unassigned (remove association) to return it to the queue. Multi-assignment targets one existing match; bulk unassignment/review/rating/deletion is not offered.
 
 Incomplete matches can receive screenshots. Assignment does not rate or approve them. Source metadata and managed PNG files remain unchanged. Parent/screenshot revisions are checked together; multi-assignment commits all members or none. Material association or answer changes invalidate recorded approvals according to the approved rules; obscurity/notes changes do not.
 
@@ -20,8 +20,9 @@ A 409 conflict never overwrites or automatically retries against newer revisions
 
 ## HTTP scope
 
-All mutations use the existing JSON/body bounds, exact origin policy and `X-Name-That-Match: library` header described in README. The new routes are:
+All mutations use the existing JSON/body bounds, exact origin policy and `X-Name-That-Match: library` header described in README. Relevant routes include:
 
+- `GET /api/library/review-queue` returns group summaries, intake counts, and whole-library statistics.
 - `GET/POST /api/matches`: deterministic basic match list or create, including an explicit empty draft.
 - `PATCH /api/matches/:id`: expected revision, editable match changes, normalized no-op handling and atomic approval invalidation results.
 - `PATCH /api/screenshots/:id`: expected screenshot revision and `changes.matchId`, `changes.difficulty`, or `changes.notes`; target match revision is required for nonnull assignment. A separate review payload accepts `reviewStatus` and requires the current parent revision for approval.

@@ -126,13 +126,11 @@ export function createLibraryRepository(db: Database.Database) {
   }
 
   function saveScreenshot(current: StoredScreenshot, changes: ScreenshotChanges): StoredScreenshot {
-    const material = (changes.matchId !== undefined && changes.matchId !== current.matchId)
-      || (changes.difficulty !== undefined && changes.difficulty !== current.difficulty);
     const next = { ...current, ...changes };
     if (next.matchId === current.matchId && next.difficulty === current.difficulty && next.notes === current.notes) return current;
     db.prepare(`UPDATE screenshots SET match_id=?, difficulty=?, notes=?, review_status=?,
       updated_at=?, revision=revision+1 WHERE id=? AND revision=?`)
-      .run(next.matchId, next.difficulty, next.notes, material && current.reviewStatus === 'approved' ? 'pending' : current.reviewStatus,
+      .run(next.matchId, next.difficulty, next.notes, next.matchId !== current.matchId && current.reviewStatus === 'approved' ? 'pending' : current.reviewStatus,
         new Date().toISOString(), current.id, current.revision);
     return getScreenshot(current.id);
   }

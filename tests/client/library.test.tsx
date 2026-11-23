@@ -103,9 +103,9 @@ it('traps focus, cancels with Escape semantics, aborts requests, and returns foc
   const signal = vi.mocked(libraryApi.recent).mock.calls[0][0]; view.unmount(); expect(signal.aborted).toBe(true); expect(trigger).toHaveFocus(); trigger.remove();
 });
 it('renders loading/empty/error queue states and refreshes after import navigation', async () => {
-  vi.spyOn(reviewApi, 'statistics').mockResolvedValue({ totalMatches: 0, totalScreenshots: 0, fullyClassifiedScreenshots: 0, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 0, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 0, competitive: 0, deathmatch: 0 }, asOf: '' });
-  render(<MatchLibraryPage />); expect(screen.getByText('Loading screenshots…')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
+  vi.spyOn(reviewApi, 'queue').mockResolvedValue({ groups: [], intake: { screenshotCount: 0, pendingCount: 0 }, statistics: { totalMatches: 0, totalScreenshots: 0, fullyClassifiedScreenshots: 0, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 0, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 0, competitive: 0, deathmatch: 0 }, asOf: '' } });
+  render(<MatchLibraryPage />); expect(screen.getByText('Loading review queue…')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ }));
   await screen.findByText(/No unassigned screenshots\. Assigned screenshots are available in Matches/);
   vi.mocked(libraryApi.unassigned).mockRejectedValueOnce(new Error('offline'));
   fireEvent.click(screen.getByRole('button', { name: 'Reload screenshots' })); expect(await screen.findByRole('alert')).toHaveTextContent(/local server/);
@@ -116,10 +116,11 @@ it('renders loading/empty/error queue states and refreshes after import navigati
   await waitFor(() => expect(libraryApi.unassigned).toHaveBeenCalledTimes(3)); expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 it('keeps screenshot geometry, provenance, and unavailable-image feedback in the basic queue', async () => {
+  vi.spyOn(reviewApi, 'queue').mockResolvedValue({ groups: [], intake: { screenshotCount: 1, pendingCount: 1 }, statistics: { totalMatches: 0, totalScreenshots: 0, fullyClassifiedScreenshots: 0, awaitingClassificationScreenshots: 0, classifiedByTier: { squash: 0, competitive: 0, deathmatch: 0 }, eligibleByTier: { squash: 0, competitive: 0, deathmatch: 0 }, asOf: '' } });
   const record = { id: 'saved', provenance: { captureId: 'sample', source: { videoId: 'abcdefghijk' }, capture: { playbackSeconds: 42, capturedAt: '2026-11-06' } },
     image: { width: 476, height: 360, url: '/api/screenshots/saved/image' }, difficulty: null, reviewStatus: 'pending', assetStatus: 'available' } as ScreenshotSummary;
   vi.mocked(libraryApi.unassigned).mockResolvedValue({ screenshots: [record], matchedCount: 1, asOf: '' }); render(<MatchLibraryPage />);
-  fireEvent.click(screen.getByRole('button', { name: 'Unassigned screenshots' }));
+  fireEvent.click(screen.getByRole('button', { name: /Unassigned Intake/ }));
   const image = await screen.findByRole('img'); expect(image).toHaveAttribute('width', '476'); expect(image).toHaveAttribute('height', '360');
   expect(screen.getByText('Unassigned · unrated · pending')).toBeInTheDocument(); fireEvent.error(image); expect(screen.getByText(/Image unavailable/)).toBeInTheDocument();
 });

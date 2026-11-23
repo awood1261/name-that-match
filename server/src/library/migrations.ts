@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3';
 import { addGameSchema, extendGuessingWindow, addStoppedTiming } from '../game/migrations.js';
 
 // Historical name: this is the global schema sequence, including game storage.
-export const LIBRARY_SCHEMA_VERSION = 5;
+export const LIBRARY_SCHEMA_VERSION = 6;
 
 export class LibraryMigrationError extends Error {
   constructor(message: string) {
@@ -129,6 +129,18 @@ function upgradeClassifications(db: Database.Database): void {
   for (const index of indexes) db.exec(index.sql);
 }
 
+function allowApprovedUnratedScreenshots(db: Database.Database): void {
+  const { sql } = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='screenshots'").get() as { sql: string };
+  const oldCheck = "CHECK (review_status != 'approved' OR (match_id IS NOT NULL AND difficulty IS NOT NULL))";
+  if (!sql.includes(oldCheck)) throw new LibraryMigrationError('Unexpected screenshot approval constraint.');
+  const indexes = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='screenshots' AND sql IS NOT NULL").all() as Array<{ sql: string }>;
+  db.exec(sql.replace(/^CREATE TABLE "?screenshots"?/, 'CREATE TABLE screenshots_next')
+    .replace(oldCheck, "CHECK (review_status != 'approved' OR match_id IS NOT NULL)"));
+  db.exec('INSERT INTO screenshots_next SELECT * FROM screenshots');
+  db.exec('DROP TABLE screenshots; ALTER TABLE screenshots_next RENAME TO screenshots');
+  for (const index of indexes) db.exec(index.sql);
+}
+
 export function applyLibraryMigrations(db: Database.Database): void {
   const version = db.pragma('user_version', { simple: true }) as number;
   if (version > LIBRARY_SCHEMA_VERSION || version < 0) {
@@ -148,6 +160,7 @@ export function applyLibraryMigrations(db: Database.Database): void {
       if (version < 3) addGameSchema(db);
       if (version < 4) extendGuessingWindow(db);
       if (version < 5) addStoppedTiming(db);
+      if (version < 6) allowApprovedUnratedScreenshots(db);
       if ((db.pragma('foreign_key_check') as unknown[]).length) throw new LibraryMigrationError('Foreign key verification failed; migration rolled back.');
       db.pragma(`user_version = ${LIBRARY_SCHEMA_VERSION}`);
     }).immediate();

@@ -141,12 +141,13 @@ describe('library persistence and transactions', () => {
     expect(repo.getScreenshot(note.id).reviewStatus).toBe('pending');
   });
 
-  it.each(['difficulty', 'unrate', 'reassign', 'unassign'] as const)('resets approval when a screenshot material edit is %s', (action) => {
+  it.each(['difficulty', 'unrate', 'reassign', 'unassign'] as const)('applies the approval policy when a screenshot edit is %s', (action) => {
     const match = identified(); const target = identified(); const approved = reviewed(match.id);
     const changes = action === 'difficulty' ? { difficulty: 'hard' }
       : action === 'unrate' ? { difficulty: null } : { matchId: action === 'reassign' ? target.id : null };
     const changed = repo.updateScreenshot(approved.id, approved.revision, changes, 1);
-    expect(changed.reviewStatus).toBe('pending'); expect(changed.revision).toBe(approved.revision + 1);
+    expect(changed.reviewStatus).toBe('matchId' in changes ? 'pending' : 'approved');
+    expect(changed.revision).toBe(approved.revision + 1);
     expect(changed.provenance).toEqual(approved.provenance); expect(changed.originalMetadataJson).toBe(approved.originalMetadataJson);
   });
 

@@ -8,8 +8,9 @@ import { createLibraryRepository } from '../../server/src/library/repository';
 import { validatePng } from '../../server/src/library/imports/png';
 import { DEFAULT_IMPORT_LIMITS } from '../../server/src/library/imports/limits';
 import { getImportEngine } from '../../server/src/library/imports/engine';
-import { statistics, matchList } from '../../server/src/library/catalog';
+import { statistics, matchList, reviewQueue } from '../../server/src/library/catalog';
 import { eligiblePool } from '../../shared/src/classification';
+import { GameLibrary } from '../../server/src/game/library';
 import type { ScreenshotSummary } from '../../shared/src/imports';
 import { createTestResources, listen } from '../helpers/resources';
 import { capture, png } from '../imports/fixtures';
@@ -59,12 +60,30 @@ describe('classification, review and library observations', () => {
     const notes = await edit({ notes: 'note' }); expect(notes.data.reviewStatus).toBe('approved');
     expect((await edit({ notes: 'again' })).status).toBe(409); record = notes.data;
     expect((await edit({ notes: 'note' })).data.revision).toBe(record.revision);
-    const changed = await edit({ difficulty: 'medium' }); expect(changed.data.reviewStatus).toBe('pending'); expect(changed.data.classification.tier).toBe('squash');
-    record = changed.data; expect((await review(record, 'rejected')).data.reviewStatus).toBe('rejected'); record = await readImage(image.id);
+    const game = new GameLibrary(storage);
+    const changed = await edit({ difficulty: 'hard' });
+    expect(changed.data).toMatchObject({ reviewStatus: 'approved', classification: { tier: 'competitive', points: 2 }, eligibility: { eligible: true } });
+    record = changed.data;
+    expect(game.availability(null).tiers.competitive.screenshots).toBe(1);
+    expect((await request('/api/library/statistics')).data.eligibleByTier.competitive).toBe(1);
+    record = (await edit({ difficulty: null })).data;
+    expect(record).toMatchObject({ reviewStatus: 'approved', classification: { tier: null, points: null }, eligibility: { eligible: false, reasons: ['unrated'] } });
+    expect((await review(record, 'approved')).status).toBe(422);
+    expect(game.availability(null).distinctMatches).toBe(0);
+    expect((await request('/api/library/statistics')).data.eligibleByTier.competitive).toBe(0);
+    record = (await edit({ difficulty: 'medium' })).data;
+    expect(record).toMatchObject({ reviewStatus: 'approved', classification: { tier: 'squash', points: 1 }, eligibility: { eligible: true } });
+    expect(game.availability(null).tiers.squash.screenshots).toBe(1);
+    expect((await request('/api/library/statistics')).data.eligibleByTier.squash).toBe(1);
+    expect((await review(record, 'rejected')).data.reviewStatus).toBe('rejected'); record = await readImage(image.id);
+    record = (await edit({ difficulty: null })).data;
+    expect(record.reviewStatus).toBe('rejected');
+    record = (await edit({ difficulty: 'easy' })).data;
+    expect(record.reviewStatus).toBe('rejected');
     expect((await review(record, 'pending')).data.reviewStatus).toBe('pending'); record = await readImage(image.id);
     for (const difficulty of [null, 'squash', 'invalid']) {
       const result = await edit({ difficulty }); expect(result.status).toBe(difficulty === null ? 200 : 422);
-      if (difficulty === null) { record = result.data; expect((await review(record, 'approved')).status).toBe(422); }
+      if (difficulty === null) { record = result.data; expect(record.reviewStatus).toBe('pending'); expect((await review(record, 'approved')).status).toBe(422); }
     }
     expect((await edit({ tier: 'deathmatch' })).status).toBe(400);
     expect((await request(`/api/screenshots/${image.id}`, { expectedRevision: record.revision, expectedMatchRevision: parent.revision, changes: {}, reviewStatus: 'approved' })).status).toBe(400);
@@ -89,9 +108,15 @@ describe('classification, review and library observations', () => {
     const second = fixture().image; repo.updateScreenshot(second.id, second.revision, { matchId: match.id, difficulty: 'hard' }, match.revision);
     expect((await request('/api/matches?difficulty=hard&review=approved')).data.matches).toHaveLength(0);
     const found = (await request('/api/matches?q=CAFE%CC%81%20100%25_&difficulty=easy&review=approved&tier=squash')).data;
-    expect(found.matches).toHaveLength(1); expect(found.matches[0]).toMatchObject({ screenshotCount: 2, matchingScreenshotCount: 1, approvedCount: 1, eligibleCount: 1 });
+    expect(found.matches).toHaveLength(1);
+    expect(found.matches[0]).toMatchObject({ screenshotCount: 2, matchingScreenshotCount: 1, approvedCount: 1, eligibleCount: 1, pendingCount: 1, assetIssueCount: 0 });
     const subset = (await request(`/api/screenshots?matchId=${match.id}&difficulty=easy&review=approved&tier=squash`)).data;
     expect(found.matches[0].matchingScreenshotCount).toBe(subset.matchedCount);
+    const file = path.join(storage.rootDir, image.imagePath);
+    fs.unlinkSync(file);
+    const withMissingAsset = (await request('/api/matches?review=pending')).data.matches.find((row: { id: string }) => row.id === match.id);
+    expect(withMissingAsset).toMatchObject({ screenshotCount: 2, matchingScreenshotCount: 1, approvedCount: 1, eligibleCount: 0, pendingCount: 1, assetIssueCount: 1 });
+    fs.writeFileSync(file, png);
     expect((await request('/api/matches')).data.matches.find((row: { id: string }) => row.id === match.id)).toMatchObject({ screenshotCount: 2, matchingScreenshotCount: 2 });
     expect((await request('/api/matches?q=absent')).data.matches).toHaveLength(0);
     expect((await request('/api/library/statistics')).data.totalMatches).toBe(2);
@@ -113,5 +138,30 @@ describe('classification, review and library observations', () => {
     const result = matchList(storage, new URLSearchParams('classificationIncomplete=true'));
     expect(result.matchedCount).toBe(300); expect(read).toHaveBeenCalledTimes(301);
     expect(statistics(storage).totalMatches).toBe(301);
+  });
+  it('returns queue counts and representative thumbnails without collections, and rejects cancelled or inconsistent scans', async () => {
+    const { repo, match, image } = fixture();
+    const other = fixture();
+    repo.updateScreenshot(other.image.id, other.image.revision, { matchId: null });
+    await review(await readImage(image.id), 'approved');
+    const response = await request('/api/library/review-queue');
+    expect(response.status).toBe(200);
+    expect(response.data.groups.find((group: { id: string }) => group.id === match.id)).toMatchObject({ pendingCount: 0, eligibleCount: 1, thumbnailUrl: `/api/screenshots/${image.id}/image` });
+    expect(response.data.intake).toEqual({ screenshotCount: 1, pendingCount: 1 });
+    expect(response.data.statistics).toMatchObject({ totalScreenshots: 2, eligibleByTier: { squash: 1 } });
+    expect(JSON.stringify(response.data)).not.toContain('provenance');
+    expect((await request(`/api/screenshots?matchId=${match.id}`)).data.screenshots).toHaveLength(1);
+    expect((await request('/api/library/review-queue?unexpected=true')).status).toBe(400);
+
+    const files = getImportEngine(storage).files;
+    const read = vi.spyOn(files, 'read');
+    await reviewQueue(storage, () => false);
+    expect(read).toHaveBeenCalledTimes(2);
+    await expect(reviewQueue(storage, () => true)).rejects.toMatchObject({ code: 'STORAGE_UNAVAILABLE' });
+    const pending = reviewQueue(storage, () => false);
+    repo.updateMatch(match.id, match.revision, { notes: 'Changed during the scan' });
+    await expect(pending).rejects.toMatchObject({ code: 'LIBRARY_CHANGED' });
+    read.mockImplementation(() => { throw Object.assign(new Error('storage unavailable'), { code: 'EIO' }); });
+    await expect(reviewQueue(storage, () => false)).rejects.toMatchObject({ code: 'STORAGE_UNAVAILABLE' });
   });
 });

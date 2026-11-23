@@ -67,3 +67,5 @@ Technical references: [SQLite backup safety](https://sqlite.org/howtocorrupt.htm
 - `data/` is excluded from Git via the repository ignore rules.
 
 Schema 5 adds nullable `game_rounds.stopped_remaining_ms`, bounded to 0–30,000ms for judgments and immutable after judgment. New correct/incorrect decisions save the authoritative remainder; timeout decisions save zero. Existing historical judgments remain NULL (unknown), without fabricated countdowns or changed awards/receipts. The migration is transactional and does not rewrite captures or images. Older binaries cannot open schema 5; retain the complete stopped-root backup and compatible code for rollback.
+
+Schema 6 allows an approved screenshot to have an unset visual difficulty. The transactional table rebuild keeps screenshot IDs, associations, revisions, review states, provenance, managed paths, indexes, and import receipt and saved round links. It verifies foreign keys before committing the new version and leaves the PNG files untouched. Follow the whole-root procedure above before upgrading. For rollback, restore the verified pre-upgrade root to a separate location and use compatible code.

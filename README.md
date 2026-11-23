@@ -32,7 +32,7 @@ This starts:
 
 ## Production startup
 
-Before starting this version against existing data, follow the [stopped-writer whole-root backup procedure](docs/local-storage.md#backup-and-restore). Startup upgrades supported stores through schema 5: the existing schema-1→2 classification mapping is unchanged, and schema 3 adds game persistence, and schema 4 widens round timing constraints for 30-second guesses without altering existing saved remainders or history. Schema 5 adds nullable saved judgment-time remainders for held screenshot displays; historical judgments keep unknown stopped time. See [classification mapping](docs/classification.md#migration) and [Game Experience Milestone 1, verification and rollback](docs/game-foundation.md). Game Experience Milestone 3 adds a separate contestant tab, countdown and live host controls; explicit round progression is available; confirmed End/New Game controls preserve final results and create independent fresh setups. See [host operation and manual acceptance](docs/game-host.md).
+Before starting this version against existing data, follow the [stopped-writer whole-root backup procedure](docs/local-storage.md#backup-and-restore). Startup upgrades supported stores through schema 6. The existing schema-1→2 classification mapping is unchanged, and schema 3 adds game persistence, and schema 4 widens round timing constraints for 30-second guesses without altering existing saved remainders or history. Schema 5 adds saved judgment-time remainders for held screenshot displays. Schema 6 allows an approved screenshot to be unrated and preserves ratings, approvals, and saved game and import references during migration. See [classification mapping](docs/classification.md#migration) and [Game Experience Milestone 1, verification and rollback](docs/game-foundation.md). Game Experience Milestone 3 adds a separate contestant tab, countdown and live host controls; explicit round progression is available; confirmed End/New Game controls preserve final results and create independent fresh setups. See [host operation and manual acceptance](docs/game-host.md).
 
 Build the client and server first:
 
@@ -75,7 +75,7 @@ Replace the example IP with the laptop's actual address. `NAME_THAT_MATCH_UI_ORI
 
 ## Capture import
 
-Open **Image Library → Import captures**. Choose a folder or multiple PNG/JSON pairs on the current browser device. Review validation, ignored files and duplicate decisions, then explicitly confirm. New screenshots are unassigned, unrated and pending; use **View unassigned screenshots** to inspect the imported copies. Open **Review screenshot** to assign Easy/Medium/Hard visual difficulty, save, then explicitly approve when all prerequisites are met.
+Open **Image Library → Import captures**. Choose a folder or multiple PNG/JSON pairs on the current browser device. Review validation, ignored files and duplicate decisions, then explicitly confirm. New screenshots are unassigned, unrated and pending; use **View unassigned screenshots** to open **Review Queue → Unassigned Intake**. Assign the capture to a match, choose and save a visual difficulty, then explicitly approve when all prerequisites are met.
 
 Closing the dialog keeps durable server progress. Reopen **Recent imports** to resume; interrupted uploads can re-select missing files, while changed metadata requires a new selection/batch. Original captures are preserved. See [limits, recovery and staging maintenance](docs/import-engine.md). Run only one server process per data root.
 
@@ -94,9 +94,9 @@ The contestant connection panel also provides a locally generated QR code for a 
 ## Match management
 
 
-Image Library opens in **Matches**. Use **Unassigned screenshots** to select up to 256 captures and choose an existing target match. **Create match for selection** keeps those screenshots selected while you save a new match; **Use this match for selected screenshots**, **Back to screenshots**, and **Save assignment** finish the explicit association. Saving a match never assigns screenshots automatically.
+Image Library opens in **Review Queue**, with **Unassigned Intake** first, pending match groups next, and completed groups available through **Show Completed**. Use **Unassigned Intake** to select up to 256 captures and choose an existing target match. **Create match for selection** keeps those screenshots selected while you save a new match; **Use this match for selected screenshots**, **Back to screenshots**, and **Save assignment** finish the explicit association. Saving a match never assigns screenshots automatically.
 
-Incomplete match drafts and year/year-month/full dates are supported. Match obscurity (Low/Medium/High) and visual difficulty (Easy/Medium/Hard) are independent nullable inputs; together they derive read-only game tiers and points. The library shows global progress, eligible-tier counts, search and filters. Match details and assignment have separate saves; unsaved navigation offers Save, Discard or Stay. Stale revisions retain the draft and selection for deliberate comparison with current records. See [match management and manual verification](docs/match-management.md) and [classification, eligibility and migration](docs/classification.md).
+Incomplete match drafts and year/year-month/full dates are supported. Match obscurity (Low/Medium/High) and visual difficulty (Easy/Medium/Hard) are independent nullable inputs; together they derive read-only game tiers and points. Use **Matches** for the searchable, sortable table and **Overview** for whole-library progress and eligible-tier counts. Match details and assignment have separate saves; unsaved navigation offers Save, Discard or Stay. Stale revisions retain the draft and selection for deliberate comparison with current records. See [match management and manual verification](docs/match-management.md) and [classification, eligibility and migration](docs/classification.md).
 
 ## Local storage
 

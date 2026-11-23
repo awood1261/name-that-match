@@ -35,7 +35,7 @@ For device acceptance, use a configured LAN origin on your phone (see the LAN gu
 
 An empty selected tier disables Prepare with an explanation. If content changes after the counts were assessed, the server returns an explicit empty-pool/stale-candidate error; refresh or review the library and deliberately prepare again. There is no automatic fallback tier or grouping by video. Pending/rejected, incomplete, unassigned, unrated or invalid/missing images are excluded. Uncertain storage produces an error, not invented zero counts.
 
-Image Library shows both **classified** and **eligible** totals for each tier. A classified Hard screenshot can still be pending review and unavailable to Play. Open its match, select **Review screenshot** and explicitly approve it after checking its saved metadata and image. Play additionally excludes matches or identical image content already exposed in the current game, so its remaining availability can be lower than whole-library eligibility. The Unassigned screenshots view is a queue; zero entries does not mean the library is empty. Assigned captures are under Matches.
+Image Library **Overview** shows both classified and eligible totals for each tier. Use **Review Queue** to approve a screenshot after checking its saved metadata, classification, and image. Play additionally excludes matches or identical image content already exposed in the current game, so its remaining availability can be lower than whole-library eligibility.
 
 ## Connect a contestant and run an attempt
 
