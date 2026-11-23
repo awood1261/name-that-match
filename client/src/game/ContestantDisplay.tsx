@@ -36,15 +36,9 @@ export function ContestantDisplay({ sessionId }: { sessionId: string }) {
   const covered = display.stale && !untimedScene;
   const previous = useRef<{ roundId: string | null; phase: string | undefined }>({ roundId: null, phase: undefined });
   const [animateResult, setAnimateResult] = useState(false);
-  const [selectionIntro, setSelectionIntro] = useState(false);
   const roundId = snapshot && 'roundId' in snapshot ? snapshot.roundId : null;
   useEffect(() => {
     const entrance = !display.stale && phase === 'answer_revealed' && previous.current.roundId === roundId && previous.current.phase !== undefined && previous.current.phase !== 'answer_revealed';
-    const selecting = phase === 'preparing' || phase === 'ready';
-    if (covered || !selecting) setSelectionIntro(false);
-    else if (previous.current.roundId !== roundId || !['preparing', 'ready'].includes(previous.current.phase ?? '')) {
-      setSelectionIntro(previous.current.phase === 'setup' || previous.current.phase === 'between_rounds');
-    }
     previous.current = { roundId, phase: covered ? undefined : phase };
     setAnimateResult(entrance);
     if (!entrance) return;
@@ -56,8 +50,20 @@ export function ContestantDisplay({ sessionId }: { sessionId: string }) {
   const labels = { setup: 'Waiting for the host', between_rounds: 'Choose your challenge', discarded: 'Setup closed', completed: 'Game complete', preparing: 'Preparing your challenge', ready: 'Ready · waiting for reveal', guessing: 'Name that match!', paused: 'Paused', awaiting_judgment: 'Time up', interrupted: 'Round interrupted', adjudicated: 'Waiting for the host', answer_revealed: 'Result revealed' };
   const label = !credential ? 'Display link required' : display.stale ? display.error ? 'Display unavailable' : 'Connecting display' : (phase ? labels[phase] : 'Waiting for session');
   const visible = !display.stale && phase === 'guessing' && !!display.imageUrl;
-  const visual = !covered && credential && snapshot && (!display.error || untimedScene || snapshot.phase === 'answer_revealed') ? snapshot.phase === 'setup' || snapshot.phase === 'between_rounds' ? <ChooseMatch />
-    : snapshot.phase === 'preparing' || snapshot.phase === 'ready' ? <SelectingMatch key={snapshot.roundId} intro={selectionIntro} />
+  const showVisual = !covered && !!credential && !!snapshot && (!display.error || untimedScene || phase === 'answer_revealed');
+  const liveChoice = showVisual && !display.recovering && (phase === 'setup' || phase === 'between_rounds');
+  const selectionRoundId = showVisual && (phase === 'preparing' || phase === 'ready') ? roundId : null;
+  const [selection, setSelection] = useState<{ liveChoice: boolean; roundId: string | null; intro: boolean }>({ liveChoice: false, roundId: null, intro: false });
+  // Adjust before painting the new scene, so a live intro has no settled-card flash on entry.
+  if (liveChoice !== selection.liveChoice || selectionRoundId !== selection.roundId || (display.recovering && selection.intro)) {
+    setSelection({
+      liveChoice,
+      roundId: selectionRoundId,
+      intro: !!selectionRoundId && !display.recovering && selection.liveChoice,
+    });
+  }
+  const visual = showVisual && snapshot ? snapshot.phase === 'setup' || snapshot.phase === 'between_rounds' ? <ChooseMatch />
+    : snapshot.phase === 'preparing' || snapshot.phase === 'ready' ? <SelectingMatch key={snapshot.roundId} tier={snapshot.requestedTier} intro={selection.intro} />
     : ['guessing', 'awaiting_judgment', 'adjudicated'].includes(snapshot.phase) && 'turnOrdinal' in snapshot && snapshot.turnOrdinal !== null && 'remainingMs' in snapshot && display.imageUrl ? <ScreenshotRound imageUrl={display.imageUrl} turnOrdinal={snapshot.turnOrdinal} tier={snapshot.requestedTier} remaining={snapshot.remainingMs === null ? null : display.remaining} running={snapshot.phase === 'guessing'} onImageError={display.retry} /> : snapshot.phase === 'answer_revealed' ? <ResultPresentation result={snapshot} animate={animateResult} imageUrl={display.imageUrl} onImageError={display.retry} /> : null : null;
   const matchResult = !!visual && snapshot?.phase === 'answer_revealed' && snapshot.outcome !== 'void' ? snapshot : null;
   useEffect(() => { setDetailsOpen(false); }, [matchResult?.roundId]);

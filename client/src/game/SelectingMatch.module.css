@@ -1,15 +1,96 @@
-.selecting { display: grid; grid-template-rows: 156px 136px minmax(0, 1fr) 260px; gap: var(--game-scene-gap); }
-.carousel { position: relative; min-height: 0; overflow: hidden; }
-.card { --card-x: 0px; --card-size: 1; --card-angle: 0deg; --card-opacity: 1; position: absolute; left: calc(50% - 250px); top: 24px; width: 500px; height: calc(100% - 48px); border: 10px solid var(--game-scene-purple); border-radius: 28px; background: var(--game-scene-black); transform: translateX(var(--card-x)) scale(var(--card-size)) rotate(var(--card-angle)); opacity: var(--card-opacity); }
-.card img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 16px; }
-.card:nth-child(1) { --card-x: -760px; --card-size: 0.65; --card-angle: 6deg; --card-opacity: 0.35; filter: blur(2px); }
-.card:nth-child(2) { --card-x: -560px; --card-size: 0.75; --card-angle: 7deg; --card-opacity: 0.55; }
-.card:nth-child(3) { --card-x: -310px; --card-size: 0.87; --card-angle: 5deg; --card-opacity: 0.8; }
-.card:nth-child(5) { --card-x: 310px; --card-size: 0.87; --card-angle: -5deg; --card-opacity: 0.8; }
-.card:nth-child(6) { --card-x: 560px; --card-size: 0.75; --card-angle: -7deg; --card-opacity: 0.55; }
-.card:nth-child(7) { --card-x: 760px; --card-size: 0.65; --card-angle: -6deg; --card-opacity: 0.35; filter: blur(2px); }
-.card[data-center='true'] { border-color: var(--game-scene-yellow); z-index: 1; }
-.card[data-center='true']::after { content: ''; position: absolute; inset: -10px; border: 10px solid var(--game-scene-yellow); border-radius: inherit; box-shadow: 0 0 24px color-mix(in srgb, var(--game-scene-yellow) 65%, transparent); pointer-events: none; }
+.selecting {
+  display: grid;
+  grid-template-rows: 156px 136px minmax(0, 1fr) 260px;
+  gap: var(--game-scene-gap);
+  background:
+    radial-gradient(ellipse at top left, color-mix(in srgb, var(--game-scene-purple) 28%, transparent), transparent 28%),
+    radial-gradient(ellipse at top right, color-mix(in srgb, var(--game-scene-purple) 28%, transparent), transparent 28%),
+    radial-gradient(ellipse at bottom, color-mix(in srgb, var(--game-scene-purple) 17%, transparent), transparent 38%),
+    var(--game-scene-black);
+}
+.selecting > img { mix-blend-mode: screen; }
+.carousel {
+  --tier-color: var(--game-scene-green);
+  --card-step: 330px;
+  position: relative;
+  isolation: isolate;
+  min-height: 0;
+  overflow: hidden;
+}
+.selecting[data-selected-tier='competitive'] .carousel { --tier-color: var(--game-scene-yellow); }
+.selecting[data-selected-tier='deathmatch'] .carousel { --tier-color: var(--game-scene-red); }
+.carousel::before {
+  content: '';
+  position: absolute;
+  inset: 0 21%;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--tier-color) 65%, transparent), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+.reel { position: absolute; inset: 0; }
+.card {
+  --card-x: 0px;
+  --card-scale: 1;
+  --card-angle: 0deg;
+  --card-opacity: 1;
+  --card-color: var(--game-scene-purple);
+  --art-color: var(--game-scene-green);
+  --edge-blur: 0px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  place-items: center;
+  width: 490px;
+  height: min(80%, 390px);
+  padding: 12px 24px 18px;
+  border: 10px solid var(--card-color);
+  border-radius: 36px;
+  background: var(--game-scene-black);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--card-color) 55%, transparent);
+  transform: translate(-50%, -50%) translateX(var(--card-x)) scale(var(--card-scale)) rotate(var(--card-angle));
+  opacity: var(--card-opacity);
+  filter: blur(calc(var(--edge-blur) + var(--motion-blur, 0px)));
+}
+.card img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.label { margin: 0; font: italic var(--font-contestant-label-weight) 80px/1 var(--font-contestant-label); }
+.card[data-offset='-3'] { --card-x: calc(var(--card-step) * -2.4); --card-opacity: 0.35; }
+.card[data-offset='-2'] { --card-x: calc(var(--card-step) * -1.8); --card-opacity: 0.52; }
+.card[data-offset='-1'] { --card-x: calc(var(--card-step) * -1); --card-angle: 7deg; }
+.card[data-offset='1'] { --card-x: var(--card-step); --card-angle: -7deg; }
+.card[data-offset='2'] { --card-x: calc(var(--card-step) * 1.8); --card-opacity: 0.52; }
+.card[data-offset='3'] { --card-x: calc(var(--card-step) * 2.4); --card-opacity: 0.35; }
+.card[data-tier='competitive'] { --art-color: var(--game-scene-yellow); }
+.card[data-tier='deathmatch'] { --art-color: var(--game-scene-red); }
+.card:is([data-offset='-1'], [data-offset='1']), .leadIn {
+  --card-scale: 0.83;
+  --card-color: var(--art-color);
+  z-index: 1;
+}
+.leadIn { --card-x: calc(var(--card-step) * (var(--lead-in-slot) + 0.9)); }
+.card:is([data-offset='-3'], [data-offset='-2'], [data-offset='2'], [data-offset='3']) {
+  --card-scale: 0.65;
+  --edge-blur: 3px;
+}
+.card[data-offset='0'] { z-index: 2; }
+.card[data-center='true'] { --card-scale: 1.04; --card-color: color-mix(in srgb, var(--game-scene-white) 85%, var(--game-scene-purple)); }
+.selecting:is([data-selection-phase='impact'], [data-selection-phase='complete']) .card[data-center='true'] {
+  --card-color: var(--tier-color);
+}
+.selecting:is([data-selection-phase='impact'], [data-selection-phase='complete']) .card[data-center='true'] .label {
+  color: var(--tier-color);
+}
+.selecting[data-selection-phase='complete'] .card[data-center='false'] { opacity: 0; }
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--tier-color) 56%, transparent);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
 .processing { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: stretch; padding: 0 70px; }
 .scan { display: flex; flex-direction: column; justify-content: center; gap: 30px; padding: 24px 36px; border: 8px solid var(--game-scene-purple); border-radius: 30px; }
 .scanHeading { display: flex; align-items: center; justify-content: center; gap: 30px; font: italic var(--font-contestant-label-weight) 56px/1 var(--font-contestant-label); }
@@ -24,28 +105,42 @@
 .stepIcon::after { content: ''; position: absolute; width: 20px; height: 12px; border-left: 6px solid #000; border-bottom: 6px solid #000; transform: rotate(-45deg); left: 10px; top: 10px; }
 .checklist li:last-child .stepIcon { background: transparent; border: 6px dotted var(--game-scene-white); }
 .checklist li:last-child .stepIcon::after { content: none; }
-:global([data-layout='compact']) .selecting { grid-template-rows: 140px 110px minmax(0, 1fr) 550px; gap: 24px; }
-:global([data-layout='compact']) .processing { grid-template-columns: 1fr; grid-template-rows: 210px minmax(0, 1fr); gap: 24px; padding: 0 40px; }
+:global([data-layout='compact']) .selecting { grid-template-rows: 140px 110px minmax(0, 1fr) 520px; gap: 24px; }
+:global([data-layout='compact']) .carousel { --card-step: 330px; }
+:global([data-layout='compact']) .card:is([data-offset='-1'], [data-offset='1']) { --card-scale: 0.66; }
+:global([data-layout='compact']) .processing { grid-template-columns: 1fr; grid-template-rows: 200px minmax(0, 1fr); gap: 24px; padding: 0 40px; }
 :global([data-layout='compact']) .checklist { border: 0; padding-left: 36px; font-size: 48px; }
-:global([data-layout='compact']) .card:nth-child(1), :global([data-layout='compact']) .card:nth-child(2), :global([data-layout='compact']) .card:nth-child(6), :global([data-layout='compact']) .card:nth-child(7) { display: none; }
-:global([data-layout='compact']) .card:nth-child(3) { --card-x: -250px; }
-:global([data-layout='compact']) .card:nth-child(5) { --card-x: 250px; }
+:global([data-layout='compact']) .selecting:not([data-selection-phase='shuffling'], [data-selection-phase='decelerating'])
+  .card:is([data-offset='-3'], [data-offset='-2'], [data-offset='2'], [data-offset='3']) { display: none; }
+
 @media (prefers-reduced-motion: no-preference) {
-  .card[data-center='true']::after { animation: waitingEmphasis var(--game-scene-wait) ease-in-out infinite; }
-  .selecting[data-intro='true'] .card { animation: shuffle var(--game-scene-intro) ease-out both; }
-  .selecting[data-intro='true'] .card[data-center='true']::after { animation-delay: var(--game-scene-intro); }
-  .selecting[data-intro='true'] .fill { animation: scanIntro var(--game-scene-intro) ease-out both; }
-  .selecting[data-intro='true'] .checklist li { animation: activateStep 400ms ease-out both; }
-  .selecting[data-intro='true'] .checklist li:nth-child(2) { animation-delay: 600ms; }
-  .selecting[data-intro='true'] .checklist li:nth-child(3) { animation-delay: 1200ms; }
-  .selecting[data-intro='true'] .checklist li:nth-child(4) { animation-delay: 1800ms; }
+  .card { transition: filter var(--deceleration-duration) ease-out; }
+  .card[data-offset='0'] {
+    transition: transform var(--lock-duration) ease-out, border-color 120ms ease-out, filter var(--deceleration-duration) ease-out;
+  }
+  .selecting:is([data-selection-phase='shuffling'], [data-selection-phase='decelerating']) .reel {
+    --braking-offset: calc(var(--card-step) * 2.8);
+    animation: shuffle var(--shuffle-duration) linear both,
+      decelerate var(--deceleration-duration) cubic-bezier(0.3, 0.52, 0.5, 1) var(--shuffle-duration) forwards;
+  }
+  .selecting[data-selection-phase='shuffling'] .reel { --motion-blur: 8px; }
+  .selecting[data-selection-phase='shuffling'] .fill { animation: scanIntro var(--shuffle-duration) ease-out both; }
+  .selecting[data-selection-phase='impact'] .carousel::before { animation: spill var(--impact-duration) ease-out both; }
+  .selecting[data-selection-phase='impact'] .card[data-center='true'] { animation: borderPulse var(--impact-duration) ease-out both; }
+  .selecting[data-selection-phase='impact'] .card[data-center='true']::after { animation: cardFlash var(--impact-duration) ease-out both; }
+  .selecting[data-selection-phase='complete'] .card[data-center='false'] { transition: opacity 180ms ease-out; }
 }
 @keyframes shuffle {
-  0% { transform: translateX(calc(var(--card-x) + 180px)) scale(var(--card-size)) rotate(var(--card-angle)); opacity: 0; }
-  35% { transform: translateX(calc(var(--card-x) - 70px)) scale(var(--card-size)) rotate(var(--card-angle)); opacity: var(--card-opacity); }
-  70% { transform: translateX(calc(var(--card-x) + 28px)) scale(var(--card-size)) rotate(var(--card-angle)); }
-  100% { transform: translateX(var(--card-x)) scale(var(--card-size)) rotate(var(--card-angle)); }
+  from { transform: translateX(calc(var(--card-step) * 11)); }
+  to { transform: translateX(var(--braking-offset)); }
 }
-@keyframes waitingEmphasis { 0%, 100% { opacity: 1; } 50% { opacity: 0.82; } }
-@keyframes scanIntro { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-@keyframes activateStep { from { opacity: 0.25; } to { opacity: 1; } }
+@keyframes decelerate {
+  from { transform: translateX(var(--braking-offset)); }
+  to { transform: translateX(0); }
+}
+@keyframes borderPulse {
+  28% { box-shadow: 0 0 50px var(--tier-color), inset 0 0 22px color-mix(in srgb, var(--tier-color) 40%, transparent); }
+}
+@keyframes cardFlash { 22% { opacity: 0.32; } }
+@keyframes spill { 34% { opacity: 0.68; } }
+@keyframes scanIntro { from { transform: scaleX(0.28); } to { transform: scaleX(1); } }

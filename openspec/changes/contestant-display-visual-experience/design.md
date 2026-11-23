@@ -82,6 +82,9 @@ For the shuffle, reuse these non-identifying illustrations in abstract wrestling
 
 ### D4 — Decorative motion, bounds and privacy
 
+The `redesign-selecting-match-shuffle-animation` change supersedes D4’s original fixed yellow center, timeline and looping emphasis. CV-03 keeps the phase, pacing and theatrical scan requirements. The original design and verification below document the earlier implementation.
+
+
 Proposed intro budget: 2.4 seconds, independent of readiness. Seven bounded decorative cards in landscape (at most three in compact view), center yellow and static side perspective/depth. Use transform/opacity movement in short staggered passes, not per-frame React updates, animated blur or moving expensive box-shadows. The scan fill advances cosmetically over that intro. Checklist activation occurs at 0, 0.6, 1.2 and 1.8 seconds; final Selecting stays active. Limit each pass to an initial finite sequence; afterward retain continuous subtle center-card/selection-indicator opacity emphasis on a slow three-second cycle. The center frame glow remains static to avoid costly shadow animation; no restarting checklist or fake percentage. This sustained waiting activity is explicitly approved and never gates Reveal.
 
 The visual scan is not an ARIA progressbar and never displays measured percentages. Provide a non-intrusive accessible description such as “Match selection presentation; waiting for host reveal.” Hide repetitive decorative art/checklist from assistive output while retaining one semantic state heading. Documentation explains the theatrical checklist is not recognition/analysis; do not add fake promises to normal host status.

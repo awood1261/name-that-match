@@ -29,6 +29,8 @@ Keep `NAME_THAT_MATCH_DATA_DIR` consistent across starts; run one server per dat
 4. On the viewer, choose optional fullscreen through its own gesture. Wait for **Primary · Connected · Decoded and synchronized** on the host, then prepare/reveal as usual. Only the designated primary gates Reveal/Resume; an extra viewer remains secondary.
 5. After an IP change, explicitly refresh/apply the LAN address and reopen the updated URL on the device. Refreshing recomposes the same viewer capability; it does not move an already open page to a new IP or change primary designation. A server restart requires a fresh capability/link.
 
+Selecting Match settles on the committed tier in both tablet orientations. A viewer reconnect while preparing or ready restores that card without a new pulse. If readiness has already passed, **Reveal & start** can interrupt the shuffle. Tablet reduced-motion preferences show the settled card immediately.
+
 The current process retains its existing four-viewer-registration limit. Open/reconnect/QR refresh do not allocate another registration. Close unused windows; at most five sockets, including connections awaiting HELLO, are admitted. A full set can temporarily refuse an additional/replacement connection until a slot closes. Reusing the same display link replaces its earlier connection; the earlier page stops reconnecting until deliberately rejoined.
 
 ## Synchronization and failure behavior

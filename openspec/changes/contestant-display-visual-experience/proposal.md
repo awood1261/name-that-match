@@ -61,3 +61,7 @@ The owner requested the same treatment on incorrect and time-expired screens. Ex
 ## Owner-requested compact contestant controls — 2026-11-23
 
 Use the existing compact fullscreen and safe-area guide icons at the top right throughout the contestant view, including connection and recovery screens, all round phases, and final results. Keep the controls outside the scaled stage, with their existing accessibility and local fullscreen and guide behavior.
+
+## Owner-approved Selecting Match shuffle refinement
+
+The `redesign-selecting-match-shuffle-animation` change supersedes the original fixed yellow center and continuous waiting pulse. The owner-approved tier mapping and existing Reveal gates still apply.

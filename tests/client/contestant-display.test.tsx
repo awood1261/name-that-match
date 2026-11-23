@@ -21,7 +21,7 @@ let createUrl: ReturnType<typeof vi.fn>; let revokeUrl: ReturnType<typeof vi.fn>
 function observation(): DisplayObservation {
   return { protocolVersion: 1, serverEpoch: credential.serverEpoch, sequence: ++sequence, connectionSequence: 1,
     snapshot: phase, sample: { nonce: randomUUID(), serverMonoMs: performance.now() },
-    asset: ['ready', 'guessing', 'paused', 'awaiting_judgment', 'adjudicated', 'answer_revealed'].includes(phase.phase) ? { roundId, imageKey: roundId } : null };
+    asset: 'roundId' in phase && ['ready', 'guessing', 'paused', 'awaiting_judgment', 'adjudicated', 'answer_revealed'].includes(phase.phase) ? { roundId: phase.roundId, imageKey: phase.roundId } : null };
 }
 beforeEach(() => {
   mockGameLive();
@@ -186,6 +186,62 @@ describe('isolated contestant stage and image lifecycle', () => {
     await screen.findByRole('heading', { name: 'CHOOSE YOUR MATCH' });
     expect(screen.queryByAltText('Current wrestling match clue')).not.toBeInTheDocument();
     expect(gameApi.command).not.toHaveBeenCalled();
+  });
+  it('holds through slow preparation, settles a reconnect, and lets Reveal interrupt impact in a new round', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let callbacks!: LiveCallbacks;
+    const ready = vi.fn();
+    vi.mocked(openGameLive).mockImplementation((_join, value) => { callbacks = value; return { ready, close: vi.fn() }; });
+    const view = render(<ContestantDisplay sessionId={sessionId} />);
+    let version = base.stateVersion;
+    const send = async (snapshot: DisplaySnapshot) => {
+      phase = { ...snapshot, stateVersion: ++version };
+      const sample = observation();
+      await act(async () => callbacks.snapshot({
+        type: 'snapshot', role: 'display', protocolVersion: 1, serverEpoch: credential.serverEpoch,
+        connectionSequence: 1, sequence: sample.sequence, sessionId, stateVersion: version,
+        serverMonoMs: performance.now(), state: { snapshot: phase, asset: sample.asset },
+      }, { synchronized: true, serverNow: performance.now() }));
+    };
+    const between = { ...base, phase: 'between_rounds' } as const;
+    const easy = { ...round, requestedTier: 'squash' } as const;
+    const selection = () => screen.getByRole('region', { name: 'SELECTING MATCH...' });
+    await send(between);
+    await send({ ...easy, phase: 'preparing' });
+    act(() => vi.advanceTimersByTime(950));
+    expect(selection()).toHaveAttribute('data-selection-phase', 'decelerating');
+    await send({ ...easy, phase: 'preparing' });
+    expect(selection()).toHaveAttribute('data-selection-phase', 'decelerating');
+    act(() => vi.advanceTimersByTime(1150));
+    expect(selection()).toHaveAttribute('data-selection-phase', 'complete');
+    expect(selection().querySelector('[data-center="true"]')).toHaveTextContent('EASY');
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    await send({ ...easy, phase: 'ready', imageKey: roundId });
+    expect(ready).toHaveBeenCalledWith({ roundId, imageKey: roundId, decoded: true });
+    expect(selection()).toHaveAttribute('data-selection-phase', 'complete');
+    expect(view.container.querySelector('img[src^="blob:"]')).toBeNull();
+    await act(async () => { callbacks.unavailable(new Error('Connection lost'), false); callbacks.reset?.(); });
+    expect(selection()).toHaveAttribute('data-selection-phase', 'complete');
+    await send({ ...easy, phase: 'ready', imageKey: roundId });
+    expect(selection()).toHaveAttribute('data-intro', 'false');
+
+    await send(between);
+    const nextRoundId = randomUUID();
+    const hard = { ...round, roundId: nextRoundId, requestedTier: 'deathmatch' } as const;
+    await send({ ...hard, phase: 'preparing' });
+    expect(selection()).toHaveAttribute('data-selection-phase', 'shuffling');
+    await send({ ...hard, phase: 'ready', imageKey: nextRoundId });
+    act(() => vi.advanceTimersByTime(1670));
+    expect(selection()).toHaveAttribute('data-selection-phase', 'impact');
+    expect(selection().querySelector('[data-center="true"]')).toHaveTextContent('HARD');
+    expect(view.container.querySelector('img[src^="blob:"]')).toBeNull();
+    await send({ ...hard, phase: 'guessing', imageKey: nextRoundId, remainingMs: 30_000 });
+    expect(screen.queryByRole('region', { name: 'SELECTING MATCH...' })).not.toBeInTheDocument();
+    expect(screen.getByAltText('Current wrestling match clue')).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toHaveTextContent('00:30');
+    expect(gameApi.command).not.toHaveBeenCalled();
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
   it('decodes a prepared clue while keeping it out of the DOM and strips join secrets from the URL', async () => {
     const view = render(<ContestantDisplay sessionId={sessionId} />); await screen.findByRole('heading', { name: 'SELECTING MATCH...' });

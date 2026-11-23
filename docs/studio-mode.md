@@ -35,6 +35,8 @@ Before upgrading existing data, stop all writers/watchers and follow the [whole-
 4. Keep host controls on the laptop. Wait for the primary connection to decode and synchronize before **Reveal & start**. A connected secondary viewer does not satisfy the primary gate. Designate the correct primary between rounds or while paused; cancel an unexposed preparation first if necessary.
 5. Leave **Safe-area guides** off for clean filming. Choose/Selecting/guessing use the full landscape composition with a centered 1080×960 framing reference; this guide does not promise a vertical crop preserves the entire image or every card. Narrow screens adapt to a compact composition. Legacy pause/result/final screens retain the original 1080×960 stage. All stages scale uniformly, and the actual display contains the complete screenshot without stretching/cropping. See [contestant visual screens and filming limits](contestant-visuals.md).
 
+During Prepare, Selecting Match settles on the committed Easy, Medium or Hard card. For filming, the host can let the effect finish before choosing **Reveal & start**. Reveal is available as soon as the usual readiness checks pass. A viewer reload restores the settled card without replaying the shuffle.
+
 The public display shows only the current public phase and host-revealed results. It never contains host commands, private pre-reveal answers, capture source filenames or the QR credential panel. Preserve this separation when placing the windows.
 
 ## Filming text and layout
